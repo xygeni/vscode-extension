@@ -1,0 +1,140 @@
+import * as vscode from 'vscode';
+import { AbstractXygeniIssue } from '../service/abstract-issue';
+import { IncomingMessage, ClientRequest } from 'http';
+import { XygeniMedia } from './media';
+
+export interface XyContext {
+  readonly xyContext: { [key: string]: unknown };
+  getKey(key: string): unknown;
+  setKey(key: string, value: unknown): Promise<void>;
+}
+
+
+export interface GlobalContext {
+  updateGlobalStateValue(key: string, value: unknown): Thenable<void>;
+  getGlobalStateValue(key: string): unknown;
+  getExtensionPath(): string;
+}
+
+export interface ILogger {
+  log(message: string): void;
+  error(error: Error | unknown, message: string): void;
+  showOutput(): void;
+}
+
+export interface IOutputChannel {
+  appendLine(value: string): void;
+  append(value: string): void;
+  show(): void;
+  clear(): void;
+}
+
+export interface EventEmitter {
+  emitChange(): void;
+}
+
+export interface WorkspaceFiles {
+  storeFile(filename: string, content: string): Promise<void>;
+  readFile(filename: string): Promise<string>;
+  fileExists(filename: string): Promise<boolean>;
+  getWsLocalStorage(): string;
+}
+
+export interface Commands {
+  refreshScannerEventEmitter: vscode.Event<void>;
+  refreshConfigEventEmitter: vscode.Event<void>;
+  refreshIssuesEventEmitter: vscode.Event<void>;
+
+  refreshAllViews(): void;
+
+  editUrl(): Promise<void>;
+
+  editToken(): Promise<void>;
+
+  testConnection(): Promise<unknown>;
+
+  getScans(): ScanResult[];
+  getIssues(): AbstractXygeniIssue[];
+  getIssuesByCategory(category: string): AbstractXygeniIssue[];
+
+  getXygeniMedia(): XygeniMedia;
+
+  getXygeniCss(): string;
+}
+
+
+export interface ScanResult {
+  timestamp: Date;
+  status: 'completed' | 'running' | 'failed' | 'not-executed';
+  issuesFound: number | undefined;
+  summary: string;
+}
+
+/**
+ * Wrapper interface for HTTP/HTTPS client functionality
+ * This allows for easy mocking in tests
+ */
+export interface IHttpClient {
+  get(url: string, callback: (res: IncomingMessage) => void): ClientRequest;
+  post(url: string, data: any, callback: (res: IncomingMessage) => void): ClientRequest;
+  setAuthToken(token: string): IHttpClient;
+}
+
+export interface XygeniIssue {
+  id: string;
+  type: string;
+  detector: string;
+  tool: string;
+  kind: 'secret' | 'misconfiguration' | 'iac_flaw' | 'code_vulnerability' | 'sca_vulnerability';
+  severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
+  confidence: 'highest' | 'high' | 'medium' | 'low';
+  category: 'secrets' | 'misconf' | 'iac' | 'sast' | 'sca';
+  categoryName: 'Secret' | 'Misconfiguration' | 'IaC' | 'SAST' | 'Vulnerability';
+  file?: string;
+  line?: number;
+  code?: string;
+  tags?: string[];
+  description: string;
+}
+
+
+export interface IssueDoc {
+  linkDocumentation: string;
+  descriptionDoc: string;
+  detectorDoc: DetectorDoc;
+}
+
+export interface DetectorDoc {
+  id: string;
+  title: string;
+  severity: string;
+  vendor: string;
+  family: string;
+  resource: string;
+  language: string;
+  tags: string;
+  sections: Section[];
+}
+
+export interface Section {
+  name: string;
+  level: number;
+  paragraphs: Paragraph[]
+}
+
+export interface Paragraph {
+  kind: Kind;
+  text: string;
+}
+
+export enum Kind {
+  doc,
+  metadata,
+  section,
+  text,
+  code,
+  admonition,
+  ul,
+  ol
+}
+

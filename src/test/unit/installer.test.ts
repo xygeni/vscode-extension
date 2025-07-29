@@ -1,0 +1,351 @@
+import * as assert from 'assert';
+import * as sinon from 'sinon';
+import * as os from 'os';
+import { EventEmitter as VscodeEventEmitter } from 'events';
+import InstallerService from '../../xygeni/service/installer';
+import { ILogger, GlobalContext, EventEmitter, IHttpClient } from '../../xygeni/common/interfaces';
+import { Platform } from '../../xygeni/common/platform';
+import { HttpClientFactory } from '../../xygeni/common/https';
+
+// Mock vscode module
+class GlobalContextMock implements GlobalContext {
+
+
+    getExtensionPath(): string {
+        return '/path/to/extension';
+    }
+
+    updateGlobalStateValue(key: string, value: unknown): Thenable<void> {
+        return Promise.resolve();
+    }
+
+    getGlobalStateValue(key: string): unknown {
+        return undefined;
+    }
+}
+
+// Mock Logger class
+class LoggerMock implements ILogger {
+    public logs: string[] = [];
+
+    log(message: string): void {
+        console.log(message);
+        this.logs.push(message);
+    }
+
+    error(error: Error | unknown, message: string): void {
+        console.log(message);
+        this.logs.push(message);
+    }
+
+    showOutput(): void {
+        // Mock implementation
+    }
+
+    clear(): void {
+        this.logs = [];
+    }
+}
+
+class EventEmitterMock implements EventEmitter {
+    emitChange(): void {
+        // Mock implementation
+    }
+}
+
+// Mock child process
+class MockChildProcess extends VscodeEventEmitter {
+    public stdout = new VscodeEventEmitter();
+    public stderr = new VscodeEventEmitter();
+    public killed = false;
+
+    kill(signal?: string): boolean {
+        this.killed = true;
+        this.emit('close', 0);
+        return true;
+    }
+}
+
+// Mock HTTP response
+class MockResponse extends VscodeEventEmitter {
+    public statusCode: number;
+    public headers: { [key: string]: string } = {};
+
+    constructor(statusCode: number = 200) {
+        super();
+        this.statusCode = statusCode;
+    }
+
+    pipe(destination: any): any {
+        // Simulate successful pipe
+        setTimeout(() => {
+            destination.emit('finish');
+        }, 10);
+        return destination;
+    }
+}
+
+// Mock HTTP request
+class MockRequest extends VscodeEventEmitter {
+    private _destroyed = false;
+
+    setTimeout(timeout: number, callback: () => void): void {
+        // Don't actually set timeout in tests
+    }
+
+    destroy(): void {
+        this._destroyed = true;
+        this.emit('error', new Error('Request destroyed'));
+    }
+
+    get destroyed(): boolean {
+        return this._destroyed;
+    }
+}
+
+// Mock WriteStream
+class MockWriteStream extends VscodeEventEmitter {
+    public path: string;
+    public closed = false;
+
+    constructor(path: string) {
+        super();
+        this.path = path;
+    }
+
+    close(): void {
+        this.closed = true;
+        this.emit('close');
+    }
+}
+
+// Mock HTTP Client
+class MockHttpClient implements IHttpClient {
+    private mockResponse: MockResponse;
+    private mockRequest: MockRequest;
+    private shouldError: boolean;
+    private errorMessage: string;
+
+    constructor(response: MockResponse, request: MockRequest, shouldError = false, errorMessage = '') {
+        this.mockResponse = response;
+        this.mockRequest = request;
+        this.shouldError = shouldError;
+        this.errorMessage = errorMessage;
+    }
+
+    get(url: string, callback: (res: any) => void): any {
+        if (this.shouldError) {
+            setTimeout(() => this.mockRequest.emit('error', new Error(this.errorMessage)), 10);
+        } else {
+            setTimeout(() => callback(this.mockResponse), 10);
+        }
+        return this.mockRequest;
+    }
+
+    post(url: string, data: any, callback: (res: any) => void): any {
+        if (this.shouldError) {
+            setTimeout(() => this.mockRequest.emit('error', new Error(this.errorMessage)), 10);
+        } else {
+            setTimeout(() => callback(this.mockResponse), 10);
+        }
+        return this.mockRequest;
+    }
+
+    setAuthToken(token: string): IHttpClient {
+        return this;
+    }
+}
+
+suite('Installer Test Suite', () => {
+    let installer: InstallerService;
+    let loggerMock: LoggerMock;
+    let emitterMock: EventEmitterMock;
+    let globalContextMock: GlobalContextMock;
+    let sandbox: sinon.SinonSandbox;
+
+    setup(() => {
+        sandbox = sinon.createSandbox();
+
+        // Create a temporary directory ramdomly
+        const tempDir = os.tmpdir() + '/' + Math.floor(Math.random() * 1000);
+        console.log(`Created temp directory: ${tempDir}`);
+
+
+        // Mock the Logger import
+        loggerMock = new LoggerMock();
+        emitterMock = new EventEmitterMock();
+        globalContextMock = new GlobalContextMock();
+
+        installer = new InstallerService(tempDir, loggerMock, emitterMock);
+    });
+
+    teardown(() => {
+        sandbox.restore();
+        // Reset HTTP client factory to default state
+        HttpClientFactory.reset();
+
+    });
+
+    suite('install method', () => {
+
+        test('should handle invalid URL', async () => {
+            // Arrange
+            const invalidUrl = 'not-a-valid-url';
+
+            // Act & Assert
+            await assert.rejects(
+                installer.install(),
+                /Invalid script URL provided/
+            );
+
+            assert.ok(loggerMock.logs.some(log => log.includes('Installation failed')));
+        });
+
+        test('should handle HTTP 404 error', async () => {
+            // Arrange
+            const scriptUrl = 'https://example.com/nonexistent.sh';
+            const mockResponse = new MockResponse(404);
+            const mockRequest = new MockRequest();
+
+            // Mock HTTP client
+            const mockHttpClient = new MockHttpClient(mockResponse, mockRequest);
+            HttpClientFactory.setHttpClient(mockHttpClient);
+
+
+            // Act & Assert
+            await assert.rejects(
+                installer.install(),
+                /Failed to download script: HTTP 404/
+            );
+        });
+
+        test('should handle network error during download', async () => {
+            // Arrange
+            const scriptUrl = 'https://example.com/install.sh';
+            const mockRequest = new MockRequest();
+            const mockResponse = new MockResponse(401);
+
+            // Mock HTTP client
+            const mockHttpClient = new MockHttpClient(mockResponse, mockRequest);
+            HttpClientFactory.setHttpClient(mockHttpClient);
+
+
+            // Act & Assert
+            await assert.rejects(
+                installer.install(),
+                /Installation failed: Failed to download script: HTTP 401/
+            );
+        });
+
+        test('should handle script execution failure', async () => {
+            // Arrange
+            const scriptUrl = 'https://example.com/install.sh';
+            const mockResponse = new MockResponse(200);
+            const mockRequest = new MockRequest();
+            const mockChildProcess = new MockChildProcess();
+
+            sandbox.stub(Platform, 'get').returns('linux');
+
+            // Mock HTTP client
+            const mockHttpClient = new MockHttpClient(mockResponse, mockRequest);
+            HttpClientFactory.setHttpClient(mockHttpClient);
+
+
+            sandbox.stub(require('child_process'), 'spawn').returns(mockChildProcess);
+
+            // Act
+            const installPromise = installer.install();
+
+            // Simulate script execution failure
+            setTimeout(() => {
+                mockChildProcess.stderr.emit('data', Buffer.from('Script failed\n'));
+                mockChildProcess.emit('close', 1); // Non-zero exit code
+            }, 30);
+
+            // Assert
+            await assert.rejects(
+                installPromise,
+                /Script execution failed with exit code 1/
+            );
+        });
+
+        test('should handle HTTP redirects', async () => {
+            // Arrange
+            const scriptUrl = 'https://example.com/install.sh';
+            const redirectUrl = 'https://cdn.example.com/install.sh';
+            const mockRedirectResponse = new MockResponse(302);
+            mockRedirectResponse.headers.location = redirectUrl;
+
+            const mockFinalResponse = new MockResponse(200);
+            const mockRequest = new MockRequest();
+            const mockResponse = new MockResponse(200);
+            const mockChildProcess = new MockChildProcess();
+
+            sandbox.stub(Platform, 'get').returns('linux');
+
+
+            // Mock HTTP client
+            const mockHttpClient = new MockHttpClient(mockResponse, mockRequest);
+            HttpClientFactory.setHttpClient(mockHttpClient);
+
+            let callCount = 0;
+            sandbox.stub(mockHttpClient, 'get').callsFake((url: any, callback: any) => {
+                callCount++;
+                if (callCount === 1) {
+                    setTimeout(() => callback(mockRedirectResponse), 10);
+                } else {
+                    setTimeout(() => callback(mockFinalResponse), 10);
+                }
+                return mockRequest as any;
+            });
+
+            sandbox.stub(require('child_process'), 'spawn').returns(mockChildProcess);
+
+            // Act
+            const installPromise = installer.install();
+
+            // Simulate successful script execution
+            setTimeout(() => {
+                mockChildProcess.emit('close', 0);
+            }, 40);
+
+            // Assert
+            await installPromise;
+
+            assert.strictEqual(callCount, 2);
+        });
+
+        test('should handle Windows platform correctly', async () => {
+            // Arrange
+            const scriptUrl = 'https://example.com/install.bat';
+            const mockResponse = new MockResponse(200);
+            const mockRequest = new MockRequest();
+            const mockChildProcess = new MockChildProcess();
+
+            sandbox.stub(Platform, 'get').returns('win32');
+
+            // Mock HTTP client
+            const mockHttpClient = new MockHttpClient(mockResponse, mockRequest);
+            HttpClientFactory.setHttpClient(mockHttpClient);
+
+            const spawnStub = sandbox.stub(require('child_process'), 'spawn').returns(mockChildProcess);
+
+            // Act
+            const installPromise = installer.install();
+
+            // Simulate successful script execution
+            setTimeout(() => {
+                mockChildProcess.emit('close', 0);
+            }, 30);
+
+            await installPromise;
+
+            // Assert - should use cmd on Windows
+            assert.ok(spawnStub.calledWith('cmd'));
+        });
+
+
+    });
+
+
+});
