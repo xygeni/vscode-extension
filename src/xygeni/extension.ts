@@ -102,8 +102,8 @@ class XygeniExtension {
         commands.editToken();
       }),
 
-      vscode.commands.registerCommand(COMMAND_TEST_XYGENI_CONNECTION, async () => {
-        await commands.testConnection();
+      vscode.commands.registerCommand(COMMAND_TEST_XYGENI_CONNECTION, async (override?: boolean) => {
+        await commands.testConnection(override);
       }),
 
       // scanner commands
@@ -143,8 +143,9 @@ class XygeniExtension {
 
       if (xygeniUrl && xygeniToken) {
         commands.showConfigView();
-        await commands.testConnection();
-        commands.readIssues();
+        commands.testConnection().then(() => {
+          commands.readIssues();
+        });
       } else {
         commands.showWelcomeView();
       }
@@ -179,7 +180,7 @@ class XygeniExtension {
     InstallerService.getInstance(context.extensionPath, Logger, installerEmitter);
 
     // init scanner and subscribe to changes
-    XygeniScannerService.getInstance(commands).onDidChange(() => {
+    XygeniScannerService.getInstance(commands, Logger).onDidChange(() => {
       commands.readIssues();
       commands.refreshAllViews();
     });

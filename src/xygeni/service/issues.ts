@@ -5,6 +5,9 @@ import { IacXygeniIssue } from './iac-issue';
 import { MisconfXygeniIssue } from './misconf-issue';
 import { SecretsXygeniIssue } from './secrets-issue';
 import { AbstractXygeniIssue } from './abstract-issue';
+import { DepsXygeniIssue } from './vuln-issue';
+import { getHttpClient } from '../common/https';
+import { ConfigManager } from '../config/xygeni-configuration';
 
 export default class IssuesService {
 
@@ -39,7 +42,8 @@ export default class IssuesService {
   private constructor(
     private readonly logger: ILogger,
     private readonly emitter: EventEmitter,
-    private readonly fs: WorkspaceFiles) { }
+    private readonly fs: WorkspaceFiles) {
+  }
 
   private issues: AbstractXygeniIssue[] = [];
   private isReadingIssues = false;
@@ -86,6 +90,13 @@ export default class IssuesService {
 
       await this.readIacReport(`iac.${suffix}`);
 
+      await this.readDepsReport(`deps.${suffix}`);
+
+      // sort issues by severity
+      this.issues.sort((a, b) => {
+        return a.getSeverityLevel() - b.getSeverityLevel();
+      });
+
       this.emitter.emitChange(); // update diagnostics
     } catch (error) {
       this.logger.error(error, 'Error reading scanner output:');
@@ -97,7 +108,7 @@ export default class IssuesService {
 
   public async readMisconfReport(filename: string): Promise<void> {
     if (!(await this.fs.fileExists(filename))) {
-      this.logger.log(`Misconf report file ${filename} does not exist, skipping...`);
+      //this.logger.log(`Misconf report file ${filename} does not exist, skipping...`);
       return;
     }
 
@@ -114,7 +125,7 @@ export default class IssuesService {
 
   public async readSastReport(filename: string): Promise<void> {
     if (!(await this.fs.fileExists(filename))) {
-      this.logger.log(`SAST report file ${filename} does not exist, skipping...`);
+      //this.logger.log(`SAST report file ${filename} does not exist, skipping...`);
       return;
     }
 
@@ -130,7 +141,7 @@ export default class IssuesService {
 
   public async readIacReport(filename: string): Promise<void> {
     if (!(await this.fs.fileExists(filename))) {
-      this.logger.log(`IAC report file ${filename} does not exist, skipping...`);
+      //this.logger.log(`IAC report file ${filename} does not exist, skipping...`);
       return;
     }
 
@@ -144,9 +155,25 @@ export default class IssuesService {
     }
   }
 
+  public async readDepsReport(filename: string): Promise<void> {
+    if (!(await this.fs.fileExists(filename))) {
+      // this.logger.log(`Deps report file ${filename} does not exist, skipping...`);
+      return;
+    }
+
+    try {
+      const data = await this.fs.readFile(filename);
+      const rawData = JSON.parse(data);
+      this.processDepsReport(rawData);
+    } catch (error) {
+      this.logger.error(error, 'Error reading deps output:');
+      throw error;
+    }
+  }
+
   public async readSecretsReport(filename: string): Promise<void> {
     if (!(await this.fs.fileExists(filename))) {
-      this.logger.log(`Secrets report file ${filename} does not exist, skipping...`);
+      //this.logger.log(`Secrets report file ${filename} does not exist, skipping...`);
       return;
     }
 
@@ -160,7 +187,53 @@ export default class IssuesService {
     }
   }
 
+  processDepsReport(jsonRaw: any): void {
+    const dependencies = Array.isArray(jsonRaw.dependencies) ? jsonRaw.dependencies : [jsonRaw.dependencies];
+    const tool = jsonRaw.metadata.reportProperties['tool.name'];
 
+    const dependenciesByGavt = new Map<string, any>();
+
+    dependencies.forEach((dep: any) => {
+      const gavt = `${dep.group}:${dep.name}:${dep.version}:${dep.language}`;
+      dependenciesByGavt.set(gavt, dep);
+    });
+
+    const vulns = this.getVulnerabilities(dependenciesByGavt, (dep, vuln) => {
+
+      // for each vulnerability, create an issue
+
+      const issue = new DepsXygeniIssue({
+        id: dep.hash,
+        type: vuln.cve,
+        virtual: dep.virtual,
+        detector: vuln.cve,
+        tool: tool,
+        kind: 'sca_vulnerability',
+        repositoryType: dep.repositoryType,
+        displayFileName: dep.displayFileName,
+        group: dep.group,
+        name: dep.name,
+        version: dep.version,
+        dependencyPaths: dep.paths.dependencyPaths,
+        directDependency: dep.paths.directDependencyPaths,
+        severity: vuln.severity,
+        confidence: dep.confidence ? dep.confidence as 'highest' | 'high' | 'medium' | 'low' : 'high',
+        category: 'sca',
+        categoryName: 'Vulnerability',
+        file: dep.location ? dep.location.filepath ? dep.location.filepath : '' : dep.filename ? dep.filename : dep.displayFileName,
+        line: dep.location ? dep.location.beginLine ? dep.location.beginLine : 0 : 0,
+        description: vuln.description ? vuln.description : 'Vulnerability ' + vuln.cve,
+        tags: dep.tags?.length > 0 ? dep.tags : undefined,
+      });
+      this.issues.push(issue);
+    });
+
+    dependencies.forEach((dep: any) => {
+
+
+
+    });
+  }
 
 
   processSecretsReport(jsonRaw: any): void {
@@ -198,7 +271,7 @@ export default class IssuesService {
     sast_vuln.forEach((raw_vuln: any) => {
       const issue = new SastXygeniIssue({
         id: raw_vuln.hash,
-        type: raw_vuln.type,
+        type: raw_vuln.kind,
         detector: raw_vuln.detector,
         tool: tool,
         kind: 'code_vulnerability',
@@ -272,6 +345,88 @@ export default class IssuesService {
     });
 
   }
+
+
+  readVulnerabilities(rawData: string, deps: Map<string, any>, addVulnerability: (dep: any, vulnerability: any) => void) {
+    if (!rawData) {
+      return [];
+    }
+    const parsedData = JSON.parse(rawData);
+
+    //this.logger.log('Vulnerabilities parsed: ' + JSON.stringify(parsedData));
+    if (!parsedData.componentsByGavt) {
+      return [];
+    }
+    const componentsByGavt = parsedData.componentsByGavt;
+
+    for (const gavt in componentsByGavt) {
+      if (Object.prototype.hasOwnProperty.call(componentsByGavt, gavt)) {
+        const vulns = componentsByGavt[gavt];
+        const dependency = deps.get(gavt);
+        for (const rawVuln of vulns) {
+
+          const parts = gavt.split(':');
+          const vulrawVuln = {
+            group: parts[0],
+            name: parts[1],
+            version: parts[2],
+            language: parts[3]
+          };
+
+          const vuln = {
+            cve: rawVuln.cveidentification,
+            severity: rawVuln.xigeniSeverity ? rawVuln.xigeniSeverity : 'info',
+            description: rawVuln.description
+          };
+          addVulnerability(dependency, vuln);
+        }
+      }
+    }
+  }
+
+  getVulnerabilities(deps: Map<string, any>, addVulnerability: (dep: any, vulnerability: any) => void): void {
+
+    const xygeniUrl = ConfigManager.getXygeniUrl();
+    if (!xygeniUrl) {
+      this.logger.log('Xygeni url not found, skipping vuln retrieve...');
+      return;
+    }
+
+    // retrieve detector doc
+    const url = new URL(`${xygeniUrl}/internal/component/newVulnerabilitiesByComponent`);
+
+    const requestData = {
+      gavtComponents: [
+        {
+          "group": "phpmailer",
+          "name": "phpmailer",
+          "version": "5.2.28",
+          "technology": "php"
+        }
+      ]
+    };
+
+    const client = getHttpClient(url.toString());
+    //this.logger.log('Retrieving vulnerabilities...' + JSON.stringify(requestData));
+    const req = client.post(url.toString(), JSON.stringify(requestData), (res) => {
+      let rawData = '';
+      res.on('data', (chunk) => {
+        rawData += chunk;
+
+      });
+      res.on('end', () => {
+        try {
+          this.readVulnerabilities(rawData, deps, addVulnerability);
+        } catch (e) {
+          this.logger.error(e, 'Error parsing vulnerabilities');
+        }
+
+      });
+    }).on('error', (err) => {
+      this.logger.error(err, 'Error retrieving vulnerabilities');
+    });
+  }
+
 }
 
 export type XygeniIssueType = SastXygeniIssue | IacXygeniIssue | MisconfXygeniIssue | SecretsXygeniIssue;

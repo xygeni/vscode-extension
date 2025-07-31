@@ -168,4 +168,20 @@ export abstract class AbstractXygeniIssue implements XygeniIssue {
       </html>
     `;
   }
+
+  public getSeverityLevel(): number {
+    switch (this.severity) {
+      case 'critical':
+        return 0;
+      case 'high':
+        return 1;
+      case 'medium':
+        return 2;
+      case 'low':
+        return 3;
+      case 'info':
+        return 4;
+    }
+  }
+
 }

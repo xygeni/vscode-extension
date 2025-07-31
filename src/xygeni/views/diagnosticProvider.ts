@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import { XygeniIssue } from '../common/interfaces';
-import { Logger } from '../common/logger';
 
 export class DiagnosticProvider {
     private diagnosticCollection: vscode.DiagnosticCollection;
@@ -142,8 +141,7 @@ export class DiagnosticProvider {
      */
     private updateDiagnosticsForDocument(document: vscode.TextDocument): void {
         // This method can be used to update diagnostics when a document changes
-        // For now, we'll keep the existing diagnostics as they are based on static analysis
-        // In a real implementation, you might want to re-analyze the document
+        // TODO: Implement this when incremental scans are implemented
     }
 
     /**

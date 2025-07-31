@@ -60,12 +60,14 @@ export interface Commands {
   getXygeniMedia(): XygeniMedia;
 
   getXygeniCss(): string;
+
+  getIconPath(iconname: string): string | vscode.IconPath;
 }
 
 
 export interface ScanResult {
   timestamp: Date;
-  status: 'completed' | 'running' | 'failed' | 'not-executed';
+  status: 'completed' | 'running' | 'failed' | '';
   issuesFound: number | undefined;
   summary: string;
 }

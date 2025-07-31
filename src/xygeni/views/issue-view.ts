@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { Commands } from '../common/interfaces';
 import { XygeniIssue } from '../common/interfaces';
+import { Logger } from '../common/logger';
 
 
 export abstract class IssueView implements vscode.TreeDataProvider<XygeniTreeItem> {
@@ -26,7 +27,10 @@ export abstract class IssueView implements vscode.TreeDataProvider<XygeniTreeIte
             // Return issues for this category
             const allIssues = this.getIssues();
             const categoryIssues = allIssues.filter(issue => issue.category === element.category);
-            return categoryIssues.map(issue => new XygeniIssueItem(issue, vscode.TreeItemCollapsibleState.None));
+
+            const map = categoryIssues.map(issue => new XygeniIssueItem(issue, vscode.TreeItemCollapsibleState.None, this.commands));
+
+            return map;
         }
         return [];
     }
@@ -37,7 +41,7 @@ export abstract class IssueView implements vscode.TreeDataProvider<XygeniTreeIte
 
         return categories.map(category => {
             const categoryIssues = allIssues.filter(issue => issue.category === category);
-            return new XygeniCategoryItem(category, categoryIssues.length);
+            return new XygeniCategoryItem(category, categoryIssues.length, this.commands);
         });
     }
 
@@ -51,7 +55,8 @@ export abstract class IssueView implements vscode.TreeDataProvider<XygeniTreeIte
 export class XygeniIssueItem extends vscode.TreeItem {
     constructor(
         public readonly issue: XygeniIssue,
-        public readonly collapsibleState: vscode.TreeItemCollapsibleState
+        public readonly collapsibleState: vscode.TreeItemCollapsibleState,
+        private commands: Commands
     ) {
         super(issue.type, collapsibleState);
 
@@ -61,19 +66,19 @@ export class XygeniIssueItem extends vscode.TreeItem {
         // Set icon based on severity
         switch (issue.severity) {
             case 'critical':
-                this.iconPath = new vscode.ThemeIcon('error', new vscode.ThemeColor('#ff0000'));
+                this.iconPath = this.commands.getIconPath("critical.png");
                 break;
             case 'high':
-                this.iconPath = new vscode.ThemeIcon('error', new vscode.ThemeColor('#ff8800'));
+                this.iconPath = this.commands.getIconPath("high.png");
                 break;
             case 'medium':
-                this.iconPath = new vscode.ThemeIcon('warning', new vscode.ThemeColor('warningForeground'));
+                this.iconPath = this.commands.getIconPath("low.png");
                 break;
             case 'low':
-                this.iconPath = new vscode.ThemeIcon('info', new vscode.ThemeColor('foreground'));
+                this.iconPath = this.commands.getIconPath("low.png");
                 break;
             case 'info':
-                this.iconPath = new vscode.ThemeIcon('info', new vscode.ThemeColor('foreground'));
+                this.iconPath = this.commands.getIconPath("info.png");
                 break;
         }
 
@@ -91,7 +96,8 @@ export type XygeniTreeItem = XygeniCategoryItem | XygeniIssueItem;
 export class XygeniCategoryItem extends vscode.TreeItem {
     constructor(
         public readonly category: 'secrets' | 'misconf' | 'iac' | 'sast' | 'sca',
-        public readonly issueCount: number
+        public readonly issueCount: number,
+        private commands: Commands
     ) {
         const categoryNames = {
             'secrets': 'Secrets',
@@ -108,21 +114,17 @@ export class XygeniCategoryItem extends vscode.TreeItem {
 
         // Set icon based on category
         const categoryIcons = {
-            'secrets': 'key',
-            'misconf': 'gear',
-            'iac': 'server',
-            'sast': 'bug',
-            'sca': 'bug'
+            'secrets': 'secrets.svg',
+            'misconf': 'misconf.svg',
+            'iac': 'iacNew.svg',
+            'sast': 'code-sec-new.svg',
+            'sca': 'open-source.svg'
         };
 
         this.iconPath = new vscode.ThemeIcon(categoryIcons[category]);
 
         // Color the count based on whether there are issues
-        if (issueCount > 0) {
-            this.iconPath = new vscode.ThemeIcon(categoryIcons[category], new vscode.ThemeColor('errorForeground'));
-        } else {
-            this.iconPath = new vscode.ThemeIcon(categoryIcons[category], new vscode.ThemeColor('foreground'));
-        }
+        this.iconPath = this.commands.getIconPath(categoryIcons[category]);
     }
 }
 

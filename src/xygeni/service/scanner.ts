@@ -1,7 +1,7 @@
 import { spawn } from 'child_process';
 import EventEmitter from '../common/event-emitter';
-import { IOutputChannel, ScanResult, WorkspaceFiles, XyContext } from "../common/interfaces";
-import { Logger, OutputChannelWrapper } from '../common/logger';
+import { ILogger, IOutputChannel, ScanResult, WorkspaceFiles, XyContext } from "../common/interfaces";
+import { OutputChannelWrapper } from '../common/logger';
 import GlobalContext from './global-context';
 import { Platform } from '../common/platform';
 import path from 'path';
@@ -16,7 +16,7 @@ class XygeniScannerService extends EventEmitter {
 
     private static instance: XygeniScannerService;
 
-    readonly timeout = 300000; // 5 minutes
+    readonly timeout = 1800000; // 30 minutes
 
     readonly output_suffix = '/scanner.report.json';
 
@@ -28,17 +28,20 @@ class XygeniScannerService extends EventEmitter {
     private scans: ScanResult[] = [];
 
 
-    public static getInstance(fs?: WorkspaceFiles): XygeniScannerService {
+    public static getInstance(fs?: WorkspaceFiles, logger?: ILogger): XygeniScannerService {
         if (!XygeniScannerService.instance) {
             if (fs === undefined) {
                 throw new Error('Workspace files are required');
             }
-            XygeniScannerService.instance = new XygeniScannerService(fs);
+            if (logger === undefined) {
+                throw new Error('Logger are required');
+            }
+            XygeniScannerService.instance = new XygeniScannerService(fs, logger);
         }
         return XygeniScannerService.instance;
     }
 
-    private constructor(private readonly fs: WorkspaceFiles) {
+    private constructor(private readonly fs: WorkspaceFiles, private logger: ILogger) {
         super();
     }
 
@@ -53,14 +56,27 @@ class XygeniScannerService extends EventEmitter {
 
         const timestamp = new Date();
 
-        this.scans = [{ timestamp: timestamp, status: 'running', issuesFound: undefined, summary: '' }];
+        // show only last 5 scans
+        if (this.scans.length > 5) {
+            this.scans.shift(); // remove the oldest scan
+        }
+
+        const workingDir = this.fs.getWsLocalStorage();
+        this.logger.log(`Running scanner on folder: ${sourceFolder}. Output path: ${workingDir}`);
+
+        this.scans.push({ timestamp: timestamp, status: 'running', issuesFound: undefined, summary: '' });
         this.emitChange();
 
-        return this.runAnalysis(sourceFolder, xygeniScannerPath, output).then(() => {
+        this.logger.log('');
+        this.logger.log('================================');
+        this.logger.log('  Running scanner');
 
-            Logger.log('  Scanner finished');
+        return this.runAnalysis(sourceFolder, xygeniScannerPath, workingDir, output).then(() => {
+
+            this.logger.log('  Scanner finished');
             this.scans.pop();
-            this.scans.push({ timestamp: timestamp, status: 'completed', issuesFound: undefined, summary: '' });
+            const totalTimeInSeconds = (new Date().getTime() - timestamp.getTime()) / 1000;
+            this.scans.push({ timestamp: timestamp, status: 'completed', issuesFound: undefined, summary: 'Duration: ' + totalTimeInSeconds + 's' });
 
             this.scannerRunning = false;
             this.exitCode = 0;
@@ -69,7 +85,7 @@ class XygeniScannerService extends EventEmitter {
 
             return;
         }).catch((error) => {
-            Logger.error('Error running scanner', error);
+            this.logger.error('Error running scanner', error);
             this.scannerRunning = false;
             this.exitCode = 1;
             this.scans.pop();
@@ -93,7 +109,7 @@ class XygeniScannerService extends EventEmitter {
     }
 
 
-    private runAnalysis(sourceFolder: string, xygeniInstallPath: string, output: OutputChannelWrapper): Promise<void> {
+    private runAnalysis(sourceFolder: string, xygeniInstallPath: string, workingDir: string, output: OutputChannelWrapper): Promise<void> {
         return new Promise((resolve, reject) => {
 
             if (!xygeniInstallPath) {
@@ -105,9 +121,9 @@ class XygeniScannerService extends EventEmitter {
             const reportOutputPath = XYGENI_SCANNER_REPORT_SUFFIX;
 
 
-            const args = ['scan', '--run=secrets,misconf,iac,suspectdeps,sast', '-f', 'json', '-o', reportOutputPath, '-d', sourceFolder, '--no-upload'];
+            const args = ['scan', '--run=deps,secrets,misconf,iac,suspectdeps,sast', '-f', 'json', '-o', reportOutputPath, '-d', sourceFolder, '--no-upload'];
 
-            Logger.log('  Running scanner command ' + scannerScriptPath + ' ' + args.join(' '));
+            this.logger.log('  Running scanner command ' + scannerScriptPath + ' ' + args.join(' '));
 
             const proxySettings = ProxyConfigManager.getProxySettings();
             const env: NodeJS.ProcessEnv = {
@@ -140,7 +156,7 @@ class XygeniScannerService extends EventEmitter {
             const scannerProcess = spawn(scannerScriptPath, args, {
                 stdio: ['pipe', 'pipe', 'pipe'],
                 shell: false,
-                cwd: this.fs.getWsLocalStorage(),
+                cwd: workingDir,
                 env: env
             });
 
@@ -167,6 +183,7 @@ class XygeniScannerService extends EventEmitter {
 
             const timeout = setTimeout(() => {
                 scannerProcess.kill('SIGTERM');
+                this.logger.log('  Scanner process stopped due to timeout.');
                 reject(new Error('Scanner process timeout'));
             }, this.timeout);
         });

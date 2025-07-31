@@ -104,7 +104,7 @@ export class CommandsImpl implements Commands, WorkspaceFiles {
    * Check connection to Xygeni
    * @returns 
    */
-  public async testConnection(): Promise<unknown> {
+  public async testConnection(override?: boolean): Promise<unknown> {
 
     const xygeniUrl = ConfigManager.getXygeniUrl();
     const xygeniToken = await ConfigManager.getXygeniToken(this.context);
@@ -117,8 +117,6 @@ export class CommandsImpl implements Commands, WorkspaceFiles {
     try {
       // Validate URL format
       new URL(xygeniUrl);
-
-
 
       this.connecting();
       if (!await InstallerService.isValidApiUrl(xygeniUrl)) {
@@ -134,7 +132,7 @@ export class CommandsImpl implements Commands, WorkspaceFiles {
       this.connectionReady();
 
       // if connection is ready, auto run installer
-      return this.installScanner().then(() => {
+      return this.installScanner(override).then(() => {
         return Promise.resolve();
       });
 
@@ -185,7 +183,7 @@ export class CommandsImpl implements Commands, WorkspaceFiles {
    * Run Installer of Xygeni Scanner 
    * @returns 
    */
-  public async installScanner(): Promise<unknown> {
+  public async installScanner(override?: boolean): Promise<unknown> {
 
     const installer = InstallerService.getInstance();
     if (installer.installationRunning) {
@@ -201,7 +199,7 @@ export class CommandsImpl implements Commands, WorkspaceFiles {
     return ConfigManager.getXygeniToken(this.context).then(xygeniToken => {
 
       this.installing();
-      installer.install(xygeniUrl, xygeniToken).then(() => {
+      installer.install(xygeniUrl, xygeniToken, override).then(() => {
         setTimeout(() => {
           this.installerOk();
         }, 500); // allow user see transition
@@ -482,6 +480,10 @@ export class CommandsImpl implements Commands, WorkspaceFiles {
 
   getXygeniCss(): string {
     return this.xygeniMedia.getXygeniCss();
+  }
+
+  getIconPath(iconname: string): string | vscode.IconPath {
+    return this.xygeniMedia.getIconPath(iconname);
   }
 
 }

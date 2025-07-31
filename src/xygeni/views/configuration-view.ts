@@ -71,7 +71,7 @@ export default class ConfigurationView implements vscode.TreeDataProvider<Config
                     {
                         command: COMMAND_TEST_XYGENI_CONNECTION,
                         title: 'Check Connect Status',
-                        arguments: []
+                        arguments: [true]
                     },
                 )
             ];

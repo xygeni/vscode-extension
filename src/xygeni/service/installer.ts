@@ -54,7 +54,7 @@ export default class InstallerService {
         return this.extensionPath + '/.xygeni';
     }
 
-    async install(apiUrl?: string, token?: string): Promise<void> {
+    async install(apiUrl?: string, token?: string, override?: boolean): Promise<void> {
 
         this.status = 'running';
         this.installationRunning = true;
@@ -69,15 +69,14 @@ export default class InstallerService {
 
             const scannerInstallUrl = `${this.xygeniGetScannerUrl}${this.getInstallName()}`;
 
-            // Validate URL
             if (!this.isValidUrl(scannerInstallUrl)) {
                 throw new Error('Invalid script URL provided');
             }
 
+            this.logger.log(`  Downloading install script to: ${this.tempDir}`);
+
             // Download the install script
             const scriptPath = await this.downloadScript(scannerInstallUrl, this.getInstallName());
-
-            //this.logger.log(`  Script downloaded to: ${scriptPath}`);
 
             // Make script executable (Unix-like systems)
             if (Platform.get() !== 'win32') {
@@ -87,11 +86,11 @@ export default class InstallerService {
             const installPath = this.getScannerInstallationDir();
 
             const args: string[] = [];
-            // set token
+
             if (token) {
                 args.push(`-t '${token}'`);
             }
-            // set api url
+
             if (apiUrl) {
                 args.push(`-s '${apiUrl}'`);
             }
@@ -99,11 +98,13 @@ export default class InstallerService {
             args.push(`-d '${installPath}'`);
 
             // override installation
-            args.push('-o');
+            if (override) {
+                args.push('-o');
+            }
 
-            this.logger.log("  Executing install script from " + scriptPath);
+            this.logger.log(`  Executing install script (${scriptPath}) on ${installPath}`);
+
             // Execute the script
-            //this.logger.log('  Executing install script...');
             return this.executeScript(scriptPath, args).then(() => {
 
 

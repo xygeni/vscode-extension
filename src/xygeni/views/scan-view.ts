@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
 import { Commands, ScanResult } from '../common/interfaces';
+import { COMMAND_RUN_SCANNER } from '../common/constants';
 
 
-export class ScanView implements vscode.TreeDataProvider<ScanResultItem> {
+export class ScanView implements vscode.TreeDataProvider<ScanItem> {
     public static readonly viewType = 'xygeni.views.scan';
 
     private _onDidChangeTreeData: vscode.EventEmitter<ScanResultItem | undefined> = new vscode.EventEmitter<ScanResultItem | undefined>();
@@ -15,25 +16,30 @@ export class ScanView implements vscode.TreeDataProvider<ScanResultItem> {
         this.commands.refreshScannerEventEmitter(() => this._onDidChangeTreeData.fire(undefined));
     }
 
-    getTreeItem(element: ScanResultItem): vscode.TreeItem | Thenable<vscode.TreeItem> {
+    getTreeItem(element: ScanItem): vscode.TreeItem | Thenable<vscode.TreeItem> {
         return element;
     }
-    getChildren(element?: any): vscode.ProviderResult<ScanResultItem[]> {
+    getChildren(element?: any): vscode.ProviderResult<ScanItem[]> {
         if (!element) {
             const results = this.commands.getScans();
             if (results.length > 0) {
-                return results.map(result => new ScanResultItem(result, vscode.TreeItemCollapsibleState.None));
+                const resultReversed = [];
+                for (let i = results.length - 1; i >= 0; i--) {
+                    resultReversed.push(results[i]);
+                }
+                return resultReversed.map(result => new ScanResultItem(result, vscode.TreeItemCollapsibleState.None));
             }
             else {
                 return [
-                    new ScanResultItem(
+                    new CommandItem(
+                        'Run Scan',
+                        vscode.TreeItemCollapsibleState.None,
                         {
-                            timestamp: new Date(),
-                            status: 'not-executed',
-                            issuesFound: 0,
-                            summary: 'Click play to run an scan'
+                            command: COMMAND_RUN_SCANNER,
+                            title: 'Run Scan',
+                            arguments: []
                         },
-                        vscode.TreeItemCollapsibleState.None
+                        new vscode.ThemeIcon('play')
                     )
                 ];
             }
@@ -43,14 +49,21 @@ export class ScanView implements vscode.TreeDataProvider<ScanResultItem> {
 
 }
 
-export class ScanResultItem extends vscode.TreeItem {
+
+export class ScanItem extends vscode.TreeItem {
+}
+
+export class ScanResultItem extends ScanItem {
+
+
     constructor(
         public readonly result: ScanResult,
         public readonly collapsibleState: vscode.TreeItemCollapsibleState
     ) {
         super(`Scan ${result.timestamp.toLocaleString()}`, collapsibleState);
 
-        this.tooltip = result.summary;
+        this.tooltip = result.status + ' - ' + result.summary;
+        this.description = result.summary;
         this.description = `${result.status}`;
         if (result.issuesFound !== undefined) { this.description += ` - ${result.issuesFound + ' issues'}`; }
 
@@ -67,4 +80,23 @@ export class ScanResultItem extends vscode.TreeItem {
                 break;
         }
     }
+}
+
+
+export class CommandItem extends ScanItem {
+    constructor(
+        text: string,
+        public readonly collapsibleState: vscode.TreeItemCollapsibleState,
+        command?: vscode.Command,
+        iconPath?: vscode.ThemeIcon
+    ) {
+        super(text, collapsibleState);
+
+        this.tooltip = text;
+        this.command = command;
+        this.iconPath = iconPath;
+    }
+
+
+
 }

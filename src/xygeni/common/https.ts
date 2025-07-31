@@ -1,13 +1,10 @@
 import * as https from 'https';
 import * as http from 'http';
 import { IncomingMessage, ClientRequest } from 'http';
-import { } from 'https';
 import { Logger } from './logger';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import { ProxyConfigManager } from '../config/proxy-configuration';
 import { IHttpClient } from './interfaces';
-
-
 
 /**
  * HTTPS client wrapper
@@ -19,6 +16,7 @@ class HttpsClient implements IHttpClient {
     setAuthToken(token: string): IHttpClient {
         const value = `Bearer ${token}`;
         this.headers['Authorization'] = value;
+        this.headers['Content-Type'] = 'application/json';
         return this;
     }
 
@@ -40,8 +38,10 @@ class HttpsClient implements IHttpClient {
             rejectUnauthorized: true,
             agent: this.getAgent()
         };
-        options.agent = new HttpsProxyAgent(ProxyConfigManager.buildProxyUrlWithAuthentication());
-        return https.get(url, options, callback);
+        const req = http.request(url, options, callback);
+        req.write(data);
+        req.end();
+        return req;
     }
 
     getAgent(): HttpsProxyAgent<string> | undefined {
@@ -62,6 +62,7 @@ class HttpClient implements IHttpClient {
     setAuthToken(token: string): IHttpClient {
         const value = `Bearer ${token}`;
         this.headers['Authorization'] = value;
+        this.headers['Content-Type'] = 'application/json';
         return this;
     }
 
@@ -82,7 +83,10 @@ class HttpClient implements IHttpClient {
             timeout: 60000,
             agent: this.getAgent()
         };
-        return http.get(url, options, callback);
+        const req = http.request(url, options, callback);
+        req.write(data);
+        req.end();
+        return req;
     }
 
     getAgent(): HttpsProxyAgent<string> | undefined {
