@@ -101,6 +101,10 @@ export class CommandsImpl implements Commands, WorkspaceFiles {
     }
   }
 
+  getToken(): Promise<string | undefined> {
+    return ConfigManager.getXygeniToken(this.context);
+  }
+
 
   /**
    * Check connection to Xygeni
@@ -167,6 +171,9 @@ export class CommandsImpl implements Commands, WorkspaceFiles {
     issue.showIssueDetails(this);
   }
 
+  public getDetectorDoc(url: URL, token: string): Promise<string> {
+    return IssuesService.getInstance().getDetectorDoc(url, token);
+  }
 
   // ============================================================================
   // Scanner Command handlers

@@ -48,14 +48,15 @@ export interface Commands {
   refreshAllViews(): void;
 
   editUrl(): Promise<void>;
-
   editToken(): Promise<void>;
+  getToken(): Promise<string | undefined>
 
   testConnection(): Promise<unknown>;
 
   getScans(): ScanResult[];
   getIssues(): AbstractXygeniIssue[];
   getIssuesByCategory(category: string): AbstractXygeniIssue[];
+  getDetectorDoc(url: URL, token: string): Promise<string>
 
   getXygeniMedia(): XygeniMedia;
 

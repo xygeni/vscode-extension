@@ -30,6 +30,7 @@ export const COMMAND_INSTALL_SCANNER = 'xygeni.scan.install';
 export const COMMAND_RUN_SCANNER = 'xygeni.scan.run';
 
 export const COMMAND_SHOW_OUTPUT = 'xygeni.showOutput';
+export const COMMAND_SHOW_SCAN_OUTPUT = 'xygeni.showScanOutput';
 
 export const COMMAND_OPEN_PROXY_CONFIG = 'xygeni.openProxyConfig';
 

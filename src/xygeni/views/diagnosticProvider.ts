@@ -17,12 +17,7 @@ export class DiagnosticProvider {
             })
         );
 
-        // Listen for document close to clear diagnostics
-        this.disposables.push(
-            vscode.workspace.onDidCloseTextDocument(document => {
-                this.diagnosticCollection.delete(document.uri);
-            })
-        );
+
     }
 
     /**
@@ -45,10 +40,21 @@ export class DiagnosticProvider {
             }
         }
 
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+
+
         // Create diagnostics for each file
         issuesByFile.forEach((fileIssues, filePath) => {
-            this.setDiagnosticsForFile(filePath, fileIssues);
+            // check file exists
+            const fileUri = workspaceFolder
+                ? vscode.Uri.joinPath(workspaceFolder.uri, filePath)
+                : vscode.Uri.file(filePath);
+            vscode.workspace.fs.stat(fileUri).then(() => {
+                this.setDiagnosticsForFile(filePath, fileIssues);
+            });
         });
+
+
     }
 
     /**
@@ -161,6 +167,7 @@ export class DiagnosticProvider {
         }
         return filePath.replace(/\\/g, '/');
     }
+
 
     /**
      * Add a single issue as a diagnostic

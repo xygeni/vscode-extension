@@ -90,6 +90,17 @@ export default class ConfigurationView implements vscode.TreeDataProvider<Config
                             title: 'Install Scan',
                             arguments: []
                         }
+                    ),
+                    new ConfigItem(
+                        '    Show Output Channel',
+                        'Click to Open Output',
+                        vscode.TreeItemCollapsibleState.None,
+                        'status-unknown',
+                        {
+                            command: 'xygeni.showOutput',
+                            title: 'Open Extension Output Channel',
+                            arguments: []
+                        }
                     )
                 );
             }
@@ -171,6 +182,9 @@ class ConfigItem extends vscode.TreeItem {
                 break;
             case 'status-unknown':
                 this.iconPath = new vscode.ThemeIcon('question');
+                break;
+            case 'show':
+                this.iconPath = new vscode.ThemeIcon('eye');
                 break;
         }
     }

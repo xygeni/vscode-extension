@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { Commands, ScanResult } from '../common/interfaces';
-import { COMMAND_RUN_SCANNER } from '../common/constants';
+import { COMMAND_RUN_SCANNER, COMMAND_SHOW_SCAN_OUTPUT } from '../common/constants';
 
 
 export class ScanView implements vscode.TreeDataProvider<ScanItem> {
@@ -22,15 +22,18 @@ export class ScanView implements vscode.TreeDataProvider<ScanItem> {
     getChildren(element?: any): vscode.ProviderResult<ScanItem[]> {
         if (!element) {
             const results = this.commands.getScans();
+            let children: ScanItem[];
             if (results.length > 0) {
                 const resultReversed = [];
                 for (let i = results.length - 1; i >= 0; i--) {
                     resultReversed.push(results[i]);
                 }
-                return resultReversed.map(result => new ScanResultItem(result, vscode.TreeItemCollapsibleState.None));
+                children = resultReversed.map(result => new ScanResultItem(result, vscode.TreeItemCollapsibleState.None));
+
+
             }
             else {
-                return [
+                children = [
                     new CommandItem(
                         'Run Scan',
                         vscode.TreeItemCollapsibleState.None,
@@ -42,9 +45,22 @@ export class ScanView implements vscode.TreeDataProvider<ScanItem> {
                         new vscode.ThemeIcon('play')
                     )
                 ];
-            }
 
+            }
+            children.push(
+                new CommandItem(
+                    '   Show Scanner Ouput',
+                    vscode.TreeItemCollapsibleState.None,
+                    {
+                        command: COMMAND_SHOW_SCAN_OUTPUT,
+                        title: 'Click to open Scanner Output',
+                        arguments: []
+                    }
+                )
+            );
+            return children;
         }
+
     }
 
 }

@@ -5,6 +5,7 @@ import { Logger } from '../common/logger';
 import { getHttpClient } from '../common/https';
 import { ConfigManager } from '../config/xygeni-configuration';
 import { IncomingMessage } from 'http';
+import { resolve } from 'path';
 
 export abstract class AbstractXygeniIssue implements XygeniIssue {
   id: string;
@@ -43,15 +44,25 @@ export abstract class AbstractXygeniIssue implements XygeniIssue {
 
   public showIssueDetails(commands: Commands): void {
     // Open the file
-    if (this.file && this.line) {
+
+    if (this.file) {
+      if (!this.line) {
+        this.line = 1;
+      }
       const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
       const fileUri = workspaceFolder
         ? vscode.Uri.joinPath(workspaceFolder.uri, this.file)
         : vscode.Uri.file(this.file);
 
-      vscode.commands.executeCommand('vscode.open', fileUri, {
-        selection: this.line > 0 ? new vscode.Range(this.line - 1, 0, this.line - 1, 0) : undefined,
-        viewColumn: vscode.ViewColumn.One
+      const lineD = this.line;
+      // check file exists
+      vscode.workspace.fs.stat(fileUri).then(() => {
+        vscode.workspace.openTextDocument(fileUri).then(document => {
+          vscode.window.showTextDocument(document, {
+            selection: new vscode.Range(lineD - 1, 0, lineD - 1, 0),
+            viewColumn: vscode.ViewColumn.One
+          });
+        });
       });
     }
 
@@ -92,35 +103,22 @@ export abstract class AbstractXygeniIssue implements XygeniIssue {
     url.searchParams.append('kind', this.kind);
     url.searchParams.append('detectorId', this.detector);
 
-    const client = getHttpClient(url.toString());
-    client.get(url.toString(), (res) => {
-      let doc = '';
-      res.on('data', (chunk) => {
-        doc += chunk;
-      });
-      res.on('end', () => {
-        if (AbstractXygeniIssue.panel) {
-          if (doc.indexOf('detector_not_found') > -1) {
-            Logger.log('Detector Doc not found ' + this.detector);
-            return;
-          }
-          try {
-            const docJson = JSON.parse(doc);
-            console.log('Detector Doc retrieved: ' + JSON.stringify(docJson));
-            html = html.replace('<span>Loading...</span>', this.getDetectorDetails(docJson));
+
+    if (AbstractXygeniIssue.panel) {
+      commands.getToken().then((token) => {
+        if (!token) {
+          return;
+        }
+        commands.getDetectorDoc(url, token).then((doc) => {
+          const docJson = JSON.parse(doc);
+          console.log('Detector Doc retrieved: ' + JSON.stringify(docJson));
+          html = html.replace('<span>Loading...</span>', this.getDetectorDetails(docJson));
+          if (AbstractXygeniIssue.panel) {
             AbstractXygeniIssue.panel.webview.html = html;
           }
-          catch (e: any) {
-            Logger.log('Error reading detctor doc. ' + e.message);
-          }
-        }
+        });
       });
-    }).on('error', (err) => {
-      Logger.error(err, 'Error loading issue doc');
-      if (AbstractXygeniIssue.panel) {
-        AbstractXygeniIssue.panel.webview.html = `Error loading issue doc: ${err.message}`;
-      }
-    });
+    }
   }
 
   private getMetaSecurityPolicy(nonce: string): string {

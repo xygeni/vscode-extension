@@ -341,6 +341,38 @@ export default class IssuesService {
   }
 
 
+  async getDetectorDoc(url: URL, token: string): Promise<string> {
+    return new Promise(async (resolve, reject) => {
+      const client = getHttpClient(url.toString());
+      if (!token) {
+        this.logger.log('   Xygeni token not found, skipping vuln retrieve...');
+        return reject('token_not_found');
+      }
+      client.setAuthToken(token);
+      client.get(url.toString(), (res) => {
+        let doc = '';
+        res.on('data', (chunk) => {
+          doc += chunk;
+        });
+        res.on('end', () => {
+          if (doc.indexOf('detector_not_found') > -1) {
+            return reject('detector_not_found');
+          }
+          try {
+            return resolve(doc);
+          }
+          catch (e: any) {
+            return reject(new Error('Error reading detector doc. ' + e.message));
+          }
+        });
+      }).on('error', (err) => {
+        this.logger.error(err, 'Error loading issue doc');
+        reject(err);
+      });
+
+    });
+  }
+
 
 
 }

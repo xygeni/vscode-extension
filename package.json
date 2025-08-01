@@ -9,7 +9,7 @@
   },
   "license": "MIT",
   "icon": "media/images/logo_xy.png",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "engines": {
     "vscode": "^1.99.2"
   },
@@ -153,7 +153,12 @@
       {
         "command": "xygeni.showOutput",
         "title": "Open Extension Output",
-        "icon": "$(terminal)"
+        "icon": "$(eye)"
+      },
+      {
+        "command": "xygeni.showScanOutput",
+        "title": "Open Scanner Output",
+        "icon": "$(eye)"
       },
       {
         "command": "xygeni.scan.openIssue",
