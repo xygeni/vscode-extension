@@ -397,7 +397,7 @@ export default class InstallerService {
     }
 
     private stripAnsiEscapeSequences(text: string): string {
-        return text.replace(/[\x1b\u001b\u241b]\[[0-9;]*m/g, '');
+        return text.replace(/\u001b\[m|\u001b\[\d+m/g, '');
     }
 }
 

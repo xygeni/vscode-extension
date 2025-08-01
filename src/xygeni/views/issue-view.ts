@@ -39,7 +39,9 @@ export abstract class IssueView implements vscode.TreeDataProvider<XygeniTreeIte
         const allIssues = this.getIssues();
         const categories: ('iac' | 'sast' | 'sca' | 'secrets' | 'misconf')[] = [this.getCategory()];
 
+        //Logger.log(`Issues by category ${this.getCategory()}: ${allIssues.length}}`);
         return categories.map(category => {
+            // this is not required when use separate views 
             const categoryIssues = allIssues.filter(issue => issue.category === category);
             return new XygeniCategoryItem(category, categoryIssues.length, this.commands);
         });

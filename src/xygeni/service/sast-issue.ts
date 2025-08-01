@@ -8,7 +8,10 @@ export class SastXygeniIssue extends AbstractXygeniIssue {
     return `
       <div id="tab-content-1">
       <table>
-                  
+                  ${this.file ?
+        '<tr><th>File</th>' +
+        '<td>' + this.file + '</td></tr>'
+        : ''}
                   ${this.tags ?
         '<tr><th>Tags</th>' +
         '<td>' + this.tags.join(', ') + '</td></tr>'

@@ -29,6 +29,10 @@ export class MisconfXygeniIssue extends AbstractXygeniIssue {
                     <th>Tool</th>
                     <td>${this.tool_kind ? this.tool_kind : ''}</td>
                   </tr>
+                  ${this.file ?
+        '<tr><th>File</th>' +
+        '<td>' + this.file + '</td></tr>'
+        : ''}
                   ${this.tags ?
         '<tr><th>Tags</th>' +
         '<td>' + this.tags.join(', ') + '</td></tr>'

@@ -45,6 +45,10 @@ export class DepsXygeniIssue extends AbstractXygeniIssue {
                       <td>${this.virtual}</td>
                     </tr>                    
                     <tr>
+                      <th>File</th>
+                      <td>${this.file ? this.file : ''}</td>
+                    </tr>
+                    <tr>
                       <th>Dependency</th>
                       <td>${this.displayFileName}</td>
                     </tr>

@@ -230,9 +230,6 @@ export class CommandsImpl implements Commands, WorkspaceFiles {
     // TODO: works with multiple workspace folders and trusted
     const sourceFolder = this.getWorkspaceFolders()[0];
 
-    Logger.log("");
-    Logger.log("==================================================");
-    Logger.log(`Running scanner on project folder: ${sourceFolder}`);
 
     if (!this.outputChannel) {
       this.outputChannel = new OutputChannelWrapper(vscode.window.createOutputChannel(XYGENI_SCANNER_OUTPUT_NAME));

@@ -38,7 +38,7 @@ class HttpsClient implements IHttpClient {
             rejectUnauthorized: true,
             agent: this.getAgent()
         };
-        const req = http.request(url, options, callback);
+        const req = https.request(url, options, callback);
         req.write(data);
         req.end();
         return req;

@@ -28,52 +28,63 @@ export class VulnerabilitiesService {
 
 
   async getVulnerabilities(deps: Map<string, any>, addVulnerabilityFunction: (dep: any, vulnerability: any) => void): Promise<void> {
+    return new Promise(async (resolve, reject) => {
+      const xygeniUrl = ConfigManager.getXygeniUrl();
+      if (!xygeniUrl) {
+        this.logger.log('Xygeni url not found, skipping vuln retrieve...');
+        return resolve();
+      }
 
-    this.logger.log("  Retrieving vulnerabilities...");
-    const xygeniUrl = ConfigManager.getXygeniUrl();
-    if (!xygeniUrl) {
-      this.logger.log('Xygeni url not found, skipping vuln retrieve...');
-      return;
-    }
+      // retrieve detector doc
+      const url = new URL(`${xygeniUrl}/internal/component/newVulnerabilitiesByComponent`);
 
-    // retrieve detector doc
-    const url = new URL(`${xygeniUrl}/internal/component/newVulnerabilitiesByComponent`);
+      const gavtComponents: any = [];
+      const requestData = {
+        'gavtComponents': []
+      };
 
-    const requestData = {
-      gavtComponents: [
-        {
-          "group": "phpmailer",
-          "name": "phpmailer",
-          "version": "5.2.28",
-          "technology": "php"
+      deps.forEach((value, key) => {
+        if (!value.group || !value.name || !value.version || !value.language) {
+          return;
         }
-      ]
-    };
-
-    const client = getHttpClient(url.toString());
-    //this.logger.log('Retrieving vulnerabilities...' + JSON.stringify(requestData));
-    const token = await ConfigManager.getXygeniToken(this.context);
-    if (!token) {
-      this.logger.log('   Xygeni token not found, skipping vuln retrieve...');
-      return;
-    }
-    client.setAuthToken(token);
-    const req = client.post(url.toString(), JSON.stringify(requestData), (res) => {
-      let rawData = '';
-      res.on('data', (chunk) => {
-        rawData += chunk;
-
+        gavtComponents.push({
+          group: value.group,
+          name: value.name,
+          version: value.version,
+          technology: value.language
+        });
       });
-      res.on('end', () => {
-        try {
-          this.readVulnerabilities(rawData, deps, addVulnerabilityFunction);
-        } catch (e) {
-          this.logger.error(e, 'Error parsing vulnerabilities');
-        }
 
+      requestData['gavtComponents'] = gavtComponents;
+
+      const client = getHttpClient(url.toString());
+      this.logger.log('  Retrieving vulnerabilities for ' + gavtComponents.length + ' components');
+      const token = await ConfigManager.getXygeniToken(this.context);
+      if (!token) {
+        this.logger.log('   Xygeni token not found, skipping vuln retrieve...');
+        return resolve();
+      }
+      client.setAuthToken(token);
+      client.post(url.toString(), JSON.stringify(requestData), (res) => {
+        let rawData = '';
+        res.on('data', (chunk) => {
+          rawData += chunk;
+
+        });
+        res.on('end', () => {
+          try {
+            this.readVulnerabilities(rawData, deps, addVulnerabilityFunction);
+            resolve();
+          } catch (e) {
+            this.logger.error(e, 'Error parsing vulnerabilities');
+            reject(e);
+          }
+
+        });
+      }).on('error', (err) => {
+        this.logger.error(err, 'Error retrieving vulnerabilities');
+        reject(err);
       });
-    }).on('error', (err) => {
-      this.logger.error(err, 'Error retrieving vulnerabilities');
     });
   }
 
@@ -84,17 +95,24 @@ export class VulnerabilitiesService {
     }
     const parsedData = JSON.parse(rawData);
 
-    //this.logger.log('Vulnerabilities parsed: ' + JSON.stringify(parsedData));
     if (!parsedData.componentsByGavt) {
       this.logger.log('  No vulnerabilities found');
       return [];
     }
+
     const componentsByGavt = parsedData.componentsByGavt;
 
+    let countV = 0;
     for (const gavt in componentsByGavt) {
       if (Object.prototype.hasOwnProperty.call(componentsByGavt, gavt)) {
         const vulns = componentsByGavt[gavt];
         const dependency = deps.get(gavt);
+        if (!dependency) {
+          this.logger.error(new Error('No dependency found for ' + gavt), 'Error retrieving vulnerabilities');
+          continue;
+        }
+
+        //this.logger.log('  Vulnerabilities found for ' + gavt + ': ' + vulns.length);
         for (const rawVuln of vulns) {
 
           const parts = gavt.split(':');
@@ -111,8 +129,13 @@ export class VulnerabilitiesService {
             description: rawVuln.description
           };
           addVulnerabilityFunction(dependency, vuln);
+          countV++;
         }
       }
+    }
+
+    if (countV > 0) {
+      this.logger.log('  ' + countV + ' vulnerabilities found');
     }
   }
 }

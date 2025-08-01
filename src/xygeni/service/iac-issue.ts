@@ -34,6 +34,10 @@ export class IacXygeniIssue extends AbstractXygeniIssue {
                     <th>Found by</th>
                     <td>${this.foundBy}</td>
                   </tr>
+                  ${this.file ?
+        '<tr><th>File</th>' +
+        '<td>' + this.file + '</td></tr>'
+        : ''}
                   ${this.tags ?
         '<tr><th>Tags</th>' +
         '<td>' + this.tags.join(', ') + '</td></tr>'

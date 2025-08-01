@@ -61,15 +61,15 @@ class XygeniScannerService extends EventEmitter {
             this.scans.shift(); // remove the oldest scan
         }
 
+        this.logger.log('');
+        this.logger.log('================================');
+
+
         const workingDir = this.fs.getWsLocalStorage();
         this.logger.log(`Running scanner on folder: ${sourceFolder}. Output path: ${workingDir}`);
 
         this.scans.push({ timestamp: timestamp, status: 'running', issuesFound: undefined, summary: '' });
         this.emitChange();
-
-        this.logger.log('');
-        this.logger.log('================================');
-        this.logger.log('  Running scanner');
 
         return this.runAnalysis(sourceFolder, xygeniScannerPath, workingDir, output).then(() => {
 

@@ -18,7 +18,7 @@ class LoggerImpl implements ILogger {
     }
 
     public error(error: Error | unknown, message: string) {
-        let emsg = message ? message : ' ';
+        let emsg = message ? message + ': ' : ' ';
         if (error instanceof Error) {
             emsg += error ? error.message : ' Unknown error ';
         }

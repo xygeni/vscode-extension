@@ -106,6 +106,7 @@ export abstract class AbstractXygeniIssue implements XygeniIssue {
           }
           try {
             const docJson = JSON.parse(doc);
+            console.log('Detector Doc retrieved: ' + JSON.stringify(docJson));
             html = html.replace('<span>Loading...</span>', this.getDetectorDetails(docJson));
             AbstractXygeniIssue.panel.webview.html = html;
           }

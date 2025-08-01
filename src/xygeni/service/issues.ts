@@ -165,7 +165,7 @@ export default class IssuesService {
     try {
       const data = await this.fs.readFile(filename);
       const rawData = JSON.parse(data);
-      this.processDepsReport(rawData);
+      await this.processDepsReport(rawData);
     } catch (error) {
       this.logger.error(error, 'Error reading deps output:');
       throw error;
@@ -188,7 +188,7 @@ export default class IssuesService {
     }
   }
 
-  processDepsReport(jsonRaw: any): void {
+  async processDepsReport(jsonRaw: any): Promise<void> {
     const dependencies = Array.isArray(jsonRaw.dependencies) ? jsonRaw.dependencies : [jsonRaw.dependencies];
     const tool = jsonRaw.metadata.reportProperties['tool.name'];
 
@@ -199,12 +199,11 @@ export default class IssuesService {
       dependenciesByGavt.set(gavt, dep);
     });
 
-    VulnerabilitiesService.getInstance().getVulnerabilities(dependenciesByGavt, (dep, vuln) => {
+    return VulnerabilitiesService.getInstance().getVulnerabilities(dependenciesByGavt, (dep, vuln) => {
 
-      // for each vulnerability, create an issue
-
+      // for each vulnerability, create an issue      
       const issue = new DepsXygeniIssue({
-        id: dep.hash,
+        id: vuln.cve,
         type: vuln.cve,
         virtual: dep.virtual,
         detector: vuln.cve,
@@ -221,7 +220,7 @@ export default class IssuesService {
         confidence: dep.confidence ? dep.confidence as 'highest' | 'high' | 'medium' | 'low' : 'high',
         category: 'sca',
         categoryName: 'Vulnerability',
-        file: dep.location ? dep.location.filepath ? dep.location.filepath : '' : dep.filename ? dep.filename : dep.displayFileName,
+        file: dep.location ? dep.location.filepath ? dep.location.filepath : '' : dep.fileName ? dep.fileName : dep.displayFileName,
         line: dep.location ? dep.location.beginLine ? dep.location.beginLine : 0 : 0,
         description: vuln.description ? vuln.description : 'Vulnerability ' + vuln.cve,
         tags: dep.tags?.length > 0 ? dep.tags : undefined,
@@ -265,7 +264,7 @@ export default class IssuesService {
 
     sast_vuln.forEach((raw_vuln: any) => {
       const issue = new SastXygeniIssue({
-        id: raw_vuln.hash,
+        id: raw_vuln.issueId,
         type: raw_vuln.kind,
         detector: raw_vuln.detector,
         tool: tool,

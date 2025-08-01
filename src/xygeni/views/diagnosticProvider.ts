@@ -110,11 +110,15 @@ export class DiagnosticProvider {
      */
     private mapSeverityToDiagnosticSeverity(severity: string): vscode.DiagnosticSeverity {
         switch (severity) {
+            case 'critical':
+                return vscode.DiagnosticSeverity.Error;
             case 'high':
                 return vscode.DiagnosticSeverity.Error;
             case 'medium':
                 return vscode.DiagnosticSeverity.Warning;
             case 'low':
+                return vscode.DiagnosticSeverity.Warning;
+            case 'info':
                 return vscode.DiagnosticSeverity.Information;
             default:
                 return vscode.DiagnosticSeverity.Hint;
