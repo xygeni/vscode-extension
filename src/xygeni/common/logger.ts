@@ -18,8 +18,12 @@ class LoggerImpl implements ILogger {
     }
 
     public error(error: Error | unknown, message: string) {
-        const errorStr = this.stringifyError(error);
-        this.output.appendLine(message ? `${message}: ${errorStr}` : errorStr);
+        let emsg = message ? message : ' ';
+        if (error instanceof Error) {
+            emsg += error ? error.message : ' Unknown error ';
+        }
+        console.error(error);
+        this.output.appendLine(emsg);
     }
 
     showOutput() {

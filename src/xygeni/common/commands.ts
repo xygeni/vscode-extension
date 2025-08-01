@@ -22,6 +22,7 @@ export class CommandsImpl implements Commands, WorkspaceFiles {
 
   private readonly wsLocalStorage: string;
   private readonly xygeniMedia: XygeniMedia;
+  private outputChannel: OutputChannelWrapper | undefined;
 
   public static getInstance(context: vscode.ExtensionContext, xygeniContext: XyContext): CommandsImpl {
     if (!CommandsImpl.instance) {
@@ -44,6 +45,7 @@ export class CommandsImpl implements Commands, WorkspaceFiles {
     //Logger.log("Scanner output path: " + this.wsLocalStorage);
 
     this.xygeniMedia = new XygeniMediaImpl(this.context);
+
   }
 
   // ============================================================================
@@ -137,8 +139,8 @@ export class CommandsImpl implements Commands, WorkspaceFiles {
       });
 
     } catch (error: any) {
-      Logger.error(error, "Error testing connection");
-      vscode.window.showErrorMessage(error.message);
+      Logger.error(error, "Error testing connection. ");
+      vscode.window.showErrorMessage("Error testing connection");
       this.connectionChanged();
       return Promise.reject(error.message);
     }
@@ -232,10 +234,12 @@ export class CommandsImpl implements Commands, WorkspaceFiles {
     Logger.log("==================================================");
     Logger.log(`Running scanner on project folder: ${sourceFolder}`);
 
-    const outputChannel = new OutputChannelWrapper(vscode.window.createOutputChannel(XYGENI_SCANNER_OUTPUT_NAME));
+    if (!this.outputChannel) {
+      this.outputChannel = new OutputChannelWrapper(vscode.window.createOutputChannel(XYGENI_SCANNER_OUTPUT_NAME));
+    }
 
     try {
-      await scanner.run(sourceFolder, this.getXygeniInstallPath(), outputChannel);
+      await scanner.run(sourceFolder, this.getXygeniInstallPath(), this.outputChannel);
       this.readIssues();
       this.refreshAllViews();
     } catch (error) {

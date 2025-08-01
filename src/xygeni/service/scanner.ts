@@ -47,7 +47,7 @@ class XygeniScannerService extends EventEmitter {
 
     async run(sourceFolder: string, xygeniScannerPath: string, output: OutputChannelWrapper) {
         if (this.scannerRunning) {
-            Promise.resolve('Scanner is already running');
+            return Promise.resolve('Scanner is already running');
         }
         this.scannerRunning = true;
         this.exitCode = undefined;
@@ -207,8 +207,7 @@ class XygeniScannerService extends EventEmitter {
     }
 
     private stripAnsiEscapeSequences(text: string): string {
-        return text;
-        //return text.replace(/[\x1b\u001b\u241b]\[[0-9;]*m/g, '');
+        return text.replace(/\u001b\[m|\u001b\[\d+m/g, '');
     }
 
 }

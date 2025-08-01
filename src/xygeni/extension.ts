@@ -18,6 +18,7 @@ import EventEmitterImpl from './common/event-emitter';
 import { IssueDecorator } from './views/issueDecorator';
 import { DiagnosticProvider } from './views/diagnosticProvider';
 import { IacXygeniIssue } from './service/iac-issue';
+import { VulnerabilitiesService } from './service/vulnerabilities';
 
 
 
@@ -181,7 +182,6 @@ class XygeniExtension {
 
     // init scanner and subscribe to changes
     XygeniScannerService.getInstance(commands, Logger).onDidChange(() => {
-      commands.readIssues();
       commands.refreshAllViews();
     });
 
@@ -191,9 +191,9 @@ class XygeniExtension {
       issueDecorator.updateIssues(commands.getIssues());
       diagnosticProvider.updateDiagnostics(commands.getIssues());
       commands.issuesAvailable();
-      commands.refreshAllViews();
     });
     IssuesService.getInstance(Logger, issuesEmitter, commands);
+    VulnerabilitiesService.getInstance(context, Logger);
 
   }
 

@@ -102,8 +102,6 @@ class HttpClient implements IHttpClient {
  * This provides a single point for mocking in tests
  */
 export class HttpClientFactory {
-    private static httpsClient: IHttpClient = new HttpsClient();
-    private static httpClient: IHttpClient = new HttpClient();
 
     private static headers: Record<string, string> = {};
 
@@ -112,30 +110,9 @@ export class HttpClientFactory {
      */
     static getClient(url: string): IHttpClient {
         const parsedUrl = new URL(url);
-        return parsedUrl.protocol === 'https:' ? this.httpsClient : this.httpClient;
+        return parsedUrl.protocol === 'https:' ? new HttpsClient() : new HttpClient();
     }
 
-    /**
-     * Set custom HTTPS client (primarily for testing)
-     */
-    static setHttpsClient(client: IHttpClient): void {
-        this.httpsClient = client;
-    }
-
-    /**
-     * Set custom HTTP client (primarily for testing)
-     */
-    static setHttpClient(client: IHttpClient): void {
-        this.httpClient = client;
-    }
-
-    /**
-     * Reset to default clients (useful for test cleanup)
-     */
-    static reset(): void {
-        this.httpsClient = new HttpsClient();
-        this.httpClient = new HttpClient();
-    }
 }
 
 /**

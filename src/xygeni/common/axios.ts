@@ -70,7 +70,7 @@ export class AxiosClient2 implements IHttpClient {
     request.then(response => {
       callback(response.data as IncomingMessage);
     }).catch(error => {
-      Logger.error(error, `Axios request failed: ${error.message}`);
+      Logger.error(error, `Axios request failed`);
     });
   }
 }

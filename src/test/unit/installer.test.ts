@@ -119,6 +119,12 @@ class MockWriteStream extends VscodeEventEmitter {
     }
 }
 
+class MockHTtpClientFactory implements HttpClientFactory {
+    getClient(): IHttpClient {
+        return new MockHttpClient(new MockResponse(), new MockRequest());
+    }
+}
+
 // Mock HTTP Client
 class MockHttpClient implements IHttpClient {
     private mockResponse: MockResponse;
@@ -181,8 +187,6 @@ suite('Installer Test Suite', () => {
 
     teardown(() => {
         sandbox.restore();
-        // Reset HTTP client factory to default state
-        HttpClientFactory.reset();
 
     });
 
@@ -207,11 +211,6 @@ suite('Installer Test Suite', () => {
             const mockResponse = new MockResponse(404);
             const mockRequest = new MockRequest();
 
-            // Mock HTTP client
-            const mockHttpClient = new MockHttpClient(mockResponse, mockRequest);
-            HttpClientFactory.setHttpClient(mockHttpClient);
-
-
             // Act & Assert
             await assert.rejects(
                 installer.install(),
@@ -224,11 +223,6 @@ suite('Installer Test Suite', () => {
             const scriptUrl = 'https://example.com/install.sh';
             const mockRequest = new MockRequest();
             const mockResponse = new MockResponse(401);
-
-            // Mock HTTP client
-            const mockHttpClient = new MockHttpClient(mockResponse, mockRequest);
-            HttpClientFactory.setHttpClient(mockHttpClient);
-
 
             // Act & Assert
             await assert.rejects(
@@ -245,11 +239,6 @@ suite('Installer Test Suite', () => {
             const mockChildProcess = new MockChildProcess();
 
             sandbox.stub(Platform, 'get').returns('linux');
-
-            // Mock HTTP client
-            const mockHttpClient = new MockHttpClient(mockResponse, mockRequest);
-            HttpClientFactory.setHttpClient(mockHttpClient);
-
 
             sandbox.stub(require('child_process'), 'spawn').returns(mockChildProcess);
 
@@ -283,13 +272,8 @@ suite('Installer Test Suite', () => {
 
             sandbox.stub(Platform, 'get').returns('linux');
 
-
-            // Mock HTTP client
-            const mockHttpClient = new MockHttpClient(mockResponse, mockRequest);
-            HttpClientFactory.setHttpClient(mockHttpClient);
-
             let callCount = 0;
-            sandbox.stub(mockHttpClient, 'get').callsFake((url: any, callback: any) => {
+            sandbox.stub(HttpClientFactory.getClient(scriptUrl), 'get').callsFake((url: any, callback: any) => {
                 callCount++;
                 if (callCount === 1) {
                     setTimeout(() => callback(mockRedirectResponse), 10);
@@ -324,9 +308,6 @@ suite('Installer Test Suite', () => {
 
             sandbox.stub(Platform, 'get').returns('win32');
 
-            // Mock HTTP client
-            const mockHttpClient = new MockHttpClient(mockResponse, mockRequest);
-            HttpClientFactory.setHttpClient(mockHttpClient);
 
             const spawnStub = sandbox.stub(require('child_process'), 'spawn').returns(mockChildProcess);
 

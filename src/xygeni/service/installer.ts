@@ -73,7 +73,7 @@ export default class InstallerService {
                 throw new Error('Invalid script URL provided');
             }
 
-            this.logger.log(`  Downloading install script to: ${this.tempDir}`);
+            this.logger.log(`  Downloading install from: ${scannerInstallUrl}  to: ${this.tempDir}`);
 
             // Download the install script
             const scriptPath = await this.downloadScript(scannerInstallUrl, this.getInstallName());
@@ -114,8 +114,7 @@ export default class InstallerService {
                 return Promise.resolve();
             })
                 .catch((error) => {
-                    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-                    this.logger.log(`  Installation failed: ${errorMessage}`);
+                    this.logger.error(error, 'Installation failed');
                     this.status = 'error';
                     this.emitter.emitChange();
                     return Promise.reject(error);
@@ -132,8 +131,7 @@ export default class InstallerService {
 
         } catch (error) {
             this.installationRunning = false;
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-            this.logger.log(`  Installation failed: ${errorMessage}`);
+            this.logger.error(error, '  Installation failed');
             this.status = 'error';
             return Promise.reject(error);
         }
@@ -150,7 +148,7 @@ export default class InstallerService {
                 });
 
             request.on('error', (error) => {
-                reject(error);
+                reject(new Error(`Error checking Xygeni Token: ${error.message}`));
             });
         });
 
@@ -164,14 +162,13 @@ export default class InstallerService {
                 .get(pingUrl, (res) => {
                     //Logger.log(`Xygeni API URL is correct: ${pingUrl} ${res.statusCode}`);
                     if (res.statusCode !== 200) {
-                        Logger.log(`Xygeni API URL is not valid or not reachable. ${pingUrl} ${res.statusCode}`);
+                        Logger.log(`Xygeni API URL is not valid or not reachable. ${pingUrl} Errorcode: ${res.statusCode}`);
                     }
                     resolve(res.statusCode === 200);
                 });
 
             request.on('error', (error) => {
-                Logger.error(error, 'Error checking Xygeni API URL');
-                reject(false);
+                reject(new Error(`Error checking Xygeni API URL: ${error.message}`));
             });
         });
 
@@ -327,7 +324,7 @@ export default class InstallerService {
 
                 // Redirect to output channel if provided, otherwise use logger
                 if (outputChannel) {
-                    outputChannel.append(output);
+                    outputChannel.append(this.stripAnsiEscapeSequences(output));
                 } else {
                     this.logger.log("");
                     this.logger.log(`[STDOUT] ${output.trim()}`);
@@ -395,9 +392,7 @@ export default class InstallerService {
                 //this.logger.log('  Temporary script file cleaned up');
             }
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown cleanup error';
-            this.logger.log(`  Warning: Failed to clean up temporary file: ${errorMessage}`);
-            // Don't throw error for cleanup failures
+            this.logger.error(error, '  Warning: Failed to clean up temporary file');
         }
     }
 
