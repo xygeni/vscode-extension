@@ -95,11 +95,11 @@ export default class ConfigurationView implements vscode.TreeDataProvider<Config
                         '    Show Output Channel',
                         'Click to Open Output',
                         vscode.TreeItemCollapsibleState.None,
-                        'status-unknown',
+                        'show',
                         {
                             command: 'xygeni.showOutput',
                             title: 'Open Extension Output Channel',
-                            arguments: []
+                            arguments: [],
                         }
                     )
                 );

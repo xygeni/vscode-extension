@@ -55,7 +55,8 @@ export class ScanView implements vscode.TreeDataProvider<ScanItem> {
                         command: COMMAND_SHOW_SCAN_OUTPUT,
                         title: 'Click to open Scanner Output',
                         arguments: []
-                    }
+                    },
+                    new vscode.ThemeIcon('eye')
                 )
             );
             return children;
