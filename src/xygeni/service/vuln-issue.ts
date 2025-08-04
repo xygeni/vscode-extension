@@ -1,7 +1,7 @@
-import { XygeniIssue } from '../common/interfaces';
 import { AbstractXygeniIssue } from './abstract-issue';
+import { XygeniIssueData } from '../common/interfaces';
 
-export interface DepsXygeniIssueData extends XygeniIssue {
+export interface DepsXygeniIssueData extends XygeniIssueData {
   virtual: boolean;
   repositoryType: string;
   displayFileName: string;

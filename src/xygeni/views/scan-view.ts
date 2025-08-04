@@ -1,7 +1,12 @@
 import * as vscode from 'vscode';
-import { Commands, ScanResult } from '../common/interfaces';
+import { ScanResult } from '../common/interfaces';
 import { COMMAND_RUN_SCANNER, COMMAND_SHOW_SCAN_OUTPUT } from '../common/constants';
 
+
+export interface ScanViewEmitter {
+    refreshScannerEventEmitter: vscode.Event<void>;
+    getScans(): ScanResult[]
+}
 
 export class ScanView implements vscode.TreeDataProvider<ScanItem> {
     public static readonly viewType = 'xygeni.views.scan';
@@ -11,7 +16,7 @@ export class ScanView implements vscode.TreeDataProvider<ScanItem> {
 
 
     constructor(private readonly _context: vscode.ExtensionContext,
-        private commands: Commands
+        private commands: ScanViewEmitter
     ) {
         this.commands.refreshScannerEventEmitter(() => this._onDidChangeTreeData.fire(undefined));
     }

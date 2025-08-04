@@ -1,19 +1,22 @@
 
-import { XygeniIssue } from '../common/interfaces';
 import { AbstractXygeniIssue } from './abstract-issue';
+import { XygeniIssueData } from '../common/interfaces';
 
-export interface SecretsXygeniIssueData extends XygeniIssue {
+export interface SecretsXygeniIssueData extends XygeniIssueData {
+  hash: string;
   resource: string;
   foundBy: string;
 }
 
 export class SecretsXygeniIssue extends AbstractXygeniIssue {
 
+  hash: string;
   resource: string;
   foundBy: string;
 
   constructor(issue: SecretsXygeniIssueData) {
     super(issue);
+    this.hash = issue.hash;
     this.resource = issue.resource;
     this.foundBy = issue.foundBy;
   }

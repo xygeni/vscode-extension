@@ -1,8 +1,8 @@
 
 import { AbstractXygeniIssue } from './abstract-issue';
-import { XygeniIssue } from '../common/interfaces';
+import { XygeniIssueData } from '../common/interfaces';
 
-export interface IacXygeniIssueData extends XygeniIssue {
+export interface IacXygeniIssueData extends XygeniIssueData {
   resource: string;
   provider: string;
   foundBy: string;

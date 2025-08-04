@@ -1,6 +1,8 @@
 
 import { AbstractXygeniIssue } from './abstract-issue';
 
+
+
 export class SastXygeniIssue extends AbstractXygeniIssue {
 
 

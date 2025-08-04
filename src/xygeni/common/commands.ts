@@ -1,22 +1,25 @@
 import * as vscode from 'vscode';
 // eslint-disable-next-line @typescript-eslint/naming-convention
 import * as _ from 'lodash';
-import { ConfigManager } from "../config/xygeni-configuration";
+import { ConfigManager, ProxySettings } from "../config/xygeni-configuration";
 import { STATUS, XYGENI_CONTEXT, XYGENI_SCANNER_OUTPUT_NAME, XYGENI_SCANNER_REPORT_SUFFIX } from './constants';
 import { EventEmitter } from 'vscode';
-import { Commands, XyContext, ScanResult, WorkspaceFiles } from './interfaces';
+import { Commands, XyContext, ScanResult, IHttpClient, XygeniMedia, XygeniIssue } from './interfaces';
 import InstallerService from '../service/installer';
 import { Logger, OutputChannelWrapper } from './logger';
 import XygeniScannerService from '../service/scanner';
 import IssuesService from '../service/issues';
-import { AbstractXygeniIssue } from '../service/abstract-issue';
 import { ProxyConfigManager } from '../config/proxy-configuration';
-import { XygeniMedia, XygeniMediaImpl } from './media';
-import path from 'path';
+import { XygeniMediaImpl } from './media';
+import { HttpClientFactory } from './https';
+import { ScanViewEmitter } from '../views/scan-view';
+import { IssueViewEmitter } from '../views/issue-view';
+import { ConfigurationViewEmitter } from '../views/configuration-view';
+import { DetailsView } from '../views/details-view';
 
 
 
-export class CommandsImpl implements Commands, WorkspaceFiles {
+export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter, ConfigurationViewEmitter {
 
 
   private static instance: CommandsImpl;
@@ -102,8 +105,24 @@ export class CommandsImpl implements Commands, WorkspaceFiles {
     }
   }
 
+  getXygeniUrl(): string | undefined {
+    return ConfigManager.getXygeniUrl();
+  }
+
   getToken(): Promise<string | undefined> {
     return ConfigManager.getXygeniToken(this.context);
+  }
+
+  isProxyEnabled(): boolean {
+    return ProxyConfigManager.isProxyEnabled(this);
+  }
+
+  getProxySettings(): ProxySettings {
+    return ConfigManager.getProxySettings();
+  }
+
+  getHttpClient(url: string): IHttpClient {
+    return HttpClientFactory.getClient(url, this);
   }
 
 
@@ -126,12 +145,12 @@ export class CommandsImpl implements Commands, WorkspaceFiles {
       new URL(xygeniUrl);
 
       this.connecting();
-      if (!await InstallerService.isValidApiUrl(xygeniUrl)) {
+      if (!await InstallerService.getInstance().isValidApiUrl(xygeniUrl)) {
         this.connectionChanged();
         throw new Error('Xygeni API URL is not valid or not reachable.');
       }
 
-      if (!await InstallerService.isValidToken(xygeniUrl, xygeniToken)) {
+      if (!await InstallerService.getInstance().isValidToken(xygeniUrl, xygeniToken)) {
         this.connectionChanged();
         throw new Error('Xygeni Token not valid. Cannot connect to Xygeni API');
       }
@@ -160,16 +179,16 @@ export class CommandsImpl implements Commands, WorkspaceFiles {
   // Issue Commands 
   // ==========================================================================
 
-  public getIssues(): AbstractXygeniIssue[] {
+  public getIssues(): XygeniIssue[] {
     return IssuesService.getInstance().getIssues();
   }
 
-  public getIssuesByCategory(category: string): AbstractXygeniIssue[] {
+  public getIssuesByCategory(category: string): XygeniIssue[] {
     return IssuesService.getInstance().getIssuesByCategory(category);
   }
 
-  public showIssueDetails(issue: AbstractXygeniIssue): void {
-    issue.showIssueDetails(this);
+  public showIssueDetails(issue: any): void {
+    DetailsView.showIssueDetails(issue, this);
   }
 
   public getDetectorDoc(url: URL, token: string): Promise<string> {
@@ -316,7 +335,7 @@ export class CommandsImpl implements Commands, WorkspaceFiles {
     leading: true,
   });
 
-  private _refreshScannerEventEmitter: EventEmitter<void> = new vscode.EventEmitter<void>();
+  private _refreshScannerEventEmitter: EventEmitter<void> = new EventEmitter<void>();
   readonly refreshScannerEventEmitter: vscode.Event<void> = this._refreshScannerEventEmitter.event;
 
   refreshScannerView = _.throttle((): void => this._refreshScannerEventEmitter.fire(), 1000, {
@@ -498,7 +517,7 @@ export class CommandsImpl implements Commands, WorkspaceFiles {
     return this.xygeniMedia.getXygeniCss();
   }
 
-  getIconPath(iconname: string): string | vscode.IconPath {
+  getIconPath(iconname: string): string {
     return this.xygeniMedia.getIconPath(iconname);
   }
 

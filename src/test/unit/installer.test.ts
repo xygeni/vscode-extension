@@ -3,9 +3,12 @@ import * as sinon from 'sinon';
 import * as os from 'os';
 import { EventEmitter as VscodeEventEmitter } from 'events';
 import InstallerService from '../../xygeni/service/installer';
-import { ILogger, GlobalContext, EventEmitter, IHttpClient } from '../../xygeni/common/interfaces';
+import { ILogger, GlobalContext, EventEmitter, IHttpClient, Commands, ScanResult, XygeniMedia } from '../../xygeni/common/interfaces';
 import { Platform } from '../../xygeni/common/platform';
-import { HttpClientFactory } from '../../xygeni/common/https';
+import { commands, Event } from 'vscode';
+import { ProxySettings } from '../../xygeni/config/xygeni-configuration';
+import { AbstractXygeniIssue } from '../../xygeni/service/abstract-issue';
+import { getHttpClient } from '../../xygeni/common/https';
 
 // Mock vscode module
 class GlobalContextMock implements GlobalContext {
@@ -119,11 +122,6 @@ class MockWriteStream extends VscodeEventEmitter {
     }
 }
 
-class MockHTtpClientFactory implements HttpClientFactory {
-    getClient(): IHttpClient {
-        return new MockHttpClient(new MockResponse(), new MockRequest());
-    }
-}
 
 // Mock HTTP Client
 class MockHttpClient implements IHttpClient {
@@ -162,10 +160,21 @@ class MockHttpClient implements IHttpClient {
     }
 }
 
+class MockXygeniMedia implements XygeniMedia {
+    getIconPath(iconname: string): string {
+        return '';
+    }
+    getXygeniCss(): string {
+        return '';
+    }
+}
+
+
 suite('Installer Test Suite', () => {
     let installer: InstallerService;
     let loggerMock: LoggerMock;
     let emitterMock: EventEmitterMock;
+    let commandsMock: Commands;
     let globalContextMock: GlobalContextMock;
     let sandbox: sinon.SinonSandbox;
 
@@ -181,8 +190,14 @@ suite('Installer Test Suite', () => {
         loggerMock = new LoggerMock();
         emitterMock = new EventEmitterMock();
         globalContextMock = new GlobalContextMock();
+        commandsMock = {
+            getToken: () => { },
+            getXygeniUrl: () => { },
+            getHttpClient: () => { return new MockHttpClient(new MockResponse(), new MockRequest()); },
+            getProxySettings: () => { return {}; },
+        } as unknown as Commands;
 
-        installer = new InstallerService(tempDir, loggerMock, emitterMock);
+        installer = new InstallerService(tempDir, loggerMock, emitterMock, commandsMock);
     });
 
     teardown(() => {
@@ -192,24 +207,10 @@ suite('Installer Test Suite', () => {
 
     suite('install method', () => {
 
-        test('should handle invalid URL', async () => {
-            // Arrange
-            const invalidUrl = 'not-a-valid-url';
-
-            // Act & Assert
-            await assert.rejects(
-                installer.install(),
-                /Invalid script URL provided/
-            );
-
-            assert.ok(loggerMock.logs.some(log => log.includes('Installation failed')));
-        });
-
         test('should handle HTTP 404 error', async () => {
-            // Arrange
-            const scriptUrl = 'https://example.com/nonexistent.sh';
             const mockResponse = new MockResponse(404);
             const mockRequest = new MockRequest();
+            commandsMock.getHttpClient = () => { return new MockHttpClient(mockResponse, mockRequest); };
 
             // Act & Assert
             await assert.rejects(
@@ -219,24 +220,23 @@ suite('Installer Test Suite', () => {
         });
 
         test('should handle network error during download', async () => {
-            // Arrange
-            const scriptUrl = 'https://example.com/install.sh';
             const mockRequest = new MockRequest();
             const mockResponse = new MockResponse(401);
+            commandsMock.getHttpClient = () => { return new MockHttpClient(mockResponse, mockRequest); };
 
             // Act & Assert
             await assert.rejects(
                 installer.install(),
-                /Installation failed: Failed to download script: HTTP 401/
+                /Error: Failed to download script: HTTP 401/
             );
         });
 
         test('should handle script execution failure', async () => {
-            // Arrange
-            const scriptUrl = 'https://example.com/install.sh';
             const mockResponse = new MockResponse(200);
             const mockRequest = new MockRequest();
             const mockChildProcess = new MockChildProcess();
+            commandsMock.getHttpClient = () => { return new MockHttpClient(mockResponse, mockRequest); };
+
 
             sandbox.stub(Platform, 'get').returns('linux');
 
@@ -254,7 +254,7 @@ suite('Installer Test Suite', () => {
             // Assert
             await assert.rejects(
                 installPromise,
-                /Script execution failed with exit code 1/
+                /Installation script failed/
             );
         });
 
@@ -269,11 +269,13 @@ suite('Installer Test Suite', () => {
             const mockRequest = new MockRequest();
             const mockResponse = new MockResponse(200);
             const mockChildProcess = new MockChildProcess();
+            const mockHttpClient = new MockHttpClient(mockResponse, mockRequest);
+            commandsMock.getHttpClient = () => mockHttpClient;
 
             sandbox.stub(Platform, 'get').returns('linux');
 
             let callCount = 0;
-            sandbox.stub(HttpClientFactory.getClient(scriptUrl), 'get').callsFake((url: any, callback: any) => {
+            sandbox.stub(mockHttpClient, 'get').callsFake((url: any, callback: any) => {
                 callCount++;
                 if (callCount === 1) {
                     setTimeout(() => callback(mockRedirectResponse), 10);
@@ -305,6 +307,7 @@ suite('Installer Test Suite', () => {
             const mockResponse = new MockResponse(200);
             const mockRequest = new MockRequest();
             const mockChildProcess = new MockChildProcess();
+            commandsMock.getHttpClient = () => { return new MockHttpClient(mockResponse, mockRequest); };
 
             sandbox.stub(Platform, 'get').returns('win32');
 

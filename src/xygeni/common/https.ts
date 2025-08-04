@@ -1,10 +1,10 @@
 import * as https from 'https';
 import * as http from 'http';
 import { IncomingMessage, ClientRequest } from 'http';
-import { Logger } from './logger';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import { ProxyConfigManager } from '../config/proxy-configuration';
-import { IHttpClient } from './interfaces';
+import { Commands, IHttpClient } from './interfaces';
+import { commands } from 'vscode';
 
 /**
  * HTTPS client wrapper
@@ -12,6 +12,8 @@ import { IHttpClient } from './interfaces';
 class HttpsClient implements IHttpClient {
 
     private headers: Record<string, string> = {};
+
+    constructor(private commands: Commands) { }
 
     setAuthToken(token: string): IHttpClient {
         const value = `Bearer ${token}`;
@@ -44,12 +46,11 @@ class HttpsClient implements IHttpClient {
         return req;
     }
 
-    getAgent(): HttpsProxyAgent<string> | undefined {
-        if (!ProxyConfigManager.isProxyEnabled()) {
+    private getAgent(): HttpsProxyAgent<string> | undefined {
+        if (!this.commands.isProxyEnabled()) {
             return undefined;
         }
-        Logger.log(`Using proxy: ${ProxyConfigManager.buildProxyUrlWithAuthentication()}`);
-        return new HttpsProxyAgent(ProxyConfigManager.buildProxyUrlWithAuthentication());
+        return new HttpsProxyAgent(ProxyConfigManager.buildProxyUrlWithAuthentication(this.commands));
     }
 }
 
@@ -58,6 +59,8 @@ class HttpsClient implements IHttpClient {
  */
 class HttpClient implements IHttpClient {
     private headers: Record<string, string> = {};
+
+    constructor(private commands: Commands) { }
 
     setAuthToken(token: string): IHttpClient {
         const value = `Bearer ${token}`;
@@ -89,11 +92,11 @@ class HttpClient implements IHttpClient {
         return req;
     }
 
-    getAgent(): HttpsProxyAgent<string> | undefined {
-        if (!ProxyConfigManager.isProxyEnabled()) {
+    private getAgent(): HttpsProxyAgent<string> | undefined {
+        if (!ProxyConfigManager.isProxyEnabled(this.commands)) {
             return undefined;
         }
-        return new HttpsProxyAgent(ProxyConfigManager.buildProxyUrlWithAuthentication());
+        return new HttpsProxyAgent(ProxyConfigManager.buildProxyUrlWithAuthentication(this.commands));
     }
 }
 
@@ -108,9 +111,9 @@ export class HttpClientFactory {
     /**
      * Get the appropriate client based on the URL protocol
      */
-    static getClient(url: string): IHttpClient {
+    static getClient(url: string, commands: Commands): IHttpClient {
         const parsedUrl = new URL(url);
-        return parsedUrl.protocol === 'https:' ? new HttpsClient() : new HttpClient();
+        return parsedUrl.protocol === 'https:' ? new HttpsClient(commands) : new HttpClient(commands);
     }
 
 }
@@ -118,8 +121,8 @@ export class HttpClientFactory {
 /**
  * Convenience function to get a client for a given URL
  */
-export function getHttpClient(url: string): IHttpClient {
-    return HttpClientFactory.getClient(url);
+export function getHttpClient(url: string, commands: Commands): IHttpClient {
+    return HttpClientFactory.getClient(url, commands);
 }
 
 /**

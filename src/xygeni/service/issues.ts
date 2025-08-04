@@ -1,14 +1,13 @@
 import { XYGENI_SCANNER_REPORT_SUFFIX } from '../common/constants';
-import { ILogger, EventEmitter, WorkspaceFiles } from '../common/interfaces';
-import { SastXygeniIssue } from './sast-issue';
+import { ILogger, EventEmitter, Commands } from '../common/interfaces';
 import { IacXygeniIssue } from './iac-issue';
 import { MisconfXygeniIssue } from './misconf-issue';
+import { SastXygeniIssue } from './sast-issue';
 import { SecretsXygeniIssue } from './secrets-issue';
-import { AbstractXygeniIssue } from './abstract-issue';
 import { DepsXygeniIssue } from './vuln-issue';
-import { getHttpClient } from '../common/https';
-import { ConfigManager } from '../config/xygeni-configuration';
 import { VulnerabilitiesService } from './vulnerabilities';
+import { XygeniIssue } from '../common/interfaces';
+
 
 export default class IssuesService {
 
@@ -16,7 +15,7 @@ export default class IssuesService {
 
   private readonly xygeniGetDetectorDocUrl = '/internal/policy/detector/doc';
 
-  public static getInstance(logger?: ILogger, emitter?: EventEmitter, fs?: WorkspaceFiles): IssuesService {
+  public static getInstance(logger?: ILogger, emitter?: EventEmitter, commands?: Commands): IssuesService {
     if (!IssuesService.instance) {
       if (logger === undefined) {
         throw new Error('Logger are required');
@@ -24,29 +23,29 @@ export default class IssuesService {
       if (emitter === undefined) {
         throw new Error('Emitter are required');
       }
-      if (fs === undefined) {
-        throw new Error('Workspace files are required');
+      if (commands === undefined) {
+        throw new Error('Commands are required');
       }
-      IssuesService.instance = new IssuesService(logger, emitter, fs);
+      IssuesService.instance = new IssuesService(logger, emitter, commands);
     }
     return IssuesService.instance;
   }
 
-  getIssues(): AbstractXygeniIssue[] {
+  getIssues(): XygeniIssue[] {
     return this.issues;
   }
 
-  getIssuesByCategory(category: string): AbstractXygeniIssue[] {
+  getIssuesByCategory(category: string): XygeniIssue[] {
     return this.issues.filter(issue => issue.category === category);
   }
 
   private constructor(
     private readonly logger: ILogger,
     private readonly emitter: EventEmitter,
-    private readonly fs: WorkspaceFiles) {
+    private readonly commands: Commands) {
   }
 
-  private issues: AbstractXygeniIssue[] = [];
+  private issues: XygeniIssue[] = [];
   private isReadingIssues = false;
 
 
@@ -108,14 +107,14 @@ export default class IssuesService {
 
 
   public async readMisconfReport(filename: string): Promise<void> {
-    if (!(await this.fs.fileExists(filename))) {
+    if (!(await this.commands.fileExists(filename))) {
       //this.logger.log(`Misconf report file ${filename} does not exist, skipping...`);
       return;
     }
 
 
     try {
-      const data = await this.fs.readFile(filename);
+      const data = await this.commands.readFile(filename);
       const rawData = JSON.parse(data);
       this.processMisconfReport(rawData);
     } catch (error) {
@@ -125,13 +124,13 @@ export default class IssuesService {
   }
 
   public async readSastReport(filename: string): Promise<void> {
-    if (!(await this.fs.fileExists(filename))) {
+    if (!(await this.commands.fileExists(filename))) {
       //this.logger.log(`SAST report file ${filename} does not exist, skipping...`);
       return;
     }
 
     try {
-      const data = await this.fs.readFile(filename);
+      const data = await this.commands.readFile(filename);
       const rawData = JSON.parse(data);
       this.processSastReport(rawData);
     } catch (error) {
@@ -141,13 +140,13 @@ export default class IssuesService {
   }
 
   public async readIacReport(filename: string): Promise<void> {
-    if (!(await this.fs.fileExists(filename))) {
+    if (!(await this.commands.fileExists(filename))) {
       //this.logger.log(`IAC report file ${filename} does not exist, skipping...`);
       return;
     }
 
     try {
-      const data = await this.fs.readFile(filename);
+      const data = await this.commands.readFile(filename);
       const rawData = JSON.parse(data);
       this.processIacReport(rawData);
     } catch (error) {
@@ -157,13 +156,13 @@ export default class IssuesService {
   }
 
   public async readDepsReport(filename: string): Promise<void> {
-    if (!(await this.fs.fileExists(filename))) {
+    if (!(await this.commands.fileExists(filename))) {
       // this.logger.log(`Deps report file ${filename} does not exist, skipping...`);
       return;
     }
 
     try {
-      const data = await this.fs.readFile(filename);
+      const data = await this.commands.readFile(filename);
       const rawData = JSON.parse(data);
       await this.processDepsReport(rawData);
     } catch (error) {
@@ -173,13 +172,13 @@ export default class IssuesService {
   }
 
   public async readSecretsReport(filename: string): Promise<void> {
-    if (!(await this.fs.fileExists(filename))) {
+    if (!(await this.commands.fileExists(filename))) {
       //this.logger.log(`Secrets report file ${filename} does not exist, skipping...`);
       return;
     }
 
     try {
-      const data = await this.fs.readFile(filename);
+      const data = await this.commands.readFile(filename);
       const rawData = JSON.parse(data);
       this.processSecretsReport(rawData);
     } catch (error) {
@@ -236,8 +235,9 @@ export default class IssuesService {
 
     secrets.forEach((rawSecret: any) => {
       const issue = new SecretsXygeniIssue({
-        id: rawSecret.hash,
+        id: rawSecret.issueId,
         type: rawSecret.type,
+        hash: rawSecret.hash,
         detector: rawSecret.detector,
         tool: tool,
         kind: 'secret',
@@ -250,7 +250,7 @@ export default class IssuesService {
         file: rawSecret.location ? rawSecret.location.filepath ? rawSecret.location.filepath : '' : '',
         line: rawSecret.location ? rawSecret.location.beginLine ? rawSecret.location.beginLine : 0 : 0,
         code: rawSecret.location ? rawSecret.location.code ? rawSecret.location.code : '' : '',
-        description: `Secret of type '${rawSecret.type}' exposed at '${rawSecret.resource}'`,
+        description: `Secret of type '${rawSecret.type}' detected by '${rawSecret.detector}'`,
         tags: rawSecret.tags?.length > 0 ? rawSecret.tags : undefined,
       });
       this.issues.push(issue);
@@ -343,7 +343,7 @@ export default class IssuesService {
 
   async getDetectorDoc(url: URL, token: string): Promise<string> {
     return new Promise(async (resolve, reject) => {
-      const client = getHttpClient(url.toString());
+      const client = this.commands.getHttpClient(url.toString());
       if (!token) {
         this.logger.log('   Xygeni token not found, skipping vuln retrieve...');
         return reject('token_not_found');
@@ -374,6 +374,9 @@ export default class IssuesService {
   }
 
 
+  clear(): void {
+    this.issues = [];
+  }
 
 }
 

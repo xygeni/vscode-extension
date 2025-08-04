@@ -1,14 +1,12 @@
 import * as vscode from "vscode";
-import { getHttpClient } from "../common/https";
-import { ConfigManager } from "../config/xygeni-configuration";
-import { ILogger } from "../common/interfaces";
+import { Commands, ILogger } from "../common/interfaces";
 
 
 export class VulnerabilitiesService {
 
   private static instance: VulnerabilitiesService;
 
-  public static getInstance(context?: vscode.ExtensionContext, logger?: ILogger): VulnerabilitiesService {
+  public static getInstance(context?: vscode.ExtensionContext, logger?: ILogger, commands?: Commands): VulnerabilitiesService {
     if (!VulnerabilitiesService.instance) {
       if (logger === undefined) {
         throw new Error('Logger are required');
@@ -16,20 +14,24 @@ export class VulnerabilitiesService {
       if (context === undefined) {
         throw new Error('Extension context are required');
       }
-      VulnerabilitiesService.instance = new VulnerabilitiesService(context, logger);
+      if (commands === undefined) {
+        throw new Error('Commands are required');
+      }
+      VulnerabilitiesService.instance = new VulnerabilitiesService(context, logger, commands);
     }
     return VulnerabilitiesService.instance;
   }
 
   constructor(
     private readonly context: vscode.ExtensionContext,
-    private readonly logger: ILogger
+    private readonly logger: ILogger,
+    private readonly commands: Commands
   ) { }
 
 
   async getVulnerabilities(deps: Map<string, any>, addVulnerabilityFunction: (dep: any, vulnerability: any) => void): Promise<void> {
     return new Promise(async (resolve, reject) => {
-      const xygeniUrl = ConfigManager.getXygeniUrl();
+      const xygeniUrl = this.commands.getXygeniUrl();
       if (!xygeniUrl) {
         this.logger.log('Xygeni url not found, skipping vuln retrieve...');
         return resolve();
@@ -57,9 +59,9 @@ export class VulnerabilitiesService {
 
       requestData['gavtComponents'] = gavtComponents;
 
-      const client = getHttpClient(url.toString());
+      const client = this.commands.getHttpClient(url.toString());
       this.logger.log('  Retrieving vulnerabilities for ' + gavtComponents.length + ' components');
-      const token = await ConfigManager.getXygeniToken(this.context);
+      const token = await this.commands.getToken();
       if (!token) {
         this.logger.log('   Xygeni token not found, skipping vuln retrieve...');
         return resolve();
