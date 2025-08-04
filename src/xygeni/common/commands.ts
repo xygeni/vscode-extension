@@ -18,11 +18,12 @@ import path from 'path';
 
 export class CommandsImpl implements Commands, WorkspaceFiles {
 
+
   private static instance: CommandsImpl;
 
   private readonly wsLocalStorage: string;
   private readonly xygeniMedia: XygeniMedia;
-  private outputChannel: OutputChannelWrapper | undefined;
+  private scanOutputChannel: OutputChannelWrapper | undefined;
 
   public static getInstance(context: vscode.ExtensionContext, xygeniContext: XyContext): CommandsImpl {
     if (!CommandsImpl.instance) {
@@ -188,6 +189,13 @@ export class CommandsImpl implements Commands, WorkspaceFiles {
     return InstallerService.getInstance().getScannerInstallationDir();
   }
 
+  showScanOutput() {
+    if (this.scanOutputChannel === undefined) {
+      this.scanOutputChannel = new OutputChannelWrapper(vscode.window.createOutputChannel(XYGENI_SCANNER_OUTPUT_NAME));
+    }
+    this.scanOutputChannel.show();
+  }
+
   /**
    * Run Installer of Xygeni Scanner 
    * @returns 
@@ -238,12 +246,12 @@ export class CommandsImpl implements Commands, WorkspaceFiles {
     const sourceFolder = this.getWorkspaceFolders()[0];
 
 
-    if (!this.outputChannel) {
-      this.outputChannel = new OutputChannelWrapper(vscode.window.createOutputChannel(XYGENI_SCANNER_OUTPUT_NAME));
+    if (!this.scanOutputChannel) {
+      this.scanOutputChannel = new OutputChannelWrapper(vscode.window.createOutputChannel(XYGENI_SCANNER_OUTPUT_NAME));
     }
 
     try {
-      await scanner.run(sourceFolder, this.getXygeniInstallPath(), this.outputChannel);
+      await scanner.run(sourceFolder, this.getXygeniInstallPath(), this.scanOutputChannel);
       this.readIssues();
       this.refreshAllViews();
     } catch (error) {

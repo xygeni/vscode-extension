@@ -95,7 +95,7 @@ class XygeniExtension {
       }),
 
       vscode.commands.registerCommand(COMMAND_SHOW_SCAN_OUTPUT, () => {
-        Logger.showOutput();
+        commands.showScanOutput();
       }),
 
       // configuration commands
