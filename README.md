@@ -1,14 +1,18 @@
-# Overview 
-This template provides users with a default set of issue templates and labels to work with.
+# Xygeni for VSCode
 
-## Issue Templates
+This extension allow to install and run Xygeni scanner in your VSCode IDE.
 
-To see the reasoning behind these issue templates see the rule:
-https://www.ssw.com.au/rules/github-issue-templates
+## Features
 
-## Labels
+## Requirements
 
-To see the reasoning behind these labels refer to the rule: 
-https://www.ssw.com.au/rules/labels-in-github
+## Extension Settings
 
-To add the default labels to your repo use Labeler. See Luke Parker's repo for instructions on how to set it up https://github.com/Hona/LabelTemplateRepository#readme
+## Known Issues
+
+## Release Notes
+
+### 1.0.0
+
+
+

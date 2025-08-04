@@ -1,0 +1,133 @@
+{
+  "metadata" : {
+    "uuid" : "bc2cec9b-95db-4b4f-994c-5f62275f36f5",
+    "timestamp" : "2025-07-07T12:45:35.636514Z",
+    "projectName" : "vdlr/test.vulnerabilities",
+    "directory" : "/mnt/nvme0n1p2/_projects/tmp/test.vulnerabilities",
+    "developerHashes" : [ ],
+    "baseline" : false,
+    "scm" : {
+      "fullName" : "vdlr/test.vulnerabilities",
+      "visibility" : "private",
+      "kind" : "github",
+      "defaultBranch" : "origin/main",
+      "branch" : "origin/maven",
+      "url" : "https://github.com/vdlr/test.vulnerabilities.git"
+    },
+    "reportProperties" : {
+      "os.release" : "Ubuntu 22.04.5 LTS (Linux 6.8.0-60-generic amd64)",
+      "tool.url" : "https://docs.xygeni.io",
+      "tool.version" : "5.19.1-build248",
+      "tool.name" : "Xygeni"
+    },
+    "sourceType" : "REPO",
+    "scanType" : "misconf",
+    "format" : "misconf-xygeni"
+  },
+  "statistics" : {
+    "miscByKind" : {
+      "signed_commits" : 1,
+      "dependency_update_tool" : 1,
+      "security_policy" : 1,
+      "lack_version_pinning" : 1
+    },
+    "elapsedTime" : 7.270616520,
+    "detectors" : 60,
+    "files" : 0,
+    "misconfigurations" : 4
+  },
+  "errors" : [ {
+    "description" : "com.depsdoctor.depsscanner.services.exception.ServiceException: Error in getBranches() - HTTP 403\n\tat com.depsdoctor.depsscanner.services.github.BaseGitHubApi.response(dgh:67)\n\tat com.depsdoctor.depsscanner.services.github.GitHubBranches.getBranches(fhh:342)\n\tat com.depsdoctor.core.model.scm.github.GitHubSCMSystem.getCodeChangeConfiguration(grh:62)\n\tat com.depsdoctor.core.model.scm.github.GitHubImpl.getCodeChangeConfiguration(aqh:209)\n\tat com.depsdoctor.core.checker.scm.SignedCommitsChecker.check(ym:56)\n\t... 19 more\n",
+    "fatal" : false,
+    "code" : "COMP-WARNING-004"
+  }, {
+    "description" : "com.depsdoctor.depsscanner.services.exception.ServiceException: Error in vdlr/test.vulnerabilities getRepository() - HTTP 403\n\tat com.depsdoctor.depsscanner.services.github.BaseGitHubApi.response(dgh:67)\n\tat com.depsdoctor.depsscanner.services.github.GitHubRepositories.getRepository(tch:150)\n\tat com.depsdoctor.core.model.scm.github.GitHubSCMSystem.getCodeChangeConfiguration(grh:404)\n\tat com.depsdoctor.core.model.scm.github.GitHubImpl.getCodeChangeConfiguration(aqh:209)\n\tat com.depsdoctor.core.checker.scm.SignedCommitsChecker.check(ym:56)\n\t... 19 more\n",
+    "fatal" : false,
+    "code" : "COMP-WARNING-004"
+  }, {
+    "description" : "com.depsdoctor.depsscanner.services.exception.ServiceException: Error in vdlr/test.vulnerabilities getRepositoryCollaborators() - HTTP 403\n\tat com.depsdoctor.depsscanner.services.github.BaseGitHubApi.response(dgh:67)\n\tat com.depsdoctor.depsscanner.services.github.GitHubRepositories.getRepositoryCollaborators(tch:193)\n\tat com.depsdoctor.depsscanner.services.github.GitHubRepositories.getRepositoryCollaborators(tch:54)\n\tat com.depsdoctor.core.model.scm.github.GitHubSCMSystem.H(grh:395)\n\tat com.depsdoctor.core.model.scm.github.GitHubSCMSystem.getCodeChangeConfiguration(grh:400)\n\t... 21 more\n",
+    "fatal" : false,
+    "code" : "COMP-WARNING-004"
+  }, {
+    "description" : "com.depsdoctor.depsscanner.services.exception.ServiceException: Error in getOrganization(vdlr) - HTTP 403\n\tat com.depsdoctor.depsscanner.services.github.BaseGitHubApi.response(dgh:67)\n\tat com.depsdoctor.depsscanner.services.github.GitHubOrganization.getOrganization(oih:233)\n\tat com.depsdoctor.depsscanner.services.github.GitHubOrganization.getOrganization(oih:318)\n\tat com.depsdoctor.core.model.scm.github.GitHubOrganizationVCS.getOrganizationConfiguration(lrh:87)\n\tat com.depsdoctor.core.model.scm.github.GitHubImpl.getOrganizationConfiguration(aqh:29)\n\t... 20 more\n",
+    "fatal" : false,
+    "code" : "COMP-WARNING-004"
+  }, {
+    "description" : "com.depsdoctor.depsscanner.services.exception.ServiceException: Error in vdlr/test.vulnerabilities getRepository() - HTTP 403\n\tat com.depsdoctor.depsscanner.services.github.BaseGitHubApi.response(dgh:67)\n\tat com.depsdoctor.depsscanner.services.github.GitHubRepositories.getRepository(tch:150)\n\tat com.depsdoctor.core.model.scm.github.GitHubRepositoryVCS.getRepositoryConfiguration(nsh:340)\n\tat com.depsdoctor.core.model.scm.github.GitHubImpl.getRepositoryConfiguration(aqh:316)\n\tat com.depsdoctor.core.checker.scm.RepositoriesAdminsChecker.check(en:367)\n\t... 19 more\n",
+    "fatal" : false,
+    "code" : "COMP-WARNING-004"
+  } ],
+  "misconfigurations" : [ {
+    "type" : "lack_version_pinning",
+    "detector" : "lack_version_pinning_npm",
+    "severity" : "low",
+    "confidence" : "high",
+    "location" : {
+      "filepath" : "package.json",
+      "beginLine" : -1,
+      "endLine" : -1,
+      "endColumn" : 0,
+      "beginColumn" : 0
+    },
+    "explanation" : "package.json without version pinning. No lockfile under version control found.",
+    "tags" : [ "in-app-code", "reachable" ],
+    "properties" : {
+      "ecosystem" : "npm"
+    },
+    "issueId" : "MIS.lack_version_pinning.lack_version_pinning_npm.package.json.-1"
+  }, {
+    "type" : "signed_commits",
+    "detector" : "signed_commits",
+    "severity" : "high",
+    "confidence" : "highest",
+    "location" : {
+      "filepath" : "vdlr/test.vulnerabilities",
+      "beginLine" : 0,
+      "endLine" : 0,
+      "endColumn" : 0,
+      "beginColumn" : 0
+    },
+    "explanation" : "The repository has no protected branches.",
+    "tags" : [ "branch-protection", "cicd-sec-09", "cicd-security", "non-reachable", "security", "supply-chain" ],
+    "properties" : { },
+    "issueId" : "MIS.signed_commits.signed_commits.vdlr/test.vulnerabilities.0"
+  }, {
+    "type" : "dependency_update_tool",
+    "detector" : "dependency_update_tool",
+    "severity" : "high",
+    "confidence" : "highest",
+    "location" : {
+      "filepath" : "vdlr/test.vulnerabilities",
+      "beginLine" : 0,
+      "endLine" : 0,
+      "endColumn" : 0,
+      "beginColumn" : 0
+    },
+    "explanation" : "No update tool detected",
+    "tags" : [ "dependencies", "non-reachable", "security", "supply-chain" ],
+    "properties" : {
+      "tool_kind" : "dependency_update"
+    },
+    "issueId" : "MIS.dependency_update_tool.dependency_update_tool.vdlr/test.vulnerabilities.0"
+  }, {
+    "type" : "security_policy",
+    "detector" : "security_policy",
+    "severity" : "low",
+    "confidence" : "highest",
+    "location" : {
+      "filepath" : "vdlr/test.vulnerabilities",
+      "beginLine" : 0,
+      "endLine" : 0,
+      "endColumn" : 0,
+      "beginColumn" : 0
+    },
+    "tags" : [ "non-reachable", "policy", "security", "supply-chain" ],
+    "properties" : { },
+    "issueId" : "MIS.security_policy.security_policy.vdlr/test.vulnerabilities.0"
+  } ],
+  "issuesAssetMapping" : {
+    "links" : { },
+    "userLinks" : { }
+  },
+  "currentBranch" : "origin/maven"
+}

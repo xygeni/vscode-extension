@@ -1,0 +1,342 @@
+{
+  "name": "xygeni-security",
+  "displayName": "Xygeni Scanner",
+  "description": "Xygeni Extension for VSCode",
+  "publisher": "xygeni",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xygeni/vscode-extension.git"
+  },
+  "license": "MIT",
+  "icon": "media/images/logo_xy.png",
+  "version": "0.5.0",
+  "engines": {
+    "vscode": "^1.99.2"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "xygeni",
+          "title": "Xygeni",
+          "icon": "media/images/xy_icon_white.svg"
+        }
+      ]
+    },
+    "views": {
+      "xygeni": [
+        {
+          "id": "xygeni.views.welcome",
+          "name": "Xygeni",
+          "when": "xygeni:welcome || !xygeni:workspaceFound || xygeni:error"
+        },
+        {
+          "id": "xygeni.views.configuration",
+          "name": "Configuration",
+          "when": "xygeni:showConfig && xygeni:workspaceFound"
+        },
+        {
+          "id": "xygeni.views.scan",
+          "name": "Scan",
+          "when": "xygeni:installReady && xygeni:workspaceFound"
+        },
+        {
+          "id": "xygeni.views.sast",
+          "name": "SAST",
+          "when": "xygeni:scannerResults && xygeni:workspaceFound"
+        },
+        {
+          "id": "xygeni.views.sca",
+          "name": "SCA",
+          "when": "xygeni:scannerResults && xygeni:workspaceFound"
+        },
+        {
+          "id": "xygeni.views.cicd",
+          "name": "CI/CD",
+          "when": "xygeni:scannerResults && xygeni:workspaceFound"
+        },
+        {
+          "id": "xygeni.views.secrets",
+          "name": "Secrets",
+          "when": "xygeni:scannerResults && xygeni:workspaceFound"
+        },
+        {
+          "id": "xygeni.views.iac",
+          "name": "IaC",
+          "when": "xygeni:scannerResults && xygeni:workspaceFound"
+        },
+        {
+          "id": "xygeni.views.help",
+          "name": "Xygeni Docs & Help",
+          "type": "webview"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "xygeni.views.welcome",
+        "contents": "# Welcome to Xygeni!.\n\n Connect to your Xygeni account to get started.\n\n[Connect to Xygeni API & Scanner](command:xygeni.showConfig)",
+        "when": "xygeni:welcome"
+      },
+      {
+        "view": "xygeni.views.welcome",
+        "contents": "# Welcome to Xygeni!.\n\n Select a workspace to run Xygeni Scans.\n\n",
+        "when": "!xygeni:workspaceFound"
+      },
+      {
+        "view": "xygeni.views.welcome",
+        "contents": "There is an error with Xygeni extension.\n\n[Show Output](command:xygeni.openConnectionOutput)",
+        "when": "xygeni:error"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "xygeni.showConfig",
+          "when": "view == 'xygeni.views.welcome' || view == 'xygeni.views.scan'",
+          "group": "navigation"
+        },
+        {
+          "command": "xygeni.closeConfig",
+          "when": "view == 'xygeni.views.configuration' && xygeni:installReady",
+          "group": "navigation"
+        },
+        {
+          "command": "xygeni.scan.run",
+          "when": "view == 'xygeni.views.scan'",
+          "group": "navigation"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "xygeni.showConfig",
+        "title": "Xygeni: Open Configuration",
+        "icon": "$(debug-configure)"
+      },
+      {
+        "command": "xygeni.openProxyConfig",
+        "title": "Xygeni: Open Proxy Configuration",
+        "icon": "$(debug-configure)"
+      },
+      {
+        "command": "xygeni.closeConfig",
+        "title": "Xygeni: Close Configuration",
+        "icon": "$(close)"
+      },
+      {
+        "command": "xygeni.config.editUrl",
+        "title": "Edit URL"
+      },
+      {
+        "command": "xygeni.config.editToken",
+        "title": "Edit Token"
+      },
+      {
+        "command": "xygeni.config.testConnection",
+        "title": "Test Connection"
+      },
+      {
+        "command": "xygeni.scan.install",
+        "title": "Install Scanner"
+      },
+      {
+        "command": "xygeni.scan.run",
+        "title": "Run Scanner",
+        "icon": "$(play)"
+      },
+      {
+        "command": "xygeni.showOutput",
+        "title": "Open Extension Output",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "xygeni.showScanOutput",
+        "title": "Open Scanner Output",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "xygeni.scan.openIssue",
+        "title": "Open Issue"
+      },
+      {
+        "command": "xygeni.scan.openIssueInEditor",
+        "title": "Open Issue in Editor"
+      }
+    ],
+    "configuration": [
+      {
+        "id": "xygeni",
+        "title": "Xygeni Security",
+        "properties": {}
+      },
+      {
+        "order": 1,
+        "id": "api",
+        "title": "Connection & Authentication",
+        "properties": {
+          "xygeni.api.xygeniUrl": {
+            "order": 1,
+            "type": "string",
+            "default": "",
+            "description": "URL of the Xygeni API server"
+          },
+          "xygeni.api.xygeniToken": {
+            "order": 2,
+            "type": "string",
+            "enum": [
+              "Use Xygeni Configuration to store Xygeni Token as a secret"
+            ],
+            "default": "Use Xygeni Configuration to store Xygeni Token as a secret",
+            "markdownDescription": "Authentication token for the Xygeni API server"
+          }
+        }
+      },
+      {
+        "order": 2,
+        "id": "proxy",
+        "title": "Proxy Configuration",
+        "properties": {
+          "xygeni.proxy.protocol": {
+            "order": 1,
+            "type": "string",
+            "enum": [
+              "http",
+              "socks"
+            ],
+            "default": "http",
+            "description": "Proxy protocol."
+          },
+          "xygeni.proxy.host": {
+            "order": 2,
+            "type": "string",
+            "default": "",
+            "description": "Proxy host. Empty for no proxy."
+          },
+          "xygeni.proxy.port": {
+            "order": 3,
+            "type": "number",
+            "default": 3128,
+            "description": "Proxy port."
+          },
+          "xygeni.proxy.authentication": {
+            "order": 4,
+            "type": "string",
+            "enum": [
+              "none",
+              "basic"
+            ],
+            "default": "none",
+            "description": "Authentication to proxy."
+          },
+          "xygeni.proxy.username": {
+            "order": 5,
+            "type": "string",
+            "default": "",
+            "description": "Proxy username. Ignored with authentication=none."
+          },
+          "xygeni.proxy.password": {
+            "order": 6,
+            "type": "string",
+            "default": "",
+            "description": "Proxy password. Ignored with authentication=none."
+          },
+          "xygeni.proxy.nonProxyHosts": {
+            "order": 7,
+            "type": "string",
+            "default": "",
+            "description": "A bar-separated (|) list of hostnames that should bypass the proxy."
+          }
+        }
+      },
+      {
+        "order": 3,
+        "id": "scanner",
+        "title": "Scanner Configuration",
+        "properties": {
+          "xygeni.scanner.secrets": {
+            "order": 1,
+            "type": "boolean",
+            "default": "true",
+            "description": "Run Secrets Analysis"
+          },
+          "xygeni.scanner.sca": {
+            "order": 2,
+            "type": "boolean",
+            "default": "true",
+            "description": "Run Dependency Analysis"
+          },
+          "xygeni.scanner.sast": {
+            "order": 3,
+            "type": "boolean",
+            "default": "true",
+            "description": "Run Sast Analysis"
+          },
+          "xygeni.scanner.iac": {
+            "order": 4,
+            "type": "boolean",
+            "default": "true",
+            "description": "Run IaC Analysis"
+          },
+          "xygeni.scanner.misconf": {
+            "order": 5,
+            "type": "boolean",
+            "default": "true",
+            "description": "Run Misconfigurations Analysis"
+          },
+          "xygeni.scanner.malware": {
+            "order": 6,
+            "type": "boolean",
+            "default": "true",
+            "description": "Run Malware Analysis"
+          }
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "cleanup": "rm -rf ./out",
+    "compile": "npm run check-types && npm run lint && node esbuild.js",
+    "rebuild": "rm -rf ./out && node esbuild.js",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "package": "npm run check-types && npm run lint && node esbuild.js --production",
+    "package:vsix": "vsce package",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run cleanup && npm run compile-tests && npm run compile",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vscode-test",
+    "copy-test-data": "cp -r src/test/unit/issues.test.data out/test/unit/",
+    "test:unit": "npm run pretest && npm run copy-test-data && mocha --ui tdd -c 'out/test/unit/**/*.test.js'"
+  },
+  "devDependencies": {
+    "@types/lodash": "^4.17.20",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "20.x",
+    "@types/sinon": "^17.0.4",
+    "@types/vscode": "^1.99.2",
+    "@typescript-eslint/eslint-plugin": "^8.31.1",
+    "@typescript-eslint/parser": "^8.31.1",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.5.2",
+    "esbuild": "^0.25.3",
+    "eslint": "^9.25.1",
+    "mocha": "^11.7.1",
+    "npm-run-all": "^4.1.5",
+    "sinon": "^21.0.0",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "axios": "^1.11.0",
+    "https-proxy-agent": "^7.0.6",
+    "lodash": "^4.17.21"
+  }
+}

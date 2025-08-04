@@ -1,0 +1,126 @@
+body {
+  background-color: var(--vscode-sideBar-background);
+  color: var(--vscode-foreground);
+  font-family: "Segoe UI", sans-serif;
+}
+
+.xy-slide-critical {
+  color: white;
+  font-weight: bold;
+  background-color: red;
+  padding: 0 10px 0 10px;
+  border-radius: 4px;
+  margin-right: 16px;
+}
+
+.xy-slide-high {
+  color: white;
+  font-weight: bold;
+  background-color: #FF7800;
+  padding: 0 10px 0 10px;
+  border-radius: 4px;
+  margin-right: 16px;
+}
+
+.xy-slide-low {
+  color: black;
+  font-weight: bold;
+  background-color: rgb(250, 199, 17);
+  padding: 0 10px 0 10px;
+  border-radius: 4px;
+  margin-right: 16px;
+}
+
+.xy-slide-info {
+  color: black;
+  font-weight: bold;
+  background-color: rgb(207, 207, 207);
+  padding: 0 10px 0 10px;
+  border-radius: 4px;
+  margin-right: 16px;
+}
+
+.xy-blue-chip {
+  font-size: 9px !important;
+  border-radius: 7px !important;
+  background-color: transparent !important;
+  color: #536DF7;
+  border: 1px solid #536DF7;
+  min-height: 22px !important;
+}
+
+vscode-panel-view {
+  display: block;
+}
+
+.xy-tabs-section {
+  max-width: 800px;
+  min-width: 250px;
+  width: 100%;
+  margin: 0 auto;
+  margin-top: 20px;
+}
+
+.xy-tabs-section input[type="radio"] {
+  font-weight: 700;
+  display: none;
+}
+
+.xy-tabs-section label {
+  display: inline-block;
+  padding: 5px 15px;
+  text-align: center;
+  border-bottom: 3px solid;
+  border-color: #d4c7e3;
+  cursor: pointer;
+}
+
+.xy-tabs-section input[type="radio"]:checked+label {
+  display: inline-block;
+  padding: 5px 15px;
+  text-align: center;
+  border-bottom: 3px solid;
+  border-color: #a788ce;
+  cursor: pointer;
+}
+
+.xy-tabs-section #tab-content-1,
+.xy-tabs-section #tab-content-2 {
+  display: none;
+  margin: 10px;
+}
+
+.xy-tabs-section #tab-1:checked~#tab-content-1,
+.xy-tabs-section #tab-2:checked~#tab-content-2 {
+  display: block;
+}
+
+.xy-tabs-section .code {
+
+  border-left: 3px solid rgb(128, 127, 127);
+  line-height: 1.6;
+  margin-bottom: 1.6em;
+  max-width: 100%;
+  min-width: none;
+  overflow: auto;
+  padding: 1em 1.5em;
+  display: block;
+}
+
+.xy-tabs-section th {
+  font-weight: 400;
+  color: var(--vscode-descriptionForeground);
+  text-align: left;
+  padding: 3px 20px 3px 10px;
+}
+
+.xy-tabs-section td {
+  font-weight: 700;
+  color: var(--vscode-foreground);
+}
+
+.xy-tabs-section file {
+  font-weight: 400;
+  color: var(--vscode-descriptionForeground);
+  text-align: left;
+}
