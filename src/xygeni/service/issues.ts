@@ -205,6 +205,7 @@ export default class IssuesService {
         id: vuln.cve,
         type: vuln.cve,
         virtual: dep.virtual,
+        url: vuln.url,
         detector: vuln.cve,
         tool: tool,
         kind: 'sca_vulnerability',

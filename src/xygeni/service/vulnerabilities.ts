@@ -117,18 +117,11 @@ export class VulnerabilitiesService {
         //this.logger.log('  Vulnerabilities found for ' + gavt + ': ' + vulns.length);
         for (const rawVuln of vulns) {
 
-          const parts = gavt.split(':');
-          const vulrawVuln = {
-            group: parts[0],
-            name: parts[1],
-            version: parts[2],
-            language: parts[3]
-          };
-
           const vuln = {
             cve: rawVuln.cveidentification,
-            severity: rawVuln.xigeniSeverity ? rawVuln.xigeniSeverity : 'info',
-            description: rawVuln.description
+            severity: rawVuln.xygeniSeverity ? rawVuln.xygeniSeverity : 'info',
+            description: rawVuln.description,
+            url: rawVuln.url
           };
           addVulnerabilityFunction(dependency, vuln);
           countV++;

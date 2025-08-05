@@ -3,6 +3,7 @@ import { XygeniIssueData } from '../common/interfaces';
 
 export interface DepsXygeniIssueData extends XygeniIssueData {
   virtual: boolean;
+  url: string;
   repositoryType: string;
   displayFileName: string;
   group: string,
@@ -15,6 +16,7 @@ export interface DepsXygeniIssueData extends XygeniIssueData {
 export class DepsXygeniIssue extends AbstractXygeniIssue {
 
   virtual: boolean;
+  url: string;
   repositoryType: string;
   displayFileName: string;
   group: string;
@@ -26,6 +28,7 @@ export class DepsXygeniIssue extends AbstractXygeniIssue {
   constructor(issue: DepsXygeniIssueData) {
     super(issue);
     this.virtual = issue.virtual;
+    this.url = issue.url;
     this.repositoryType = issue.repositoryType;
     this.displayFileName = issue.displayFileName;
     this.group = issue.group;
@@ -63,7 +66,11 @@ export class DepsXygeniIssue extends AbstractXygeniIssue {
                     <tr>
                       <th>Description</th>
                       <td>${this.description}</td>
-                    </tr>                  
+                    </tr>    
+                    ${this.url ?
+        '<tr><th></th>' +
+        '<td><a href="' + this.url + '" target="_blank">Link to documentation</a></td></tr></tr>'
+        : ''}              
                   </table>
                  
         </div>`;

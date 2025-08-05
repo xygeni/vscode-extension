@@ -186,7 +186,7 @@ class XygeniExtension {
     // init installer
     const installerEmitter = new EventEmitterImpl();
     installerEmitter.onDidChange(() => { commands.refreshAllViews(); });
-    InstallerService.getInstance(context.extensionPath, Logger, installerEmitter);
+    InstallerService.getInstance(context.extensionPath, Logger, installerEmitter, commands);
 
     // init scanner and subscribe to changes
     XygeniScannerService.getInstance(commands, Logger).onDidChange(() => {
@@ -201,7 +201,7 @@ class XygeniExtension {
       commands.issuesAvailable();
     });
     IssuesService.getInstance(Logger, issuesEmitter, commands);
-    VulnerabilitiesService.getInstance(context, Logger);
+    VulnerabilitiesService.getInstance(context, Logger, commands);
 
   }
 
