@@ -65,7 +65,7 @@ export class DepsXygeniIssue extends AbstractXygeniIssue {
         : ''}
                     <tr>
                       <th>Description</th>
-                      <td>${this.description}</td>
+                      <td>${this.explanation}</td>
                     </tr>    
                     ${this.url ?
         '<tr><th></th>' +

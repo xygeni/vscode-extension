@@ -65,7 +65,7 @@ export class XygeniIssueItem extends vscode.TreeItem {
     ) {
         super(issue.type, collapsibleState);
 
-        this.tooltip = issue.description;
+        this.tooltip = issue.explanation;
         this.description = `${issue.severity.toUpperCase()}${issue.file ? ` - ${issue.file}` : ''}`;
 
         // Set icon based on severity

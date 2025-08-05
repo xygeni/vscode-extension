@@ -40,7 +40,7 @@ export class SecretsXygeniIssue extends AbstractXygeniIssue {
         : ''}
                   <tr>
                     <th>Description</th>
-                    <td>${this.description}</td>
+                    <td>${this.explanation}</td>
                   </tr>                  
                 </table>
                 <p>Details:</p>

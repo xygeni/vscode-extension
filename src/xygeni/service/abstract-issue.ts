@@ -15,7 +15,7 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
   line?: number;
   code?: string;
   tags?: string[];
-  description: string;
+  explanation: string;
 
   constructor(issue: XygeniIssueData) {
     this.id = issue.id;
@@ -31,7 +31,7 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
     this.line = issue.line;
     this.code = issue.code;
     this.tags = issue.tags;
-    this.description = issue.description;
+    this.explanation = issue.explanation;
   }
 
   public showIssueDetails(commands: Commands): void {

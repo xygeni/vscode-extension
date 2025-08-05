@@ -20,7 +20,7 @@ export class SastXygeniIssue extends AbstractXygeniIssue {
         : ''}
                   <tr>
                     <th>Description</th>
-                    <td>${this.description}</td>
+                    <td>${this.explanation}</td>
                   </tr>                  
                 </table>
                 

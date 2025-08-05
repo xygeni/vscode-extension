@@ -92,7 +92,7 @@ export class DiagnosticProvider {
         // Create the diagnostic
         const diagnostic = new vscode.Diagnostic(
             range,
-            `${issue.type}: ${issue.description}`,
+            `${issue.type}: ${issue.explanation}`,
             severity
         );
 

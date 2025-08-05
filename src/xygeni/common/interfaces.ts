@@ -101,7 +101,7 @@ export interface XygeniIssueData {
   line?: number;
   code?: string;
   tags?: string[];
-  description: string;
+  explanation: string;
 }
 
 export interface XygeniIssue extends XygeniIssueData {

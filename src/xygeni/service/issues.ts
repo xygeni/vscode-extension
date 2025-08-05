@@ -222,7 +222,7 @@ export default class IssuesService {
         categoryName: 'Vulnerability',
         file: dep.location ? dep.location.filepath ? dep.location.filepath : '' : dep.fileName ? dep.fileName : dep.displayFileName,
         line: dep.location ? dep.location.beginLine ? dep.location.beginLine : 0 : 0,
-        description: vuln.description ? vuln.description : 'Vulnerability ' + vuln.cve,
+        explanation: vuln.description ? vuln.description : 'Vulnerability ' + vuln.cve,
         tags: dep.tags?.length > 0 ? dep.tags : undefined,
       });
       this.issues.push(issue);
@@ -251,7 +251,7 @@ export default class IssuesService {
         file: rawSecret.location ? rawSecret.location.filepath ? rawSecret.location.filepath : '' : '',
         line: rawSecret.location ? rawSecret.location.beginLine ? rawSecret.location.beginLine : 0 : 0,
         code: rawSecret.location ? rawSecret.location.code ? rawSecret.location.code : '' : '',
-        description: `Secret of type '${rawSecret.type}' detected by '${rawSecret.detector}'`,
+        explanation: `Secret of type '${rawSecret.type}' detected by '${rawSecret.detector}'`,
         tags: rawSecret.tags?.length > 0 ? rawSecret.tags : undefined,
       });
       this.issues.push(issue);
@@ -277,7 +277,7 @@ export default class IssuesService {
         file: raw_vuln.location ? raw_vuln.location.filepath ? raw_vuln.location.filepath : '' : '',
         line: raw_vuln.location ? raw_vuln.location.beginLine ? raw_vuln.location.beginLine : 0 : 0,
         code: raw_vuln.location ? raw_vuln.location.code ? raw_vuln.location.code : '' : '',
-        description: raw_vuln.explanation
+        explanation: raw_vuln.explanation
       });
       this.issues.push(issue);
     });
@@ -303,7 +303,7 @@ export default class IssuesService {
         file: rawMisconf.location ? rawMisconf.location.filepath ? rawMisconf.location.filepath : '' : '',
         line: rawMisconf.location ? rawMisconf.location.beginLine ? rawMisconf.location.beginLine : 0 : 0,
         code: rawMisconf.location ? rawMisconf.location.code ? rawMisconf.location.code : '' : '',
-        description: rawMisconf.explanation
+        explanation: rawMisconf.explanation
       });
       this.issues.push(issue);
     });
@@ -334,7 +334,7 @@ export default class IssuesService {
         line: flaw.location ? flaw.location.beginLine ? flaw.location.beginLine : 0 : 0,
         code: flaw.location ? flaw.location.code ? flaw.location.code : '' : '',
         tags: flaw.tags?.length > 0 ? flaw.tags : undefined,
-        description: flaw.explanation
+        explanation: flaw.explanation
       });
       this.issues.push(issue);
     });
