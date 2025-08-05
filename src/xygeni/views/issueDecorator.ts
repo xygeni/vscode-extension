@@ -80,7 +80,7 @@ export class IssueDecorator {
 
         // Group issues by file
         for (const issue of issues) {
-            if (issue.file && issue.line) {
+            if (issue.file) {
                 const normalizedPath = this.normalizeFilePath(issue.file);
                 if (!this.issuesByFile.has(normalizedPath)) {
                     this.issuesByFile.set(normalizedPath, []);
@@ -125,7 +125,7 @@ export class IssueDecorator {
             }
 
             const decorations: vscode.DecorationOptions[] = severityIssues.map(issue => {
-                const line = Math.max(0, (issue.line || 1) - 1); // Convert to 0-based indexing
+                const line = Math.max(0, (issue.beginLine || 1) - 1); // Convert to 0-based indexing
                 const range = new vscode.Range(line, 0, line, editor.document.lineAt(line).text.length);
 
                 // Create hover message with issue details
@@ -134,7 +134,7 @@ export class IssueDecorator {
                 hoverMessage.appendMarkdown(`**Issue:** ${issue.type}\n\n`);
                 hoverMessage.appendMarkdown(`**Description:** ${issue.explanation}\n\n`);
                 hoverMessage.appendMarkdown(`**File:** ${issue.file}\n\n`);
-                hoverMessage.appendMarkdown(`**Line:** ${issue.line}`);
+                hoverMessage.appendMarkdown(`**Line:** ${issue.beginLine}`);
                 hoverMessage.isTrusted = true;
 
                 return {
@@ -152,6 +152,7 @@ export class IssueDecorator {
                 };
             });
 
+            // TODO: remove extra decorations
             //editor.setDecorations(decorationType, decorations);
         });
     }

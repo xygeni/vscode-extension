@@ -31,7 +31,7 @@ export class DiagnosticProvider {
         const issuesByFile = new Map<string, XygeniIssue[]>();
 
         for (const issue of issues) {
-            if (issue.file && issue.line) {
+            if (issue.file) {
                 const normalizedPath = this.normalizeFilePath(issue.file);
                 if (!issuesByFile.has(normalizedPath)) {
                     issuesByFile.set(normalizedPath, []);
@@ -81,10 +81,13 @@ export class DiagnosticProvider {
      */
     private createDiagnostic(issue: XygeniIssue): vscode.Diagnostic {
         // Convert 1-based line number to 0-based
-        const line = Math.max(0, (issue.line || 1) - 1);
+        const beginLine = Math.max(0, (issue.beginLine || 1) - 1);
+        const endLine = Math.max(0, (issue.endLine || issue.beginLine || 1) - 1);
+        const begingColumn = Math.max(0, (issue.beginColumn || 1) - 1);
+        const endColumn = issue.endColumn || Number.MAX_SAFE_INTEGER;
 
         // Create range for the entire line (we could make this more specific if we had column info)
-        const range = new vscode.Range(line, 0, line, Number.MAX_SAFE_INTEGER);
+        const range = new vscode.Range(beginLine, begingColumn, endLine, endColumn);
 
         // Map severity to VSCode diagnostic severity
         const severity = this.mapSeverityToDiagnosticSeverity(issue.severity);
@@ -92,7 +95,7 @@ export class DiagnosticProvider {
         // Create the diagnostic
         const diagnostic = new vscode.Diagnostic(
             range,
-            `${issue.type}: ${issue.explanation}`,
+            `${issue.type} [${issue.severity}]: ${issue.explanation.length < 100 ? issue.explanation : issue.explanation.slice(0, 100)}... `,
             severity
         );
 
@@ -101,12 +104,9 @@ export class DiagnosticProvider {
 
         // Set code for the issue (can be used for quick fixes later)
         diagnostic.code = {
-            value: `${issue.category} - ${issue.type}`,
+            value: `${issue.category} - ${issue.detector}`,
             target: vscode.Uri.parse(`command:xygeni.showIssueDetailsFromDiagnostic?${encodeURIComponent(JSON.stringify([issue.id]))}`)
         };
-
-        // Add tags based on severity
-        diagnostic.tags = this.getDiagnosticTags(issue.severity);
 
         return diagnostic;
     }
@@ -131,20 +131,7 @@ export class DiagnosticProvider {
         }
     }
 
-    /**
-     * Get diagnostic tags based on severity
-     */
-    private getDiagnosticTags(severity: string): vscode.DiagnosticTag[] {
-        const tags: vscode.DiagnosticTag[] = [];
 
-        // Add security-related tag for high severity issues
-        if (severity === 'high') {
-            // Note: DiagnosticTag.Security is not available in all VSCode versions
-            // We'll use Unnecessary as a placeholder or omit tags
-        }
-
-        return tags;
-    }
 
     /**
      * Update diagnostics for a specific document
@@ -173,7 +160,7 @@ export class DiagnosticProvider {
      * Add a single issue as a diagnostic
      */
     public addIssue(issue: XygeniIssue): void {
-        if (!issue.file || !issue.line) {
+        if (!issue.file) {
             return;
         }
 

@@ -12,7 +12,10 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
   category: 'secrets' | 'misconf' | 'iac' | 'sast' | 'sca';
   categoryName: 'Secret' | 'Misconfiguration' | 'IaC' | 'SAST' | 'Vulnerability';
   file?: string;
-  line?: number;
+  beginLine?: number;
+  endLine?: number;
+  beginColumn?: number;
+  endColumn?: number;
   code?: string;
   tags?: string[];
   explanation: string;
@@ -28,7 +31,10 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
     this.category = issue.category;
     this.categoryName = issue.categoryName;
     this.file = issue.file;
-    this.line = issue.line;
+    this.beginLine = issue.beginLine;
+    this.endLine = issue.endLine;
+    this.beginColumn = issue.beginColumn;
+    this.endColumn = issue.endColumn;
     this.code = issue.code;
     this.tags = issue.tags;
     this.explanation = issue.explanation;

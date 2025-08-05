@@ -86,7 +86,7 @@ suite('Issues Test Suite', () => {
     assert.strictEqual(firstIssue.type, 'lack_version_pinning');
     assert.strictEqual(firstIssue.severity, 'low');
     //assert.strictEqual(firstIssue.file, 'package.json');
-    //assert.strictEqual(firstIssue.line, -1);
+    //assert.strictEqual(firstIssue.beginLine, -1);
     assert.strictEqual(firstIssue.explanation, 'package.json without version pinning. No lockfile under version control found.');
 
     const secondIssue = parsedIssues[1];
@@ -94,7 +94,7 @@ suite('Issues Test Suite', () => {
     assert.strictEqual(secondIssue.type, 'signed_commits');
     assert.strictEqual(secondIssue.severity, 'high');
     //assert.strictEqual(secondIssue.file, 'vdlr/test.vulnerabilities');
-    //assert.strictEqual(secondIssue.line, 0);
+    //assert.strictEqual(secondIssue.beginLine, 0);
     assert.strictEqual(secondIssue.explanation, 'The repository has no protected branches.');
   });
 
@@ -115,7 +115,7 @@ suite('Issues Test Suite', () => {
     assert.strictEqual(firstIssue.type, 'data_storage_secret');
     assert.strictEqual(firstIssue.severity, 'high');
     assert.strictEqual(firstIssue.file, 'iac/docker-compose.yml');
-    assert.strictEqual(firstIssue.line, 6);
+    assert.strictEqual(firstIssue.beginLine, 6);
     assert.strictEqual(firstIssue.explanation, "Secret of type 'data_storage_secret' detected by 'postgres_assignment'");
 
   });
@@ -137,7 +137,7 @@ suite('Issues Test Suite', () => {
     assert.strictEqual(firstIssue.type, 'network');
     assert.strictEqual(firstIssue.severity, 'low');
     assert.strictEqual(firstIssue.file, 'vendor/leafs/aloe/src/Command/themes/docker/docker/Dockerfile');
-    assert.strictEqual(firstIssue.line, 1);
+    assert.strictEqual(firstIssue.beginLine, 1);
     assert.strictEqual(firstIssue.explanation, "Healthcheck instructions have not been added to container image");
     assert.strictEqual(firstIssue.resource, "php:8.1-apache");
 
@@ -160,7 +160,7 @@ suite('Issues Test Suite', () => {
     assert.strictEqual(firstIssue.type, 'information_leak');
     assert.strictEqual(firstIssue.severity, 'low');
     assert.strictEqual(firstIssue.file, 'src/test/suite.test.ts');
-    assert.strictEqual(firstIssue.line, 26);
+    assert.strictEqual(firstIssue.beginLine, 26);
     assert.strictEqual(firstIssue.explanation, "Generation of error message containing sensitive information");
 
   });

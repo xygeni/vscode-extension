@@ -13,20 +13,22 @@ export class DetailsView {
     // Open the file
 
     if (issue.file) {
-      if (!issue.line) {
-        issue.line = 1;
-      }
+
+      const beginLine = Math.max(0, (issue.beginLine || 1) - 1);
+      const endLine = Math.max(0, (issue.endLine || issue.beginLine || 1) - 1);
+      const beginColumn = Math.max(0, (issue.beginColumn || 1) - 1);
+      const endColumn = issue.endColumn || Number.MAX_SAFE_INTEGER;
+
       const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
       const fileUri = workspaceFolder
         ? vscode.Uri.joinPath(workspaceFolder.uri, issue.file)
         : vscode.Uri.file(issue.file);
 
-      const lineD = issue.line;
       // check file exists
       vscode.workspace.fs.stat(fileUri).then(() => {
         vscode.workspace.openTextDocument(fileUri).then(document => {
           vscode.window.showTextDocument(document, {
-            selection: new vscode.Range(lineD - 1, 0, lineD - 1, 0),
+            selection: new vscode.Range(beginLine, beginColumn, endLine, endColumn),
             viewColumn: vscode.ViewColumn.One
           });
         });
@@ -61,6 +63,11 @@ export class DetailsView {
     const xygeniUrl = ConfigManager.getXygeniUrl();
     if (!xygeniUrl) {
       this.panel.webview.html = 'Xygeni URL not configured.';
+      return;
+    }
+
+    // sca vuln type dont have a detector
+    if (issue.kind === 'sca_vulnerability') {
       return;
     }
 
