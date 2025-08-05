@@ -1,5 +1,5 @@
 {
-  "name": "xygeni-scanner",
+  "name": "xygeni-scanner-vscode",
   "displayName": "Xygeni Security Scanner",
   "description": "Secure your codebase with Secrets, SAST, SCA, IaC & Supply Chain scanning",
   "publisher": "xygeni-security",
@@ -251,49 +251,6 @@
             "type": "string",
             "default": "",
             "description": "A bar-separated (|) list of hostnames that should bypass the proxy."
-          }
-        }
-      },
-      {
-        "order": 3,
-        "id": "scanner",
-        "title": "Scanner Configuration",
-        "properties": {
-          "xygeni.scanner.secrets": {
-            "order": 1,
-            "type": "boolean",
-            "default": "true",
-            "description": "Run Secrets Analysis"
-          },
-          "xygeni.scanner.sca": {
-            "order": 2,
-            "type": "boolean",
-            "default": "true",
-            "description": "Run Dependency Analysis"
-          },
-          "xygeni.scanner.sast": {
-            "order": 3,
-            "type": "boolean",
-            "default": "true",
-            "description": "Run Sast Analysis"
-          },
-          "xygeni.scanner.iac": {
-            "order": 4,
-            "type": "boolean",
-            "default": "true",
-            "description": "Run IaC Analysis"
-          },
-          "xygeni.scanner.misconf": {
-            "order": 5,
-            "type": "boolean",
-            "default": "true",
-            "description": "Run Misconfigurations Analysis"
-          },
-          "xygeni.scanner.malware": {
-            "order": 6,
-            "type": "boolean",
-            "default": "true",
-            "description": "Run Malware Analysis"
           }
         }
       }
