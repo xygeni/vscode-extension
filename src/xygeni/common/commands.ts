@@ -35,9 +35,13 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     return CommandsImpl.instance;
   }
 
+  /**
+   * Constructor. Use workspace storage as working directory.
+   */
+
   constructor(private readonly context: vscode.ExtensionContext, private readonly xygeniContext: XyContext) {
     if (this.context.storageUri === undefined) {
-      // use random folder
+      // if no workspace storage availabele, use global storage and create a random folder
       const path = this.context.globalStorageUri.fsPath + "/" + _.random(0, 1000);
       this.wsLocalStorage = path;
     }
@@ -46,7 +50,6 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
       this.wsLocalStorage = path;
     }
     vscode.workspace.fs.createDirectory(vscode.Uri.file(this.wsLocalStorage)); // ensure output directory is create before running scanner
-    //Logger.log("Scanner output path: " + this.wsLocalStorage);
 
     this.xygeniMedia = new XygeniMediaImpl(this.context);
 

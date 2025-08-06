@@ -7,6 +7,14 @@ import { Platform } from '../common/platform';
 import { reject } from 'lodash';
 
 
+/**
+ * Service to install Xygeni Scanner
+ * Retrieve the install script from the Xygeni resources server https://get.xygeni.io/latest/scanner/
+ * The scanner is installed in the .xygeni directory under the extension path folder
+ * 
+ * Provide isValidUrl method to validate the script URL using /ping endpoint
+ * Provide isValidToken method to validate the token using /language endpoint
+ */
 export default class InstallerService {
     private readonly tempDir: string;
 

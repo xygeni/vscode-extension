@@ -9,6 +9,17 @@ import { VulnerabilitiesService } from './vulnerabilities';
 import { XygeniIssue } from '../common/interfaces';
 
 
+/**
+ * Service for issues.
+ * Following Issues report will be read from workspace storage when extension is activated and after each scan.
+ *   Secrets
+ *   Misconfigurations
+ *   SAST
+ *   IaC
+ *   SCA: after dependencies report is read, vulnerabilities are resolved using VulnerabilitiesService.
+ * 
+ * Also provides a method 'getDetectorDoc' to retrieve a detector document as published in Xygeni Docs.
+ */
 export default class IssuesService {
 
   private static instance: IssuesService;
