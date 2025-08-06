@@ -1,22 +1,32 @@
 import { XYGENI_SCANNER_REPORT_SUFFIX } from '../common/constants';
-import { ILogger, EventEmitter, WorkspaceFiles } from '../common/interfaces';
-import { SastXygeniIssue } from './sast-issue';
+import { ILogger, EventEmitter, Commands } from '../common/interfaces';
 import { IacXygeniIssue } from './iac-issue';
 import { MisconfXygeniIssue } from './misconf-issue';
+import { SastXygeniIssue } from './sast-issue';
 import { SecretsXygeniIssue } from './secrets-issue';
-import { AbstractXygeniIssue } from './abstract-issue';
 import { DepsXygeniIssue } from './vuln-issue';
-import { getHttpClient } from '../common/https';
-import { ConfigManager } from '../config/xygeni-configuration';
 import { VulnerabilitiesService } from './vulnerabilities';
+import { XygeniIssue } from '../common/interfaces';
 
+
+/**
+ * Service for issues.
+ * Following Issues report will be read from workspace storage when extension is activated and after each scan.
+ *   Secrets
+ *   Misconfigurations
+ *   SAST
+ *   IaC
+ *   SCA: after dependencies report is read, vulnerabilities are resolved using VulnerabilitiesService.
+ * 
+ * Also provides a method 'getDetectorDoc' to retrieve a detector document as published in Xygeni Docs.
+ */
 export default class IssuesService {
 
   private static instance: IssuesService;
 
   private readonly xygeniGetDetectorDocUrl = '/internal/policy/detector/doc';
 
-  public static getInstance(logger?: ILogger, emitter?: EventEmitter, fs?: WorkspaceFiles): IssuesService {
+  public static getInstance(logger?: ILogger, emitter?: EventEmitter, commands?: Commands): IssuesService {
     if (!IssuesService.instance) {
       if (logger === undefined) {
         throw new Error('Logger are required');
@@ -24,29 +34,29 @@ export default class IssuesService {
       if (emitter === undefined) {
         throw new Error('Emitter are required');
       }
-      if (fs === undefined) {
-        throw new Error('Workspace files are required');
+      if (commands === undefined) {
+        throw new Error('Commands are required');
       }
-      IssuesService.instance = new IssuesService(logger, emitter, fs);
+      IssuesService.instance = new IssuesService(logger, emitter, commands);
     }
     return IssuesService.instance;
   }
 
-  getIssues(): AbstractXygeniIssue[] {
+  getIssues(): XygeniIssue[] {
     return this.issues;
   }
 
-  getIssuesByCategory(category: string): AbstractXygeniIssue[] {
+  getIssuesByCategory(category: string): XygeniIssue[] {
     return this.issues.filter(issue => issue.category === category);
   }
 
   private constructor(
     private readonly logger: ILogger,
     private readonly emitter: EventEmitter,
-    private readonly fs: WorkspaceFiles) {
+    private readonly commands: Commands) {
   }
 
-  private issues: AbstractXygeniIssue[] = [];
+  private issues: XygeniIssue[] = [];
   private isReadingIssues = false;
 
 
@@ -108,14 +118,14 @@ export default class IssuesService {
 
 
   public async readMisconfReport(filename: string): Promise<void> {
-    if (!(await this.fs.fileExists(filename))) {
+    if (!(await this.commands.fileExists(filename))) {
       //this.logger.log(`Misconf report file ${filename} does not exist, skipping...`);
       return;
     }
 
 
     try {
-      const data = await this.fs.readFile(filename);
+      const data = await this.commands.readFile(filename);
       const rawData = JSON.parse(data);
       this.processMisconfReport(rawData);
     } catch (error) {
@@ -125,13 +135,13 @@ export default class IssuesService {
   }
 
   public async readSastReport(filename: string): Promise<void> {
-    if (!(await this.fs.fileExists(filename))) {
+    if (!(await this.commands.fileExists(filename))) {
       //this.logger.log(`SAST report file ${filename} does not exist, skipping...`);
       return;
     }
 
     try {
-      const data = await this.fs.readFile(filename);
+      const data = await this.commands.readFile(filename);
       const rawData = JSON.parse(data);
       this.processSastReport(rawData);
     } catch (error) {
@@ -141,13 +151,13 @@ export default class IssuesService {
   }
 
   public async readIacReport(filename: string): Promise<void> {
-    if (!(await this.fs.fileExists(filename))) {
+    if (!(await this.commands.fileExists(filename))) {
       //this.logger.log(`IAC report file ${filename} does not exist, skipping...`);
       return;
     }
 
     try {
-      const data = await this.fs.readFile(filename);
+      const data = await this.commands.readFile(filename);
       const rawData = JSON.parse(data);
       this.processIacReport(rawData);
     } catch (error) {
@@ -157,13 +167,13 @@ export default class IssuesService {
   }
 
   public async readDepsReport(filename: string): Promise<void> {
-    if (!(await this.fs.fileExists(filename))) {
+    if (!(await this.commands.fileExists(filename))) {
       // this.logger.log(`Deps report file ${filename} does not exist, skipping...`);
       return;
     }
 
     try {
-      const data = await this.fs.readFile(filename);
+      const data = await this.commands.readFile(filename);
       const rawData = JSON.parse(data);
       await this.processDepsReport(rawData);
     } catch (error) {
@@ -173,13 +183,13 @@ export default class IssuesService {
   }
 
   public async readSecretsReport(filename: string): Promise<void> {
-    if (!(await this.fs.fileExists(filename))) {
+    if (!(await this.commands.fileExists(filename))) {
       //this.logger.log(`Secrets report file ${filename} does not exist, skipping...`);
       return;
     }
 
     try {
-      const data = await this.fs.readFile(filename);
+      const data = await this.commands.readFile(filename);
       const rawData = JSON.parse(data);
       this.processSecretsReport(rawData);
     } catch (error) {
@@ -206,6 +216,7 @@ export default class IssuesService {
         id: vuln.cve,
         type: vuln.cve,
         virtual: dep.virtual,
+        url: vuln.url,
         detector: vuln.cve,
         tool: tool,
         kind: 'sca_vulnerability',
@@ -215,14 +226,17 @@ export default class IssuesService {
         name: dep.name,
         version: dep.version,
         dependencyPaths: dep.paths.dependencyPaths,
-        directDependency: dep.paths.directDependencyPaths,
+        directDependency: dep.paths.directDependency,
         severity: vuln.severity,
         confidence: dep.confidence ? dep.confidence as 'highest' | 'high' | 'medium' | 'low' : 'high',
         category: 'sca',
         categoryName: 'Vulnerability',
         file: dep.location ? dep.location.filepath ? dep.location.filepath : '' : dep.fileName ? dep.fileName : dep.displayFileName,
-        line: dep.location ? dep.location.beginLine ? dep.location.beginLine : 0 : 0,
-        description: vuln.description ? vuln.description : 'Vulnerability ' + vuln.cve,
+        beginLine: dep.location ? dep.location.beginLine ? dep.location.beginLine : 0 : 0,
+        endLine: dep.location ? dep.location.endLine ? dep.location.endLine : 0 : 0,
+        beginColumn: dep.location ? dep.location.beginColumn ? dep.location.beginColumn : 0 : 0,
+        endColumn: dep.location ? dep.location.endColumn ? dep.location.endColumn : 0 : 0,
+        explanation: vuln.description ? vuln.description : 'Vulnerability ' + vuln.cve,
         tags: dep.tags?.length > 0 ? dep.tags : undefined,
       });
       this.issues.push(issue);
@@ -236,8 +250,9 @@ export default class IssuesService {
 
     secrets.forEach((rawSecret: any) => {
       const issue = new SecretsXygeniIssue({
-        id: rawSecret.hash,
+        id: rawSecret.issueId,
         type: rawSecret.type,
+        hash: rawSecret.hash,
         detector: rawSecret.detector,
         tool: tool,
         kind: 'secret',
@@ -248,9 +263,12 @@ export default class IssuesService {
         category: 'secrets',
         categoryName: 'Secret',
         file: rawSecret.location ? rawSecret.location.filepath ? rawSecret.location.filepath : '' : '',
-        line: rawSecret.location ? rawSecret.location.beginLine ? rawSecret.location.beginLine : 0 : 0,
+        beginLine: rawSecret.location ? rawSecret.location.beginLine ? rawSecret.location.beginLine : 0 : 0,
+        endLine: rawSecret.location ? rawSecret.location.endLine ? rawSecret.location.endLine : 0 : 0,
+        beginColumn: rawSecret.location ? rawSecret.location.beginColumn ? rawSecret.location.beginColumn : 0 : 0,
+        endColumn: rawSecret.location ? rawSecret.location.endColumn ? rawSecret.location.endColumn : 0 : 0,
         code: rawSecret.location ? rawSecret.location.code ? rawSecret.location.code : '' : '',
-        description: `Secret of type '${rawSecret.type}' exposed at '${rawSecret.resource}'`,
+        explanation: `Secret of type '${rawSecret.type}' detected by '${rawSecret.detector}'`,
         tags: rawSecret.tags?.length > 0 ? rawSecret.tags : undefined,
       });
       this.issues.push(issue);
@@ -274,9 +292,12 @@ export default class IssuesService {
         category: 'sast',
         categoryName: 'SAST',
         file: raw_vuln.location ? raw_vuln.location.filepath ? raw_vuln.location.filepath : '' : '',
-        line: raw_vuln.location ? raw_vuln.location.beginLine ? raw_vuln.location.beginLine : 0 : 0,
+        beginLine: raw_vuln.location ? raw_vuln.location.beginLine ? raw_vuln.location.beginLine : 0 : 0,
+        endLine: raw_vuln.location ? raw_vuln.location.endLine ? raw_vuln.location.endLine : 0 : 0,
+        beginColumn: raw_vuln.location ? raw_vuln.location.beginColumn ? raw_vuln.location.beginColumn : 0 : 0,
+        endColumn: raw_vuln.location ? raw_vuln.location.endColumn ? raw_vuln.location.endColumn : 0 : 0,
         code: raw_vuln.location ? raw_vuln.location.code ? raw_vuln.location.code : '' : '',
-        description: raw_vuln.explanation
+        explanation: raw_vuln.explanation
       });
       this.issues.push(issue);
     });
@@ -300,9 +321,12 @@ export default class IssuesService {
         categoryName: 'Misconfiguration',
         tool_kind: rawMisconf.properties ? rawMisconf.properties.tool_kind ? rawMisconf.properties.tool_kind : '' : '',
         file: rawMisconf.location ? rawMisconf.location.filepath ? rawMisconf.location.filepath : '' : '',
-        line: rawMisconf.location ? rawMisconf.location.beginLine ? rawMisconf.location.beginLine : 0 : 0,
+        beginLine: rawMisconf.location ? rawMisconf.location.beginLine ? rawMisconf.location.beginLine : 0 : 0,
+        endLine: rawMisconf.location ? rawMisconf.location.endLine ? rawMisconf.location.endLine : 0 : 0,
+        beginColumn: rawMisconf.location ? rawMisconf.location.beginColumn ? rawMisconf.location.beginColumn : 0 : 0,
+        endColumn: rawMisconf.location ? rawMisconf.location.endColumn ? rawMisconf.location.endColumn : 0 : 0,
         code: rawMisconf.location ? rawMisconf.location.code ? rawMisconf.location.code : '' : '',
-        description: rawMisconf.explanation
+        explanation: rawMisconf.explanation
       });
       this.issues.push(issue);
     });
@@ -330,10 +354,13 @@ export default class IssuesService {
         category: 'iac',
         categoryName: 'IaC',
         file: flaw.location ? flaw.location.filepath ? flaw.location.filepath : '' : '',
-        line: flaw.location ? flaw.location.beginLine ? flaw.location.beginLine : 0 : 0,
+        beginLine: flaw.location ? flaw.location.beginLine ? flaw.location.beginLine : 0 : 0,
+        endLine: flaw.location ? flaw.location.endLine ? flaw.location.endLine : 0 : 0,
+        beginColumn: flaw.location ? flaw.location.beginColumn ? flaw.location.beginColumn : 0 : 0,
+        endColumn: flaw.location ? flaw.location.endColumn ? flaw.location.endColumn : 0 : 0,
         code: flaw.location ? flaw.location.code ? flaw.location.code : '' : '',
         tags: flaw.tags?.length > 0 ? flaw.tags : undefined,
-        description: flaw.explanation
+        explanation: flaw.explanation
       });
       this.issues.push(issue);
     });
@@ -343,7 +370,7 @@ export default class IssuesService {
 
   async getDetectorDoc(url: URL, token: string): Promise<string> {
     return new Promise(async (resolve, reject) => {
-      const client = getHttpClient(url.toString());
+      const client = this.commands.getHttpClient(url.toString());
       if (!token) {
         this.logger.log('   Xygeni token not found, skipping vuln retrieve...');
         return reject('token_not_found');
@@ -374,6 +401,9 @@ export default class IssuesService {
   }
 
 
+  clear(): void {
+    this.issues = [];
+  }
 
 }
 

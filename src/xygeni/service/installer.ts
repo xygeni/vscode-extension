@@ -2,20 +2,23 @@ import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
 import { spawn } from 'child_process';
-import { ILogger, IOutputChannel, EventEmitter } from '../common/interfaces';
+import { ILogger, IOutputChannel, EventEmitter, Commands } from '../common/interfaces';
 import { Platform } from '../common/platform';
-import { getHttpClient } from '../common/https';
 import { reject } from 'lodash';
-import GlobalContext from './global-context';
-import { ProxyConfigManager } from '../config/proxy-configuration';
-import { Logger } from '../common/logger';
 
 
+/**
+ * Service to install Xygeni Scanner
+ * Retrieve the install script from the Xygeni resources server https://get.xygeni.io/latest/scanner/
+ * The scanner is installed in the .xygeni directory under the extension path folder
+ * 
+ * Provide isValidUrl method to validate the script URL using /ping endpoint
+ * Provide isValidToken method to validate the token using /language endpoint
+ */
 export default class InstallerService {
     private readonly tempDir: string;
 
     private readonly xygeniGetScannerUrl = 'https://get.xygeni.io/latest/scanner/';
-
 
     private static instance: InstallerService;
 
@@ -25,7 +28,8 @@ export default class InstallerService {
     public static getInstance(
         extensionPath?: string,
         logger?: ILogger,
-        emitter?: EventEmitter // allow service to isolate from vscode
+        emitter?: EventEmitter,
+        commands?: Commands
     ): InstallerService {
         if (!InstallerService.instance) {
             if (extensionPath === undefined) {
@@ -37,7 +41,10 @@ export default class InstallerService {
             if (emitter === undefined) {
                 throw new Error('Emitter are required');
             }
-            InstallerService.instance = new InstallerService(extensionPath, logger, emitter);
+            if (commands === undefined) {
+                throw new Error('Commands are required');
+            }
+            InstallerService.instance = new InstallerService(extensionPath, logger, emitter, commands);
         }
         return InstallerService.instance;
     }
@@ -45,7 +52,8 @@ export default class InstallerService {
     constructor(
         private readonly extensionPath: string,
         private readonly logger: ILogger,
-        private readonly emitter: EventEmitter
+        private readonly emitter: EventEmitter,
+        private readonly commands: Commands
     ) {
         this.tempDir = os.tmpdir();
     }
@@ -114,10 +122,10 @@ export default class InstallerService {
                 return Promise.resolve();
             })
                 .catch((error) => {
-                    this.logger.error(error, 'Installation failed');
+                    this.logger.error(error, '  Installation script failed');
                     this.status = 'error';
                     this.emitter.emitChange();
-                    return Promise.reject(error);
+                    return Promise.reject('Installation script failed');
                 })
                 .finally(() => {
                     // Clean up temporary script file
@@ -125,23 +133,19 @@ export default class InstallerService {
                     this.installationRunning = false;
                 });
 
-
-
-
-
         } catch (error) {
             this.installationRunning = false;
-            this.logger.error(error, '  Installation failed');
+            this.logger.error(error, '  Installation process failed');
             this.status = 'error';
             return Promise.reject(error);
         }
     }
 
 
-    public static async isValidToken(xygeniApiUrl: string, xygeniToken: string): Promise<boolean> {
+    public async isValidToken(xygeniApiUrl: string, xygeniToken: string): Promise<boolean> {
         const testApiUrl = `${xygeniApiUrl}/language`;
         return new Promise<boolean>((resolve) => {
-            const request = getHttpClient(xygeniApiUrl)
+            const request = this.commands.getHttpClient(xygeniApiUrl)
                 .setAuthToken(xygeniToken)
                 .get(testApiUrl, (res) => {
                     resolve(res.statusCode === 200);
@@ -154,15 +158,15 @@ export default class InstallerService {
 
     }
 
-    public static async isValidApiUrl(xygeniApiUrl: string): Promise<boolean> {
+    public async isValidApiUrl(xygeniApiUrl: string): Promise<boolean> {
         const pingUrl = `${xygeniApiUrl}/ping`;
 
         return new Promise<boolean>((resolve, reject) => {
-            const request = getHttpClient(pingUrl)
+            const request = this.commands.getHttpClient(pingUrl)
                 .get(pingUrl, (res) => {
                     //Logger.log(`Xygeni API URL is correct: ${pingUrl} ${res.statusCode}`);
                     if (res.statusCode !== 200) {
-                        Logger.log(`Xygeni API URL is not valid or not reachable. ${pingUrl} Errorcode: ${res.statusCode}`);
+                        reject(new Error(`Error checking Xygeni API URL: ${res.statusCode}`));
                     }
                     resolve(res.statusCode === 200);
                 });
@@ -194,7 +198,7 @@ export default class InstallerService {
 
             //this.logger.log(`  Downloading install script from: ${scriptUrl}`);
 
-            const client = getHttpClient(scriptUrl);
+            const client = this.commands.getHttpClient(scriptUrl);
 
             const request = client.get(scriptUrl, (response) => {
                 // Handle redirects
@@ -294,7 +298,7 @@ export default class InstallerService {
 
             //this.logger.log(`Executing command: ${command} ${args.join(' ')}`);
 
-            const proxySettings = ProxyConfigManager.getProxySettings();
+            const proxySettings = this.commands.getProxySettings();
             const env: NodeJS.ProcessEnv = {
                 ...process.env,
             };

@@ -1,8 +1,8 @@
 
-import { XygeniIssue } from '../common/interfaces';
 import { AbstractXygeniIssue } from './abstract-issue';
+import { XygeniIssueData } from '../common/interfaces';
 
-export interface MisconfXygeniIssueData extends XygeniIssue {
+export interface MisconfXygeniIssueData extends XygeniIssueData {
   type: string;
   tool_kind: string;
 }
@@ -39,7 +39,7 @@ export class MisconfXygeniIssue extends AbstractXygeniIssue {
         : ''}
                   <tr>
                     <th>Description</th>
-                    <td>${this.description}</td>
+                    <td>${this.explanation}</td>
                   </tr>                  
                 </table>
                 

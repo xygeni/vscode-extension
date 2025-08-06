@@ -1,10 +1,8 @@
 import * as vscode from 'vscode';
 import { readFileSync } from 'fs';
+import { XygeniMedia } from './interfaces';
 
-export interface XygeniMedia {
-  getIconPath(iconname: string): string | vscode.IconPath;
-  getXygeniCss(): string
-}
+
 
 export class XygeniMediaImpl implements XygeniMedia {
 
@@ -17,9 +15,9 @@ export class XygeniMediaImpl implements XygeniMedia {
     return style;
   }
 
-  getIconPath(iconName: string): string | vscode.IconPath {
+  getIconPath(iconName: string): string {
     const iconPath = vscode.Uri.joinPath(
       vscode.Uri.file(this.context.extensionPath), 'media', 'icons', iconName);
-    return iconPath;
+    return iconPath.fsPath;
   }
 }

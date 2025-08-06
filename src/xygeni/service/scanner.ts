@@ -1,6 +1,6 @@
 import { spawn } from 'child_process';
 import EventEmitter from '../common/event-emitter';
-import { ILogger, IOutputChannel, ScanResult, WorkspaceFiles, XyContext } from "../common/interfaces";
+import { Commands, ILogger, IOutputChannel, ScanResult, WorkspaceFiles, XyContext } from "../common/interfaces";
 import { OutputChannelWrapper } from '../common/logger';
 import GlobalContext from './global-context';
 import { Platform } from '../common/platform';
@@ -11,7 +11,13 @@ import IssuesService from './issues';
 import { ProxyConfigManager } from '../config/proxy-configuration';
 
 
-
+/**
+ * Run scanner using workspace storage as working directory. 
+ * Allow only one scanner running at a time.
+ * Issues reports are persisted in workspace storage.
+ * Scanner command (no report is uploaded, generate issues reports in json format at working directory):
+ *   scan --run=deps,secrets,misconf,iac,suspectdeps,sast -f json -o <reportOutputPath> -d <sourceFolder> --no-upload
+ */
 class XygeniScannerService extends EventEmitter {
 
     private static instance: XygeniScannerService;
@@ -28,20 +34,20 @@ class XygeniScannerService extends EventEmitter {
     private scans: ScanResult[] = [];
 
 
-    public static getInstance(fs?: WorkspaceFiles, logger?: ILogger): XygeniScannerService {
+    public static getInstance(commands?: Commands, logger?: ILogger): XygeniScannerService {
         if (!XygeniScannerService.instance) {
-            if (fs === undefined) {
-                throw new Error('Workspace files are required');
+            if (commands === undefined) {
+                throw new Error('Commands are required');
             }
             if (logger === undefined) {
                 throw new Error('Logger are required');
             }
-            XygeniScannerService.instance = new XygeniScannerService(fs, logger);
+            XygeniScannerService.instance = new XygeniScannerService(commands, logger);
         }
         return XygeniScannerService.instance;
     }
 
-    private constructor(private readonly fs: WorkspaceFiles, private logger: ILogger) {
+    private constructor(private readonly commands: Commands, private logger: ILogger) {
         super();
     }
 
@@ -65,7 +71,7 @@ class XygeniScannerService extends EventEmitter {
         this.logger.log('================================');
 
 
-        const workingDir = this.fs.getWsLocalStorage();
+        const workingDir = this.commands.getWsLocalStorage();
         this.logger.log(`Running scanner on folder: ${sourceFolder}. Output path: ${workingDir}`);
 
         this.scans.push({ timestamp: timestamp, status: 'running', issuesFound: undefined, summary: '' });
@@ -125,7 +131,7 @@ class XygeniScannerService extends EventEmitter {
 
             this.logger.log('  Running scanner command ' + scannerScriptPath + ' ' + args.join(' '));
 
-            const proxySettings = ProxyConfigManager.getProxySettings();
+            const proxySettings = this.commands.getProxySettings();
             const env: NodeJS.ProcessEnv = {
                 ...process.env,
             };

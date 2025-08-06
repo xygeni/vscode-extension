@@ -1,0 +1,86 @@
+{
+  "metadata" : {
+    "uuid" : "5cd243b6-dd96-4fbc-a96b-478c7b69738f",
+    "timestamp" : "2025-07-09T06:59:28.704278Z",
+    "projectName" : "any/vuln-php",
+    "directory" : "/mnt/nvme0n1p2/_projects/tmp/vuln-php",
+    "developerHashes" : [ ],
+    "baseline" : false,
+    "diffMode" : false,
+    "scm" : {
+      "fullName" : "any/vuln-php",
+      "visibility" : "private",
+      "kind" : "github",
+      "defaultBranch" : "origin/main",
+      "branch" : "origin/main",
+      "url" : "https://github.com/any/vuln-php.git"
+    },
+    "scanType" : "iac",
+    "sourceType" : "REPO",
+    "reportProperties" : {
+      "os.release" : "Ubuntu 22.04.5 LTS (Linux 6.8.0-60-generic amd64)",
+      "tool.url" : "https://docs.xygeni.io",
+      "tool.version" : "5.19.1-build248",
+      "tool.name" : "Xygeni"
+    },
+    "format" : "iac-xygeni"
+  },
+  "flaws" : [ {
+    "type" : "network",
+    "detector" : "no_healthcheck",
+    "framework" : "dockerfile",
+    "provider" : "docker",
+    "location" : {
+      "filepath" : "vendor/leafs/aloe/src/Command/themes/docker/docker/Dockerfile",
+      "beginLine" : 1,
+      "endLine" : 1,
+      "code" : "FROM php:8.1-apache",
+      "endColumn" : 0,
+      "beginColumn" : 0
+    },
+    "severity" : "low",
+    "explanation" : "Healthcheck instructions have not been added to container image",
+    "resource" : "php:8.1-apache",
+    "properties" : { },
+    "tags" : [ "in-app-code", "reachable" ],
+    "issueId" : "IAC.network.no_healthcheck.vendor/leafs/aloe/src/Command/themes/docker/docker/Dockerfile.1"
+  }, {
+    "type" : "appsec",
+    "detector" : "container_runs_as_root",
+    "framework" : "dockerfile",
+    "provider" : "docker",
+    "location" : {
+      "filepath" : "vendor/leafs/aloe/src/Command/themes/docker/docker/Dockerfile",
+      "beginLine" : 1,
+      "endLine" : 1,
+      "code" : "FROM php:8.1-apache",
+      "endColumn" : 0,
+      "beginColumn" : 0
+    },
+    "severity" : "high",
+    "explanation" : "No USER non-root found, containers for image might run as root",
+    "resource" : "php:8.1-apache",
+    "properties" : { },
+    "tags" : [ "in-app-code", "reachable" ],
+    "issueId" : "IAC.appsec.container_runs_as_root.vendor/leafs/aloe/src/Command/themes/docker/docker/Dockerfile.1"
+  } ],
+  "issuesAssetMapping" : {
+    "links" : { },
+    "userLinks" : { }
+  },
+  "statistics" : {
+    "files" : 1,
+    "flaws" : 2,
+    "filesByKind" : {
+      "dockerfile" : 1
+    },
+    "flawsByKind" : {
+      "appsec" : 1,
+      "network" : 1
+    },
+    "detectors" : 445,
+    "elapsedTime" : 0.304767366
+  },
+  "errors" : [ ],
+  "currentBranch" : "origin/main"
+}

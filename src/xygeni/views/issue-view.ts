@@ -1,8 +1,11 @@
 import * as vscode from 'vscode';
-import { Commands } from '../common/interfaces';
 import { XygeniIssue } from '../common/interfaces';
-import { Logger } from '../common/logger';
 
+export interface IssueViewEmitter {
+    refreshIssuesEventEmitter: vscode.Event<void>;
+    getIssuesByCategory(category: string): XygeniIssue[]
+    getIconPath(iconname: string): string
+}
 
 export abstract class IssueView implements vscode.TreeDataProvider<XygeniTreeItem> {
     public static readonly viewType = 'xygeni.views.issue';
@@ -11,7 +14,7 @@ export abstract class IssueView implements vscode.TreeDataProvider<XygeniTreeIte
     readonly onDidChangeTreeData: vscode.Event<XygeniTreeItem | undefined> = this._onDidChangeTreeData.event;
 
 
-    constructor(protected commands: Commands) {
+    constructor(protected commands: IssueViewEmitter) {
         this.commands.refreshIssuesEventEmitter(() => this._onDidChangeTreeData.fire(undefined));
     }
 
@@ -58,11 +61,11 @@ export class XygeniIssueItem extends vscode.TreeItem {
     constructor(
         public readonly issue: XygeniIssue,
         public readonly collapsibleState: vscode.TreeItemCollapsibleState,
-        private commands: Commands
+        private commands: IssueViewEmitter
     ) {
         super(issue.type, collapsibleState);
 
-        this.tooltip = issue.description;
+        this.tooltip = issue.explanation;
         this.description = `${issue.severity.toUpperCase()}${issue.file ? ` - ${issue.file}` : ''}`;
 
         // Set icon based on severity
@@ -99,7 +102,7 @@ export class XygeniCategoryItem extends vscode.TreeItem {
     constructor(
         public readonly category: 'secrets' | 'misconf' | 'iac' | 'sast' | 'sca',
         public readonly issueCount: number,
-        private commands: Commands
+        private commands: IssueViewEmitter
     ) {
         const categoryNames = {
             'secrets': 'Secrets',
@@ -133,7 +136,7 @@ export class XygeniCategoryItem extends vscode.TreeItem {
 export class SastIssueView extends IssueView {
     private category = 'sast';
 
-    constructor(commands: Commands) {
+    constructor(commands: IssueViewEmitter) {
         super(commands);
     }
 
@@ -149,7 +152,7 @@ export class SastIssueView extends IssueView {
 export class ScaIssueView extends IssueView {
     private category = 'sca';
 
-    constructor(commands: Commands) {
+    constructor(commands: IssueViewEmitter) {
         super(commands);
     }
 
@@ -165,7 +168,7 @@ export class ScaIssueView extends IssueView {
 export class MisconfIssueView extends IssueView {
     private category = 'misconf';
 
-    constructor(commands: Commands) {
+    constructor(commands: IssueViewEmitter) {
         super(commands);
     }
 
@@ -181,7 +184,7 @@ export class MisconfIssueView extends IssueView {
 export class SecretsIssueView extends IssueView {
     private category = 'secrets';
 
-    constructor(commands: Commands) {
+    constructor(commands: IssueViewEmitter) {
         super(commands);
     }
 
@@ -197,7 +200,7 @@ export class SecretsIssueView extends IssueView {
 export class IaCIssueView extends IssueView {
     private category = 'iac';
 
-    constructor(commands: Commands) {
+    constructor(commands: IssueViewEmitter) {
         super(commands);
     }
 

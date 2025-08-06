@@ -1,7 +1,6 @@
-import * as vscode from 'vscode';
-import { AbstractXygeniIssue } from '../service/abstract-issue';
 import { IncomingMessage, ClientRequest } from 'http';
-import { XygeniMedia } from './media';
+import { ProxySettings } from '../config/xygeni-configuration';
+
 
 export interface XyContext {
   readonly xyContext: { [key: string]: unknown };
@@ -33,6 +32,7 @@ export interface EventEmitter {
   emitChange(): void;
 }
 
+
 export interface WorkspaceFiles {
   storeFile(filename: string, content: string): Promise<void>;
   readFile(filename: string): Promise<string>;
@@ -40,29 +40,31 @@ export interface WorkspaceFiles {
   getWsLocalStorage(): string;
 }
 
-export interface Commands {
-  refreshScannerEventEmitter: vscode.Event<void>;
-  refreshConfigEventEmitter: vscode.Event<void>;
-  refreshIssuesEventEmitter: vscode.Event<void>;
+export interface Commands extends WorkspaceFiles {
 
   refreshAllViews(): void;
+  showIssueDetails(issue: XygeniIssue): void;
 
   editUrl(): Promise<void>;
   editToken(): Promise<void>;
+  getXygeniUrl(): string | undefined
   getToken(): Promise<string | undefined>
+  isProxyEnabled(): boolean
+  getProxySettings(): ProxySettings
+
+  getHttpClient(url: string): IHttpClient;
 
   testConnection(): Promise<unknown>;
 
   getScans(): ScanResult[];
-  getIssues(): AbstractXygeniIssue[];
-  getIssuesByCategory(category: string): AbstractXygeniIssue[];
+  getIssues(): XygeniIssue[];
+  getIssuesByCategory(category: string): XygeniIssue[];
   getDetectorDoc(url: URL, token: string): Promise<string>
 
   getXygeniMedia(): XygeniMedia;
 
   getXygeniCss(): string;
 
-  getIconPath(iconname: string): string | vscode.IconPath;
 }
 
 
@@ -73,17 +75,19 @@ export interface ScanResult {
   summary: string;
 }
 
-/**
- * Wrapper interface for HTTP/HTTPS client functionality
- * This allows for easy mocking in tests
- */
 export interface IHttpClient {
   get(url: string, callback: (res: IncomingMessage) => void): ClientRequest;
   post(url: string, data: any, callback: (res: IncomingMessage) => void): ClientRequest;
   setAuthToken(token: string): IHttpClient;
 }
 
-export interface XygeniIssue {
+export interface XygeniMedia {
+  getIconPath(iconname: string): string;
+  getXygeniCss(): string
+}
+
+
+export interface XygeniIssueData {
   id: string;
   type: string;
   detector: string;
@@ -94,10 +98,22 @@ export interface XygeniIssue {
   category: 'secrets' | 'misconf' | 'iac' | 'sast' | 'sca';
   categoryName: 'Secret' | 'Misconfiguration' | 'IaC' | 'SAST' | 'Vulnerability';
   file?: string;
-  line?: number;
+  beginLine?: number;
+  endLine?: number;
+  beginColumn?: number;
+  endColumn?: number;
   code?: string;
   tags?: string[];
-  description: string;
+  explanation: string;
+}
+
+export interface XygeniIssue extends XygeniIssueData {
+  getSeverityLevel(): number;
+  getWebviewContent(): string;
+  getIssueDetailsHtml(): string;
+  getCodeSnippetHtml(): string;
+  getCodeSnippetHtmlTab(): string;
+  getDetectorDetails(doc: any): string
 }
 
 

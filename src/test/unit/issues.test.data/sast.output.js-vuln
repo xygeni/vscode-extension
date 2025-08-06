@@ -1,0 +1,168 @@
+{
+  "metadata" : {
+    "uuid" : "751f3071-8a22-4da2-ae78-cf7f60efa04a",
+    "timestamp" : "2025-08-01T07:15:49.938865196Z",
+    "projectName" : "any/js-vuln",
+    "directory" : "/home/victor/_projects/any/js-vuln",
+    "developerHashes" : [ ],
+    "baseline" : false,
+    "diffMode" : false,
+    "scm" : {
+      "url" : "https://github.com/any/js-vuln.git",
+      "visibility" : "private",
+      "kind" : "github",
+      "branch" : "origin/release/v0.2.0",
+      "fullName" : "any/js-vuln",
+      "defaultBranch" : "origin/main"
+    },
+    "reportProperties" : {
+      "os.release" : "Ubuntu 22.04.5 LTS (Linux 6.8.0-64-generic amd64)",
+      "tool.url" : "https://docs.xygeni.io",
+      "tool.version" : "5.22.0",
+      "tool.name" : "Xygeni"
+    },
+    "sourceType" : "REPO",
+    "scanType" : "sast",
+    "format" : "sast-xygeni"
+  },
+  "rules" : [ ],
+  "vulnerabilities" : [ {
+    "detector" : "javascript.information_exposure_through_error_message",
+    "kind" : "information_leak",
+    "severity" : "low",
+    "location" : {
+      "filepath" : "src/test/suite.test.ts",
+      "beginLine" : 26,
+      "endLine" : 26,
+      "code" : "console.error(err)",
+      "beginColumn" : 13,
+      "endColumn" : 30
+    },
+    "properties" : { },
+    "language" : "javascript",
+    "explanation" : "Generation of error message containing sensitive information",
+    "tags" : [ "CWE:209", "NIST.SP.800-53", "OWASP:2021:A4", "PCI-DSS:6.5.5" ],
+    "identifiers" : { },
+    "issueId" : "SAS.information_leak.javascript.information_exposure_through_error_message.src/test/suite.test.ts.26",
+    "cwe" : 209,
+    "cwes" : [ "CWE-209" ]
+  }, {
+    "detector" : "javascript.information_exposure_through_error_message",
+    "kind" : "information_leak",
+    "severity" : "low",
+    "location" : {
+      "filepath" : "out/test/suite.test.js",
+      "beginLine" : 28,
+      "endLine" : 28,
+      "code" : "console.error(err)",
+      "beginColumn" : 13,
+      "endColumn" : 30
+    },
+    "properties" : { },
+    "language" : "javascript",
+    "explanation" : "Generation of error message containing sensitive information",
+    "tags" : [ "CWE:209", "in-repo", "NIST.SP.800-53", "OWASP:2021:A4", "PCI-DSS:6.5.5" ],
+    "identifiers" : { },
+    "issueId" : "SAS.information_leak.javascript.information_exposure_through_error_message.out/test/suite.test.js.28",
+    "cwe" : 209,
+    "cwes" : [ "CWE-209" ]
+  }, {
+    "detector" : "javascript.insecure_transport",
+    "kind" : "information_leak",
+    "severity" : "high",
+    "location" : {
+      "filepath" : "src/js-vuln/common/https.ts",
+      "beginLine" : 41,
+      "endLine" : 41,
+      "code" : "const req = http.request(url, options, callback);",
+      "beginColumn" : 9,
+      "endColumn" : 57
+    },
+    "properties" : { },
+    "language" : "javascript",
+    "explanation" : "Connection to 'http://<unknown>' is performed with an insecure protocol",
+    "tags" : [ "CWE:319", "in-app-code", "in-repo", "NIST.SP.800-53", "OWASP:2021:A4", "PCI-DSS:6.5.4" ],
+    "identifiers" : { },
+    "issueId" : "SAS.information_leak.javascript.insecure_transport.src/js-vuln/common/https.ts.41",
+    "cwe" : 319,
+    "cwes" : [ "CWE-319" ],
+    "container" : "function post(url, data, callback)"
+  }, {
+    "detector" : "javascript.insecure_transport",
+    "kind" : "information_leak",
+    "severity" : "high",
+    "location" : {
+      "filepath" : "src/js-vuln/common/https.ts",
+      "beginLine" : 76,
+      "endLine" : 76,
+      "code" : "http.get(url, options, callback)",
+      "beginColumn" : 16,
+      "endColumn" : 47
+    },
+    "properties" : { },
+    "language" : "javascript",
+    "explanation" : "Connection to 'http://<unknown>' is performed with an insecure protocol",
+    "tags" : [ "CWE:319", "in-app-code", "in-repo", "NIST.SP.800-53", "OWASP:2021:A4", "PCI-DSS:6.5.4" ],
+    "identifiers" : { },
+    "issueId" : "SAS.information_leak.javascript.insecure_transport.src/js-vuln/common/https.ts.76",
+    "cwe" : 319,
+    "cwes" : [ "CWE-319" ],
+    "container" : "function (get(url, callback)"
+  }, {
+    "detector" : "javascript.insecure_transport",
+    "kind" : "information_leak",
+    "severity" : "high",
+    "location" : {
+      "filepath" : "src/js-vuln/common/https.ts",
+      "beginLine" : 86,
+      "endLine" : 86,
+      "code" : "const req = http.request(url, options, callback);",
+      "beginColumn" : 9,
+      "endColumn" : 57
+    },
+    "properties" : { },
+    "language" : "javascript",
+    "explanation" : "Connection to 'http://<unknown>' is performed with an insecure protocol",
+    "tags" : [ "CWE:319", "in-app-code", "in-repo", "NIST.SP.800-53", "OWASP:2021:A4", "PCI-DSS:6.5.4" ],
+    "identifiers" : { },
+    "issueId" : "SAS.information_leak.javascript.insecure_transport.src/js-vuln/common/https.ts.86",
+    "cwe" : 319,
+    "cwes" : [ "CWE-319" ],
+    "container" : "function post(url, data, callback)"
+  } ],
+  "statistics" : {
+    "filesByKind" : {
+      "typescript" : 39,
+      "javascript" : 31
+    },
+    "vulnerabilitiesBySeverity" : {
+      "high" : 3,
+      "low" : 2
+    },
+    "linesScanned" : 0,
+    "vulnerabilitiesByDetector" : {
+      "javascript.insecure_transport" : 3,
+      "javascript.information_exposure_through_error_message" : 2
+    },
+    "vulnerabilitiesByKind" : {
+      "information_leak" : 5
+    },
+    "vulnerabilities" : 5,
+    "elapsedTime" : 16.893147180,
+    "detectors" : 0,
+    "files" : 70
+  },
+  "errors" : [ {
+    "description" : "io.xygeni.sast.scanner.parser.ParseException: \nEncountered an error at (or somewhere around) /home/victor/_projects/any/js-vuln/src/js-vuln/views/issue-view.ts:50:5\nWas expecting one of the following:\nSEMICOLON\nFound string \"abstract\" of type ABSTRACT\n\tat io.xygeni.sast.scanner.parser.JavaScriptParser.parse(tca:150)\n\tat io.xygeni.sast.scanner.parser.JavaScriptParser.parse(tca:143)\n\tat io.xygeni.sast.scanner.engine.SastEngine.K(va:784)\n\tat io.xygeni.sast.scanner.engine.SastEngine.M(va:541)\n\tat io.xygeni.sast.scanner.engine.SastEngine.K(va:792)\n\t... 6 more\n",
+    "file" : "/home/victor/_projects/any/js-vuln/src/js-vuln/views/issue-view.ts",
+    "fatal" : false,
+    "code" : "SAST-WARNING-001",
+    "detector" : "JavaScriptParser"
+  } ],
+  "issuesAssetMapping" : {
+    "links" : { },
+    "userLinks" : { }
+  },
+  "properties" : { },
+  "currentBranch" : "origin/release/v0.2.0"
+}

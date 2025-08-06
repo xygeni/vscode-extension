@@ -3,6 +3,11 @@ import { ConfigManager } from '../config/xygeni-configuration';
 import { COMMAND_EDIT_XYGENI_API_URL, COMMAND_INSTALL_SCANNER, COMMAND_TEST_XYGENI_CONNECTION, CONFIG_XYGENI_API_URL, STATUS, XYGENI_CONTEXT } from '../common/constants';
 import { Commands, XyContext } from '../common/interfaces';
 
+
+export interface ConfigurationViewEmitter {
+    refreshConfigEventEmitter: vscode.Event<void>;
+}
+
 export default class ConfigurationView implements vscode.TreeDataProvider<ConfigItem> {
 
     private readonly CONNECTION_ITEM_LABEL = '  Connection Status => ';
@@ -14,7 +19,7 @@ export default class ConfigurationView implements vscode.TreeDataProvider<Config
     constructor(
         private context: vscode.ExtensionContext,
         private xygeniContext: XyContext,
-        private commands: Commands
+        private commands: ConfigurationViewEmitter
     ) {
         this.commands.refreshConfigEventEmitter(() => this._onDidChangeTreeData.fire(undefined));
     }

@@ -5,9 +5,20 @@ export interface XygeniConfig {
     xygeniToken: string;
 }
 
+export interface ProxySettings {
+    protocol?: string;
+    host?: string;
+    port?: number;
+    authentication?: string;
+    username?: string;
+    password?: string;
+    nonProxyHosts?: string;
+}
+
 export class ConfigManager {
 
     private static readonly XYGENI_CONFIG_SECTION = 'xygeni.api';
+    private static readonly PROXY_CONFIG_SECTION = 'xygeni.proxy';
     private static readonly XYGENI_DEFAULT_API_URL = 'https://api.xygeni.io';
     private static readonly XYGENI_URL_PROP_NAME = 'xygeniUrl';
     private static readonly XYGENI_TOKEN_SECRET_NAME = 'xygeniToken';
@@ -97,6 +108,19 @@ export class ConfigManager {
         }
 
         return false;
+    }
+
+    public static getProxySettings(): ProxySettings {
+        const config = vscode.workspace.getConfiguration(this.PROXY_CONFIG_SECTION);
+        return {
+            protocol: config.get('protocol'),
+            host: config.get('host'),
+            port: config.get('port'),
+            authentication: config.get('authentication'),
+            username: config.get('username'),
+            password: config.get('password'),
+            nonProxyHosts: config.get('nonProxyHosts')
+        };
     }
 
 }
