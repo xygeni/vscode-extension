@@ -98,10 +98,10 @@ export interface XygeniIssueData {
   category: 'secrets' | 'misconf' | 'iac' | 'sast' | 'sca';
   categoryName: 'Secret' | 'Misconfiguration' | 'IaC' | 'SAST' | 'Vulnerability';
   file?: string;
-  beginLine?: number;
-  endLine?: number;
-  beginColumn?: number;
-  endColumn?: number;
+  beginLine: number;
+  endLine: number;
+  beginColumn: number;
+  endColumn: number;
   code?: string;
   tags?: string[];
   explanation: string;

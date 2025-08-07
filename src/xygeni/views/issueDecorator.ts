@@ -125,8 +125,7 @@ export class IssueDecorator {
             }
 
             const decorations: vscode.DecorationOptions[] = severityIssues.map(issue => {
-                const line = Math.max(0, (issue.beginLine || 1) - 1); // Convert to 0-based indexing
-                const range = new vscode.Range(line, 0, line, editor.document.lineAt(line).text.length);
+                const range = new vscode.Range(issue.beginLine, issue.beginColumn, issue.endLine, issue.endColumn);
 
                 // Create hover message with issue details
                 const hoverMessage = new vscode.MarkdownString();

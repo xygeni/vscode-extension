@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { Commands } from "../common/interfaces";
 import { ConfigManager } from '../config/xygeni-configuration';
 import { XygeniIssue } from '../common/interfaces';
+import { Logger } from '../common/logger';
 
 
 export class DetailsView {
@@ -14,11 +15,6 @@ export class DetailsView {
 
     if (issue.file) {
 
-      const beginLine = Math.max(0, (issue.beginLine || 1) - 1);
-      const endLine = Math.max(0, (issue.endLine || issue.beginLine || 1) - 1);
-      const beginColumn = Math.max(0, (issue.beginColumn || 1) - 1);
-      const endColumn = issue.endColumn || Number.MAX_SAFE_INTEGER;
-
       const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
       const fileUri = workspaceFolder
         ? vscode.Uri.joinPath(workspaceFolder.uri, issue.file)
@@ -28,7 +24,7 @@ export class DetailsView {
       vscode.workspace.fs.stat(fileUri).then(() => {
         vscode.workspace.openTextDocument(fileUri).then(document => {
           vscode.window.showTextDocument(document, {
-            selection: new vscode.Range(beginLine, beginColumn, endLine, endColumn),
+            selection: new vscode.Range(issue.beginLine, issue.beginColumn, issue.endLine, issue.endColumn),
             viewColumn: vscode.ViewColumn.One
           });
         });

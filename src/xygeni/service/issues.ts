@@ -211,11 +211,13 @@ export default class IssuesService {
 
     return VulnerabilitiesService.getInstance().getVulnerabilities(dependenciesByGavt, (dep, vuln) => {
 
+      const location = dep.paths ? dep.paths.locations ? dep.paths.locations[0] : null : null;
       // for each vulnerability, create an issue      
       const issue = new DepsXygeniIssue({
         id: vuln.cve,
         type: vuln.cve,
         virtual: dep.virtual,
+        fixedVersion: dep.fixedVersion,
         url: vuln.url,
         detector: vuln.cve,
         tool: tool,
@@ -231,11 +233,12 @@ export default class IssuesService {
         confidence: dep.confidence ? dep.confidence as 'highest' | 'high' | 'medium' | 'low' : 'high',
         category: 'sca',
         categoryName: 'Vulnerability',
-        file: dep.location ? dep.location.filepath ? dep.location.filepath : '' : dep.fileName ? dep.fileName : dep.displayFileName,
-        beginLine: dep.location ? dep.location.beginLine ? dep.location.beginLine : 0 : 0,
-        endLine: dep.location ? dep.location.endLine ? dep.location.endLine : 0 : 0,
-        beginColumn: dep.location ? dep.location.beginColumn ? dep.location.beginColumn : 0 : 0,
-        endColumn: dep.location ? dep.location.endColumn ? dep.location.endColumn : 0 : 0,
+        file: location ? location.filepath : dep.fileName ? dep.fileName : dep.displayFileName,
+        beginLine: location ? location.beginLine ? location.beginLine : 0 : 0,
+        endLine: location ? location.endLine ? location.endLine : 0 : 0,
+        beginColumn: location ? location.beginColumn ? location.beginColumn : 0 : 0,
+        endColumn: location ? location.endColumn ? location.endColumn : 0 : 0,
+        code: location ? location.code ? location.code : '' : '',
         explanation: vuln.description ? vuln.description : 'Vulnerability ' + vuln.cve,
         tags: dep.tags?.length > 0 ? dep.tags : undefined,
       });

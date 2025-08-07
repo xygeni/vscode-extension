@@ -36,6 +36,13 @@ export class ScaXygeniIssue extends AbstractXygeniIssue {
     </div>`;
   }
 
+  getFixSnippetHtmlTab(): string {
+    return ``;
+  }
+  getFixSnippetHtml(): string {
+    return ``;
+  }
+
   getDetectorDetails(doc: any): string {
     return `    
     <p><a href="${doc.linkDocumentation}" target="_blank">Link to documentation</a></p>

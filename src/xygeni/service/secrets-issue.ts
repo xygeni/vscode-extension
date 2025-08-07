@@ -61,6 +61,14 @@ export class SecretsXygeniIssue extends AbstractXygeniIssue {
     </div>`;
   }
 
+  getFixSnippetHtmlTab(): string {
+    return ``;
+  }
+  getFixSnippetHtml(): string {
+    return ``;
+  }
+
+
   getDetectorDetails(doc: any): string {
     return `  
     <p>${doc.descriptionDoc}</p>

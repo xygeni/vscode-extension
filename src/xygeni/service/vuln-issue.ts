@@ -9,6 +9,7 @@ export interface DepsXygeniIssueData extends XygeniIssueData {
   group: string,
   name: string,
   version: string,
+  fixedVersion: string,
   dependencyPaths: string,
   directDependency: string
 }
@@ -22,6 +23,7 @@ export class DepsXygeniIssue extends AbstractXygeniIssue {
   group: string;
   name: string;
   version: string;
+  fixedVersion: string;
   dependencyPaths: string;
   directDependency: string;
 
@@ -34,6 +36,7 @@ export class DepsXygeniIssue extends AbstractXygeniIssue {
     this.group = issue.group;
     this.name = issue.name;
     this.version = issue.version;
+    this.fixedVersion = issue.fixedVersion;
     this.dependencyPaths = issue.dependencyPaths;
     this.directDependency = issue.directDependency;
   }
@@ -77,9 +80,39 @@ export class DepsXygeniIssue extends AbstractXygeniIssue {
   }
 
   getCodeSnippetHtmlTab(): string {
+    if (this.code) {
+      return `<input type="radio" name="tabs" id="tab-2">
+        <label for="tab-2">CODE SNIPPET</label>`;
+    }
     return ``;
   }
   getCodeSnippetHtml(): string {
+    if (this.code) {
+      return `    
+        <div id="tab-content-2">
+        <p class="file">${this.file ? this.file : ''}</p>
+        <pre><code class="code language-js">${this.code}</code></pre>
+        </div>`;
+    }
+    return ``;
+  }
+
+  getFixSnippetHtmlTab(): string {
+    if (this.fixedVersion) {
+      return `<input type="radio" name="tabs" id="tab-3">
+    <label for="tab-3">FIX IT</label>`;
+    }
+    return ``;
+  }
+  getFixSnippetHtml(): string {
+    if (this.fixedVersion) {
+      return `<div id="tab-content-3">
+      <p>Fix this version: ${this.group}:${this.name}:${this.version} to ${this.fixedVersion}</p>
+      <pre><code class="code language-js">${this.code}</code></pre>
+      <pre><code class="code language-js">${this.code?.replace(this.version, this.fixedVersion)}</code></pre>
+      <button id="fix-it">FIX IT</button>
+    </div>`;
+    }
     return ``;
   }
 

@@ -12,10 +12,10 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
   category: 'secrets' | 'misconf' | 'iac' | 'sast' | 'sca';
   categoryName: 'Secret' | 'Misconfiguration' | 'IaC' | 'SAST' | 'Vulnerability';
   file?: string;
-  beginLine?: number;
-  endLine?: number;
-  beginColumn?: number;
-  endColumn?: number;
+  beginLine: number;
+  endLine: number;
+  beginColumn: number;
+  endColumn: number;
   code?: string;
   tags?: string[];
   explanation: string;
@@ -31,10 +31,17 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
     this.category = issue.category;
     this.categoryName = issue.categoryName;
     this.file = issue.file;
-    this.beginLine = issue.beginLine;
-    this.endLine = issue.endLine;
-    this.beginColumn = issue.beginColumn;
-    this.endColumn = issue.endColumn;
+    if (this.category === 'sca') {
+      this.beginLine = Math.max(0, issue.beginLine ? issue.beginLine : 0);
+      this.endLine = Math.max(0, issue.endLine ? issue.endLine : this.beginLine);;
+    }
+    else {
+      // normalize line numbers to 0-based
+      this.beginLine = Math.max(0, issue.beginLine ? issue.beginLine - 1 : 0);
+      this.endLine = Math.max(0, issue.endLine ? issue.endLine - 1 : this.beginLine);
+    }
+    this.beginColumn = Math.max(0, issue.beginColumn ? issue.beginColumn - 1 : 0);
+    this.endColumn = Math.max(0, issue.endColumn ? issue.endColumn - 1 : Number.MAX_SAFE_INTEGER);
     this.code = issue.code;
     this.tags = issue.tags;
     this.explanation = issue.explanation;
@@ -47,6 +54,8 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
   abstract getIssueDetailsHtml(): string;
   abstract getCodeSnippetHtmlTab(): string;
   abstract getCodeSnippetHtml(): string;
+  abstract getFixSnippetHtmlTab(): string;
+  abstract getFixSnippetHtml(): string;
   abstract getDetectorDetails(doc: any): string;
 
   public getWebviewContent(): string {
@@ -68,9 +77,11 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
             <input type="radio" name="tabs" id="tab-1" checked>
             <label for="tab-1">ISSUE DETAILS</label>
             ${this.getCodeSnippetHtmlTab()}
+            ${this.getFixSnippetHtmlTab()}
             
             ${this.getIssueDetailsHtml()}
             ${this.getCodeSnippetHtml()}
+            ${this.getFixSnippetHtml()}
 
             </section>
       </body>
