@@ -36,11 +36,13 @@ export default class ConfigurationView implements vscode.TreeDataProvider<Config
             // Root level - show configuration items
             const xygeniUrl = ConfigManager.getXygeniUrl();
             const xygeniToken = await ConfigManager.getXygeniToken(this.context);
+            const isLicenseIdeAvailable = this.xygeniContext.getKey(XYGENI_CONTEXT.LICENSE_IDE_AVAILABLE);
             const isConfigValid = await ConfigManager.isConfigValid(this.context);
             const isConnectionValid = this.xygeniContext.getKey(XYGENI_CONTEXT.CONNECTION_READY);
             const isXygeniInstalled = this.xygeniContext.getKey(XYGENI_CONTEXT.INSTALL_READY);
             const isConnecting = this.xygeniContext.getKey(XYGENI_CONTEXT.CONNECTING);
             const isInstalling = this.xygeniContext.getKey(XYGENI_CONTEXT.INSTALLING);
+            const overrideInstallation = true;
 
             this.configItems = [
                 // Xygeni API Url field
@@ -75,14 +77,24 @@ export default class ConfigurationView implements vscode.TreeDataProvider<Config
                     isConnecting ? 'status-loading' : isConnectionValid ? 'status-ok' : isConfigValid ? 'status-unknown' : 'status-error',
                     {
                         command: COMMAND_TEST_XYGENI_CONNECTION,
-                        title: 'Check Connect Status',
-                        arguments: [true]
+                        title: 'Refresh Connection',
+                        arguments: [overrideInstallation]
                     },
                 )
             ];
 
+            if (!isLicenseIdeAvailable) {
+                this.configItems.push(
+                    new ConfigItem(
+                        'Ide License Not Available.',
+                        'Max Xygeni Ide Licenses reached. Contact administrator to increase limit.',
+                        vscode.TreeItemCollapsibleState.None,
+                        'status-error'
+                    )
+                );
+            }
 
-            if (this.xygeniContext.getKey(XYGENI_CONTEXT.CONNECTION_READY)) {
+            if (isConnectionValid) {
                 this.configItems.push(
                     // Install Scanner
                     new ConfigItem(

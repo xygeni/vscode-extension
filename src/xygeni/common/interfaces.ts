@@ -37,6 +37,9 @@ export interface WorkspaceFiles {
   storeFile(filename: string, content: string): Promise<void>;
   readFile(filename: string): Promise<string>;
   fileExists(filename: string): Promise<boolean>;
+  storeGlobalFile(filename: string, content: string): Promise<void>;
+  readGlobalFile(filename: string): Promise<string>;
+  globalFileExists(filename: string): Promise<boolean>;
   getWsLocalStorage(): string;
 }
 
@@ -54,7 +57,7 @@ export interface Commands extends WorkspaceFiles {
 
   getHttpClient(url: string): IHttpClient;
 
-  testConnection(): Promise<unknown>;
+  refreshAndInstall(): Promise<unknown>;
 
   getScans(): ScanResult[];
   getIssues(): XygeniIssue[];

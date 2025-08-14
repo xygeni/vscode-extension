@@ -9,7 +9,7 @@
   },
   "license": "MIT",
   "icon": "media/images/logo_xy.png",
-  "version": "0.6.0",
+  "version": "0.8.0",
   "engines": {
     "vscode": "^1.99.2"
   },
@@ -33,7 +33,8 @@
         {
           "id": "xygeni.views.welcome",
           "name": "Xygeni",
-          "when": "xygeni:welcome || !xygeni:workspaceFound || xygeni:error"
+          "when": "xygeni:welcome || !xygeni:workspaceFound || xygeni:error",
+          "icon": "media/images/xy_icon_white.svg"
         },
         {
           "id": "xygeni.views.configuration",

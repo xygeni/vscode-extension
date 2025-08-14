@@ -87,14 +87,14 @@ export class DepsXygeniIssue extends AbstractXygeniIssue {
     return ``;
   }
   getFixSnippetHtmlTab(): string {
-    if (this.fixedVersion) {
+    if (this.fixedVersion && false) { // TODO: enable when fix is available
       return `<input type="radio" name="tabs" id="tab-3">
     <label for="tab-3">FIX IT</label>`;
     }
     return ``;
   }
   getFixSnippetHtml(): string {
-    if (this.fixedVersion) {
+    if (this.fixedVersion && false) {  // TODO : enable when fix is available
       return `<div id="tab-content-3">
       <p>Fix this version: ${this.group}:${this.name}:${this.version} to ${this.fixedVersion}</p>
       <pre><code class="code language-js">${this.code}</code></pre>
