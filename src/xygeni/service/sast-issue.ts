@@ -33,14 +33,6 @@ export class SastXygeniIssue extends AbstractXygeniIssue {
     <input type="radio" name="tabs" id="tab-2">
     <label for="tab-2">CODE SNIPPET</label>`;
   }
-  getCodeSnippetHtml(): string {
-    return `
-    <div id="tab-content-2">
-    <p class="file">${this.file ? this.file : ''}</p>
-    <pre><code class="code language-js">${this.code}</code></pre>
-    </div>`;
-  }
-
   getFixSnippetHtmlTab(): string {
     return ``;
   }

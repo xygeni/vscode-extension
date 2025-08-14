@@ -89,6 +89,7 @@ vscode-panel-view {
 .xy-tabs-section #tab-content-3 {
   display: none;
   margin: 10px;
+  overflow-x: auto;
 }
 
 .xy-tabs-section #tab-1:checked~#tab-content-1,
@@ -125,4 +126,25 @@ vscode-panel-view {
   font-weight: 400;
   color: var(--vscode-descriptionForeground);
   text-align: left;
+}
+
+.xy-tabs-section .code-snippet-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.xy-tabs-section .line-number {
+  text-align: right;
+  padding-right: 10px;
+  color: var(--vscode-descriptionForeground);
+  user-select: none;
+  width: 1%;
+  padding-right: 1em;
+  border-right: 1px solid var(--vscode-descriptionForeground);
+}
+
+.xy-tabs-section .code-line {
+  padding-left: 10px;
+  white-space: pre;
+  font-family: var(--vscode-editor-font-family);
 }

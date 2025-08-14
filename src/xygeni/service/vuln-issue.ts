@@ -86,17 +86,6 @@ export class DepsXygeniIssue extends AbstractXygeniIssue {
     }
     return ``;
   }
-  getCodeSnippetHtml(): string {
-    if (this.code) {
-      return `    
-        <div id="tab-content-2">
-        <p class="file">${this.file ? this.file : ''}</p>
-        <pre><code class="code language-js">${this.code}</code></pre>
-        </div>`;
-    }
-    return ``;
-  }
-
   getFixSnippetHtmlTab(): string {
     if (this.fixedVersion) {
       return `<input type="radio" name="tabs" id="tab-3">

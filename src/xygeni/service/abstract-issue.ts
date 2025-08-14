@@ -53,10 +53,34 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
 
   abstract getIssueDetailsHtml(): string;
   abstract getCodeSnippetHtmlTab(): string;
-  abstract getCodeSnippetHtml(): string;
   abstract getFixSnippetHtmlTab(): string;
   abstract getFixSnippetHtml(): string;
   abstract getDetectorDetails(doc: any): string;
+
+  public getCodeSnippetHtml(): string {
+    const codeLines = this.code?.split('\n') || [];
+    const codeSnippet = codeLines.map((line, index) => {
+      const lineNumber = this.beginLine + index + 1;
+      const escapedLine = line.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return `
+        <tr>
+          <td class="line-number">${lineNumber}</td>
+          <td class="code-line">${escapedLine}</td>
+        </tr>
+      `;
+    }).join('');
+
+    return `
+      <div id="tab-content-2">
+        <p class="file">${this.file ? this.file : ''}</p>
+        <table class="code-snippet-table">
+          <tbody>
+            ${codeSnippet}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
 
   public getWebviewContent(): string {
     return `
