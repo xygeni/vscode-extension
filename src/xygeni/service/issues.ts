@@ -312,6 +312,12 @@ export default class IssuesService {
         code: raw_vuln.location ? raw_vuln.location.code ? raw_vuln.location.code : '' : '',
         explanation: raw_vuln.explanation,
         url: raw_vuln.url ? raw_vuln.url : '',
+        tags: raw_vuln.tags?.length > 0 ? raw_vuln.tags : undefined,
+        branch: sast_vuln.currentBranch ? sast_vuln.currentBranch : '',
+        cwe: raw_vuln.cwe,
+        cwes: raw_vuln.cwes,
+        container: raw_vuln.container,
+        language: raw_vuln.language
       });
       this.issues.push(issue);
     });
@@ -378,6 +384,7 @@ export default class IssuesService {
         tags: flaw.tags?.length > 0 ? flaw.tags : undefined,
         explanation: flaw.explanation,
         url: flaw.url ? flaw.url : '',
+        branch: jsonRaw.currentBranch ? jsonRaw.currentBranch : ''
       });
       this.issues.push(issue);
     });

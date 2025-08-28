@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ConfigManager } from '../config/xygeni-configuration';
-import { COMMAND_EDIT_XYGENI_API_URL, COMMAND_INSTALL_SCANNER, COMMAND_TEST_XYGENI_CONNECTION, CONFIG_XYGENI_API_URL, STATUS, XYGENI_CONTEXT } from '../common/constants';
+import { COMMAND_EDIT_XYGENI_API_URL, COMMAND_INSTALL_SCANNER, COMMAND_TEST_XYGENI_CONNECTION, STATUS, XYGENI_CONTEXT } from '../common/constants';
 import { Commands, XyContext } from '../common/interfaces';
 
 
@@ -83,7 +83,8 @@ export default class ConfigurationView implements vscode.TreeDataProvider<Config
                 )
             ];
 
-            if (!isLicenseIdeAvailable) {
+            // TODO: enable when license validation was implemented
+            if (!isLicenseIdeAvailable && false) {
                 this.configItems.push(
                     new ConfigItem(
                         'Ide License Not Available.',
@@ -106,17 +107,6 @@ export default class ConfigurationView implements vscode.TreeDataProvider<Config
                             command: COMMAND_INSTALL_SCANNER,
                             title: 'Install Scan',
                             arguments: []
-                        }
-                    ),
-                    new ConfigItem(
-                        '    Show Output Channel',
-                        'Click to Open Output',
-                        vscode.TreeItemCollapsibleState.None,
-                        'show',
-                        {
-                            command: 'xygeni.showOutput',
-                            title: 'Open Extension Output Channel',
-                            arguments: [],
                         }
                     )
                 );

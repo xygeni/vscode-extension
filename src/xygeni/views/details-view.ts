@@ -4,6 +4,7 @@ import { ConfigManager } from '../config/xygeni-configuration';
 import { XygeniIssue } from '../common/interfaces';
 import { Logger } from '../common/logger';
 import path from 'path';
+import { MarkdownParser } from '../common/markdown';
 
 
 export class DetailsView {
@@ -54,7 +55,7 @@ export class DetailsView {
     }
 
     const nonce = this.getNonce();
-    
+  
 
     let html = issue.getWebviewContent()
       .replace('{{meta-security-policy}}', this.getMetaSecurityPolicy(nonce, this.panel.webview.cspSource))

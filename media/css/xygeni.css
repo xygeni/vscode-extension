@@ -45,7 +45,7 @@ body {
   align-items: start;
   gap: 2px;
   flex-direction: row;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 
 .xy-blue-chip {
@@ -62,6 +62,7 @@ body {
   padding-right: 2px; 
   padding-top: 5px; 
   margin-right: 2px;
+  text-wrap: nowrap;
 }
 
 vscode-panel-view {

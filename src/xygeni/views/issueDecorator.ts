@@ -129,7 +129,7 @@ export class IssueDecorator {
 
                 // Create hover message with issue details
                 const hoverMessage = new vscode.MarkdownString();
-                hoverMessage.appendMarkdown(`**${this.getSeverityIcon(issue.severity)} ${issue.severity.toUpperCase()} SEVERITY**\n\n`);
+                hoverMessage.appendMarkdown(`**${this.getSeverityIcon(issue.severity)} ${issue.severity ? issue.severity.toUpperCase() : ''} - ${issue.severity.toUpperCase()} SEVERITY**\n\n`);
                 hoverMessage.appendMarkdown(`**Issue:** ${issue.type}\n\n`);
                 hoverMessage.appendMarkdown(`**Description:** ${issue.explanation}\n\n`);
                 hoverMessage.appendMarkdown(`**File:** ${issue.file}\n\n`);

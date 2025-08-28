@@ -56,6 +56,7 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     vscode.workspace.fs.createDirectory(vscode.Uri.file(this.globalStoragePath)); // ensure output directory is create before running scanner
     vscode.workspace.fs.createDirectory(vscode.Uri.file(this.wsLocalStoragePath)); // ensure output directory is create before running scanner
 
+    //Logger.log(`Workspace storage path: ${this.wsLocalStoragePath}`);
     this.xygeniMedia = new XygeniMediaImpl(this.context);
 
   }

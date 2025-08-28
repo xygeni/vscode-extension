@@ -52,7 +52,7 @@ export class SecretsXygeniIssue extends AbstractXygeniIssue {
   getIssueDetailsHtml(): string {
     return `      
       <div id="tab-content-1">
-      <table>
+      <table>                 
                   ${this.field(this.type, 'Type')}
                   ${this.field(this.secret, 'Secret')}
                   ${this.field(this.where(this.branch, this.commitHash, this.user), 'Where')}
@@ -63,10 +63,7 @@ export class SecretsXygeniIssue extends AbstractXygeniIssue {
                   
                   ${this.fieldTags(this.tags)}
 
-                  ${this.fieldDetails(this.explanation)}
-
                 </table>
-                <p>Details:</p>
                 <p><span>Loading...</span></p>
       </div>`;
   }
@@ -84,12 +81,7 @@ export class SecretsXygeniIssue extends AbstractXygeniIssue {
   }
 
 
-  getDetectorDetails(doc: any): string {
-    return `  
-    <p>${doc.descriptionDoc}</p>
-    <p><a href="${doc.linkDocumentation}" target="_blank">Link to documentation</a></p>
-    `;
-  }
+  
 
   
 }

@@ -1,4 +1,5 @@
 import { Commands, XygeniIssue, XygeniIssueData } from '../common/interfaces';
+import { MarkdownParser } from '../common/markdown';
 
 
 export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssue {
@@ -57,7 +58,6 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
   abstract getCodeSnippetHtmlTab(): string;
   abstract getFixSnippetHtmlTab(): string;
   abstract getFixSnippetHtml(): string;
-  abstract getDetectorDetails(doc: any): string;
 
   public getSubtitleLineHtml(): string {
 
@@ -106,13 +106,13 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         {{meta-security-policy}}
-        <title>Xygeni Issue Details</title>
-        <link rel="stylesheet" href="{{xygeniCss}}" />
+        <title>Xygeni Issue Details</title>        
+        <style nonce="{{nonce}}">{{xygeniStyle}}</style>
         
       </head>
       <body>
             <h1>Xygeni ${this.categoryName} Issue</h1>
-            <p><span class="xy-slide-${this.severity}">${this.severity}</span> ${this.explanation ? this.explanation.length > 30 ? this.explanation.substring(0, 30) + '...' : this.explanation : this.type}</p>
+            <p>${this.severity ? `<span class="xy-slide-${this.severity}">${this.severity}</span>` : ''}</span> ${this.explanation ? this.explanation.length > 50 ? this.explanation.substring(0, 50) + '...' : this.explanation : this.type}</p>
             <p> ${this.getSubtitleLineHtml()} </p>
             <section class="xy-tabs-section">
             <input type="radio" name="tabs" id="tab-1" checked>
@@ -140,7 +140,7 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
   public fieldTags(tags: string[] | undefined): string {
     return tags ?
       '<tr><th>Tags</th>' +
-      '<td><div class="xy-container-chip">' + tags.map(tag => `<div class="xy-blue-chip">${this.tagText(tag)}</div>`).join(' ') + '</div></td></tr>'
+      '<td><div class="xy-container-chip">' + tags.map(tag => `<div class="xy-blue-chip">${this.tagNames(tag)}</div>`).join(' ') + '</div></td></tr>'
       : '';    
   }
 
@@ -152,13 +152,13 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
   }
 
   public fieldDetails(explanation: string | undefined): string {
-    return explanation ?
-      '<tr><th>Details</th>' +
-      '<td>' + explanation + '</td></tr>'
+    return explanation && explanation.length > 0 ?
+      '<tr><th>Details </th>' +
+      '<td>' + MarkdownParser.parse(explanation) + '</td></tr>'
       : '';
   }
 
-  private tagText(tag: string): string {
+  private tagNames(tag: string): string {
     const texts: Record<string, string> = {
       "manual_fix": "Manual Fix",
       "potential_reachable": "Potential Reachable",
@@ -167,6 +167,13 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
     } as const;
 
     return texts[tag.toLowerCase()] ? texts[tag.toLowerCase()] : tag;
+  }
+
+  public getDetectorDetails(doc: any): string {
+    return `      
+    ${doc.descriptionDoc ? "<p> " + MarkdownParser.parse(doc.descriptionDoc) + "</p>" : ''}
+    <p><a href="${doc.linkDocumentation}" target="_blank">Link to documentation</a></p>
+    `;
   }
 
   public where(branch: string, commitHash: string | undefined, user: string | undefined): string {

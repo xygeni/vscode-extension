@@ -1,5 +1,6 @@
 import { AbstractXygeniIssue } from './abstract-issue';
 import { XygeniIssueData } from '../common/interfaces';
+import { MarkdownParser } from '../common/markdown';
 
 export interface VulnXygeniIssueData extends XygeniIssueData {
   virtual: boolean;
@@ -80,12 +81,13 @@ export class VulnXygeniIssue extends AbstractXygeniIssue {
   }
 
   getIssueDetailsHtml(): string {
+    
     return `      
         <div id="tab-content-1">
         <table>
                     
                     ${this.field(this.publicationDate, 'Published')}
-                    ${this.field(this.group ? this.group + ':' : '' + this.name , 'Affecting')}
+                    ${this.field(this.group ? this.group + ':' + this.name  : this.name , 'Affecting')}
                     ${this.field(this.version, 'Versions')}
                     ${this.field(this.fixedVersion, 'Fixed at')}
                     ${this.field(this.file ? this.file : '', 'File')}
@@ -93,12 +95,13 @@ export class VulnXygeniIssue extends AbstractXygeniIssue {
                
                     
                     ${this.fieldTags(this.tags)}  
-
-                    ${this.fieldDetails(this.explanation)}                       
-
-                    ${this.fieldLinkDoc(this.url)}
+                    
 
                   </table>
+
+                  ${this.explanation ? `<p>${MarkdownParser.parse(this.explanation)}</p>` : ''}                       
+
+                  ${this.url ? `<p><a href="${this.url}" target="_blank">Link to documentation</a></p>` : ''}
                  
         </div>`;
   }
@@ -128,11 +131,6 @@ export class VulnXygeniIssue extends AbstractXygeniIssue {
     }
     return ``;
   }
-
-  getDetectorDetails(doc: any): string {
-    return `  
-      <p>${doc.descriptionDoc}</p>
-      <p><a href="${doc.linkDocumentation}" target="_blank">Link to documentation</a></p>
-      `;
-  }
+  
+  
 }

@@ -32,7 +32,6 @@ export class MisconfXygeniIssue extends AbstractXygeniIssue {
         ${this.fieldTags(this.tags)}
       </table>
                 
-                <p>Details:</p>
                 <p><span>Loading...</span></p>
       </div>`;
   }
@@ -51,9 +50,5 @@ export class MisconfXygeniIssue extends AbstractXygeniIssue {
     return ``;
   }
 
-  getDetectorDetails(doc: any): string {
-    return `    
-    <p><a href="${doc.linkDocumentation}" target="_blank">Link to documentation</a></p>
-    `;
-  }
+  
 }
