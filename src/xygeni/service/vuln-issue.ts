@@ -1,20 +1,24 @@
 import { AbstractXygeniIssue } from './abstract-issue';
 import { XygeniIssueData } from '../common/interfaces';
 
-export interface DepsXygeniIssueData extends XygeniIssueData {
+export interface VulnXygeniIssueData extends XygeniIssueData {
   virtual: boolean;
   url: string;
   repositoryType: string;
   displayFileName: string;
-  group: string,
-  name: string,
-  version: string,
-  fixedVersion: string,
-  dependencyPaths: string,
-  directDependency: string
+  group: string;
+  name: string;
+  version: string;
+  fixedVersion: string;
+  dependencyPaths: string;
+  directDependency: string;
+
+  baseScore: number;
+  publicationDate: string;
+  weakness: string[];
 }
 
-export class DepsXygeniIssue extends AbstractXygeniIssue {
+export class VulnXygeniIssue extends AbstractXygeniIssue {
 
   virtual: boolean;
   url: string;
@@ -27,7 +31,11 @@ export class DepsXygeniIssue extends AbstractXygeniIssue {
   dependencyPaths: string;
   directDependency: string;
 
-  constructor(issue: DepsXygeniIssueData) {
+  baseScore: number;
+  publicationDate: string;
+  weakness: string[];
+
+  constructor(issue: VulnXygeniIssueData) {
     super(issue);
     this.virtual = issue.virtual;
     this.url = issue.url;
@@ -39,41 +47,57 @@ export class DepsXygeniIssue extends AbstractXygeniIssue {
     this.fixedVersion = issue.fixedVersion;
     this.dependencyPaths = issue.dependencyPaths;
     this.directDependency = issue.directDependency;
+
+    this.baseScore = issue.baseScore;
+    this.publicationDate = issue.publicationDate;
+    this.weakness = issue.weakness? issue.weakness : [];
   }
 
+  override getSubtitleLineHtml(): string {
+
+    let subtitle = this.categoryName;
+
+      if(this.url) {
+        subtitle +=  ` &nbsp;&nbsp; <a href="${this.url}" target="_blank">${this.type}</a>` ;
+      }
+      else {
+        subtitle += ` ${this.type}`;
+      }
+
+      if(this.weakness.length > 0) {
+
+        subtitle += ' &nbsp;&nbsp;  ' + this.weakness.map(
+          weakness => {
+            const wcode = weakness.split('-')[1]; // use the CWE code (CWE-123)
+            return `<a href="https://cwe.mitre.org/data/definitions/${wcode}.html" target="_blank">${weakness}</a>`;
+          }).join(' &nbsp;&nbsp; ');
+      }
+
+      if(this.baseScore) {
+        subtitle += ` &nbsp;&nbsp; Score: <span class="xy-slide-${this.severity}">${this.baseScore}</span> `;
+      }
+      return subtitle;
+  }
 
   getIssueDetailsHtml(): string {
     return `      
         <div id="tab-content-1">
         <table>
-                    <tr>
-                      <th>Virtual</th>
-                      <td>${this.virtual}</td>
-                    </tr>                    
-                    <tr>
-                      <th>File</th>
-                      <td>${this.file ? this.file : ''}</td>
-                    </tr>
-                    <tr>
-                      <th>Dependency</th>
-                      <td>${this.displayFileName}</td>
-                    </tr>
-                    <tr>
-                      <th>Direct Dependency</th>
-                      <td>${this.directDependency ? this.directDependency : ''}</td>
-                    </tr>
-                    ${this.tags ?
-        '<tr><th>Tags</th>' +
-        '<td>' + this.tags.join(', ') + '</td></tr>'
-        : ''}
-                    <tr>
-                      <th>Description</th>
-                      <td>${this.explanation}</td>
-                    </tr>    
-                    ${this.url ?
-        '<tr><th></th>' +
-        '<td><a href="' + this.url + '" target="_blank">Link to documentation</a></td></tr></tr>'
-        : ''}              
+                    
+                    ${this.field(this.publicationDate, 'Published')}
+                    ${this.field(this.group ? this.group + ':' : '' + this.name , 'Affecting')}
+                    ${this.field(this.version, 'Versions')}
+                    ${this.field(this.fixedVersion, 'Fixed at')}
+                    ${this.field(this.file ? this.file : '', 'File')}
+                    ${this.field(this.directDependency, 'Direct Dependency')}
+               
+                    
+                    ${this.fieldTags(this.tags)}  
+
+                    ${this.fieldDetails(this.explanation)}                       
+
+                    ${this.fieldLinkDoc(this.url)}
+
                   </table>
                  
         </div>`;

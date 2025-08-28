@@ -68,6 +68,10 @@ export interface Commands extends WorkspaceFiles {
 
   getXygeniCss(): string;
 
+  getIconPath(iconname: string): string;
+  getExtensionPath(): string;
+  getIconsPath(): string;
+
 }
 
 
@@ -86,6 +90,7 @@ export interface IHttpClient {
 
 export interface XygeniMedia {
   getIconPath(iconname: string): string;
+  getIconsPath(): string;
   getXygeniCss(): string
 }
 
@@ -108,6 +113,7 @@ export interface XygeniIssueData {
   code?: string;
   tags?: string[];
   explanation: string;
+  url: string;
 }
 
 export interface XygeniIssue extends XygeniIssueData {

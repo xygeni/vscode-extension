@@ -593,5 +593,11 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
   getIconPath(iconname: string): string {
     return this.xygeniMedia.getIconPath(iconname);
   }
+  getExtensionPath(): string {
+    return this.context.extensionPath;
+  }
+  getIconsPath(): string {
+    return this.xygeniMedia.getIconsPath();
+  }
 
 }

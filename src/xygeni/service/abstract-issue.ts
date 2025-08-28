@@ -19,6 +19,7 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
   code?: string;
   tags?: string[];
   explanation: string;
+  url: string;
 
   constructor(issue: XygeniIssueData) {
     this.id = issue.id;
@@ -45,6 +46,7 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
     this.code = issue.code;
     this.tags = issue.tags;
     this.explanation = issue.explanation;
+    this.url = issue.url;
   }
 
   public showIssueDetails(commands: Commands): void {
@@ -56,6 +58,19 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
   abstract getFixSnippetHtmlTab(): string;
   abstract getFixSnippetHtml(): string;
   abstract getDetectorDetails(doc: any): string;
+
+  public getSubtitleLineHtml(): string {
+
+    let subtitle = this.categoryName;
+
+    if (this.url) {
+      subtitle += ` &nbsp;&nbsp; <a href="${this.url}" target="_blank">${this.type}</a>`;
+    }
+    else {
+      subtitle += ` ${this.type}`;
+    }
+    return subtitle;
+  }
 
   public getCodeSnippetHtml(): string {
     const codeLines = this.code?.split('\n') || [];
@@ -83,6 +98,7 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
   }
 
   public getWebviewContent(): string {
+    
     return `
       <!DOCTYPE html>
       <html lang="en">
@@ -91,12 +107,13 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         {{meta-security-policy}}
         <title>Xygeni Issue Details</title>
-        <style nonce="{{nonce}}">{{xygeniStyle}}</style>
+        <link rel="stylesheet" href="{{xygeniCss}}" />
+        
       </head>
       <body>
             <h1>Xygeni ${this.categoryName} Issue</h1>
-            <p><span class="xy-slide-${this.severity}">${this.severity}</span> ${this.type}</p>
-          
+            <p><span class="xy-slide-${this.severity}">${this.severity}</span> ${this.explanation ? this.explanation.length > 30 ? this.explanation.substring(0, 30) + '...' : this.explanation : this.type}</p>
+            <p> ${this.getSubtitleLineHtml()} </p>
             <section class="xy-tabs-section">
             <input type="radio" name="tabs" id="tab-1" checked>
             <label for="tab-1">ISSUE DETAILS</label>
@@ -111,6 +128,59 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
       </body>
       </html>
     `;
+  }
+
+  public field(value: string | undefined, title: string): string {
+    return value ?
+      '<tr><th>' + title + '</th>' +
+      '<td>' + value + '</td></tr>'
+      : '';
+  }
+
+  public fieldTags(tags: string[] | undefined): string {
+    return tags ?
+      '<tr><th>Tags</th>' +
+      '<td><div class="xy-container-chip">' + tags.map(tag => `<div class="xy-blue-chip">${this.tagText(tag)}</div>`).join(' ') + '</div></td></tr>'
+      : '';    
+  }
+
+  public fieldLinkDoc(url: string | undefined): string {
+    return url ?
+      '<tr><th></th>' +
+      '<td><a href="' + url + '" target="_blank">Link to documentation</a></td></tr></tr>'
+      : '';
+  }
+
+  public fieldDetails(explanation: string | undefined): string {
+    return explanation ?
+      '<tr><th>Details</th>' +
+      '<td>' + explanation + '</td></tr>'
+      : '';
+  }
+
+  private tagText(tag: string): string {
+    const texts: Record<string, string> = {
+      "manual_fix": "Manual Fix",
+      "potential_reachable": "Potential Reachable",
+      "in-app-code": "In-App Code",      
+      "generic": "Generic"
+    } as const;
+
+    return texts[tag.toLowerCase()] ? texts[tag.toLowerCase()] : tag;
+  }
+
+  public where(branch: string, commitHash: string | undefined, user: string | undefined): string {
+    let where = '';
+    if (branch) {
+      where += '<img src="{{iconsPath}}/branch.svg" alt="Branch"></img> ' + branch + ' &nbsp;&nbsp; ';
+    }
+    if (commitHash) { 
+      where += '<img src="{{iconsPath}}/branch.svg" alt="Commit"></i> ' + commitHash + ' &nbsp;&nbsp; ';
+    }
+    if (user) {
+      where += '<img src="{{iconsPath}}/account.svg" alt="User"></img> ' + user ;
+    }
+    return where;
   }
 
   public getSeverityLevel(): number {

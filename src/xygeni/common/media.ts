@@ -15,6 +15,12 @@ export class XygeniMediaImpl implements XygeniMedia {
     return style;
   }
 
+  getIconsPath(): string {
+    const iconPath = vscode.Uri.joinPath(
+      vscode.Uri.file(this.context.extensionPath), 'media', 'icons');
+    return iconPath.fsPath;
+  }
+
   getIconPath(iconName: string): string {
     const iconPath = vscode.Uri.joinPath(
       vscode.Uri.file(this.context.extensionPath), 'media', 'icons', iconName);

@@ -1,6 +1,6 @@
-body {
-  background-color: var(--vscode-sideBar-background);
+body {  
   color: var(--vscode-foreground);
+  background-color: var(--vscode-editor-background);
   font-family: "Segoe UI", sans-serif;
 }
 
@@ -40,13 +40,28 @@ body {
   margin-right: 16px;
 }
 
+.xy-container-chip {
+  display: flex;
+  align-items: start;
+  gap: 2px;
+  flex-direction: row;
+  flex-wrap: nowrap;
+}
+
 .xy-blue-chip {
-  font-size: 9px !important;
+  font-size: 10px !important;
+  font-weight: 500;
+  position: relative;
   border-radius: 7px !important;
+  box-sizing: border-box;
   background-color: transparent !important;
   color: #536DF7;
   border: 1px solid #536DF7;
   min-height: 22px !important;
+  padding-left: 2px;
+  padding-right: 2px; 
+  padding-top: 5px; 
+  margin-right: 2px;
 }
 
 vscode-panel-view {
@@ -111,14 +126,14 @@ vscode-panel-view {
 }
 
 .xy-tabs-section th {
-  font-weight: 400;
+  font-weight: 300;
   color: var(--vscode-descriptionForeground);
   text-align: left;
   padding: 3px 20px 3px 10px;
 }
 
 .xy-tabs-section td {
-  font-weight: 700;
+  font-weight: 500;
   color: var(--vscode-foreground);
 }
 

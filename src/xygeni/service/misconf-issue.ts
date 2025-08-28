@@ -2,18 +2,20 @@
 import { AbstractXygeniIssue } from './abstract-issue';
 import { XygeniIssueData } from '../common/interfaces';
 
-export interface MisconfXygeniIssueData extends XygeniIssueData {
-  type: string;
+export interface MisconfXygeniIssueData extends XygeniIssueData {  
   tool_kind: string;
+  currentBranch: string;
 }
 
 export class MisconfXygeniIssue extends AbstractXygeniIssue {
 
   tool_kind: string;
+  currentBranch: string;
 
   constructor(issue: MisconfXygeniIssueData) {
     super(issue);
     this.tool_kind = issue.tool_kind;
+    this.currentBranch = issue.currentBranch;
   }
 
 
@@ -21,27 +23,14 @@ export class MisconfXygeniIssue extends AbstractXygeniIssue {
     return `
       <div id="tab-content-1">
       <table>
-                  <tr>
-                    <th>Type</th>
-                    <td>${this.type}</td>
-                  </tr>
-                  <tr>
-                    <th>Tool</th>
-                    <td>${this.tool_kind ? this.tool_kind : ''}</td>
-                  </tr>
-                  ${this.file ?
-        '<tr><th>File</th>' +
-        '<td>' + this.file + '</td></tr>'
-        : ''}
-                  ${this.tags ?
-        '<tr><th>Tags</th>' +
-        '<td>' + this.tags.join(', ') + '</td></tr>'
-        : ''}
-                  <tr>
-                    <th>Description</th>
-                    <td>${this.explanation}</td>
-                  </tr>                  
-                </table>
+        ${this.field(this.explanation, 'Explanation')}                    
+        ${this.field(this.where(this.currentBranch, undefined, undefined), 'Where')}
+        ${this.field(this.file, 'Location')}
+        ${this.field(this.detector, 'Found By')}          
+        ${this.field(this.tool_kind, 'Tool')}
+      
+        ${this.fieldTags(this.tags)}
+      </table>
                 
                 <p>Details:</p>
                 <p><span>Loading...</span></p>
