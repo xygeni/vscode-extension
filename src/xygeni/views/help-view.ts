@@ -4,6 +4,8 @@ import * as crypto from 'crypto';
 export class HelpView {
     public static readonly viewType = 'xygeni.views.help';
 
+    constructor(private readonly currentVersion: string) { }
+
     public resolveWebviewView(
         webviewView: vscode.WebviewView,
         context: vscode.WebviewViewResolveContext,
@@ -13,6 +15,7 @@ export class HelpView {
     ) {
         // get nonce
         const nonce = this.getNonce();
+        const currentYear = new Date().getFullYear();
 
         webviewView.webview.options = {
             enableScripts: true,
@@ -41,8 +44,8 @@ export class HelpView {
             <div class="help-content">
                 <p>For more information, visit <a href="https://docs.xygeni.io">https://docs.xygeni.io</a></p>
                 <p>See Xygeni output channel for more details. <a href="command:xygeni.showOutput">Show Output</a></p>
-                <p>Are you using a proxy?. <a href="command:xygeni.openProxyConfig">Proxy Configuration</a></p>
-
+                <p>Are you using a proxy? <a href="command:xygeni.openProxyConfig">Proxy Configuration</a></p>
+                <p> © ${currentYear} Xygeni Security v${this.currentVersion} - All rights reserved</p>
             </div>
         </body>
         </html>`;

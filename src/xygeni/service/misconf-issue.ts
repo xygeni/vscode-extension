@@ -2,18 +2,20 @@
 import { AbstractXygeniIssue } from './abstract-issue';
 import { XygeniIssueData } from '../common/interfaces';
 
-export interface MisconfXygeniIssueData extends XygeniIssueData {
-  type: string;
+export interface MisconfXygeniIssueData extends XygeniIssueData {  
   tool_kind: string;
+  currentBranch: string;
 }
 
 export class MisconfXygeniIssue extends AbstractXygeniIssue {
 
   tool_kind: string;
+  currentBranch: string;
 
   constructor(issue: MisconfXygeniIssueData) {
     super(issue);
     this.tool_kind = issue.tool_kind;
+    this.currentBranch = issue.currentBranch;
   }
 
 
@@ -21,29 +23,15 @@ export class MisconfXygeniIssue extends AbstractXygeniIssue {
     return `
       <div id="tab-content-1">
       <table>
-                  <tr>
-                    <th>Type</th>
-                    <td>${this.type}</td>
-                  </tr>
-                  <tr>
-                    <th>Tool</th>
-                    <td>${this.tool_kind ? this.tool_kind : ''}</td>
-                  </tr>
-                  ${this.file ?
-        '<tr><th>File</th>' +
-        '<td>' + this.file + '</td></tr>'
-        : ''}
-                  ${this.tags ?
-        '<tr><th>Tags</th>' +
-        '<td>' + this.tags.join(', ') + '</td></tr>'
-        : ''}
-                  <tr>
-                    <th>Description</th>
-                    <td>${this.explanation}</td>
-                  </tr>                  
-                </table>
+        ${this.field(this.explanation, 'Explanation')}                    
+        ${this.field(this.where(this.currentBranch, undefined, undefined), 'Where')}
+        ${this.field(this.file, 'Location')}
+        ${this.field(this.detector, 'Found By')}          
+        ${this.field(this.tool_kind, 'Tool')}
+      
+        ${this.fieldTags(this.tags)}
+      </table>
                 
-                <p>Details:</p>
                 <p><span>Loading...</span></p>
       </div>`;
   }
@@ -55,21 +43,12 @@ export class MisconfXygeniIssue extends AbstractXygeniIssue {
     <input type="radio" name="tabs" id="tab-2">
     <label for="tab-2">CODE SNIPPET</label>`;
   }
-  getCodeSnippetHtml(): string {
-    if (!this.file || !this.code) {
-      return '';
-    }
-
-    return `
-    <div id="tab-content-2">
-    <p class="file">${this.file ? this.file : ''}</p>
-    <pre><code class="code language-js">${this.code}</code></pre>
-    </div>`;
+  getFixSnippetHtmlTab(): string {
+    return ``;
+  }
+  getFixSnippetHtml(): string {
+    return ``;
   }
 
-  getDetectorDetails(doc: any): string {
-    return `    
-    <p><a href="${doc.linkDocumentation}" target="_blank">Link to documentation</a></p>
-    `;
-  }
+  
 }

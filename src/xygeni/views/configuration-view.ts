@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ConfigManager } from '../config/xygeni-configuration';
-import { COMMAND_EDIT_XYGENI_API_URL, COMMAND_INSTALL_SCANNER, COMMAND_TEST_XYGENI_CONNECTION, CONFIG_XYGENI_API_URL, STATUS, XYGENI_CONTEXT } from '../common/constants';
+import { COMMAND_EDIT_XYGENI_API_URL, COMMAND_INSTALL_SCANNER, COMMAND_TEST_XYGENI_CONNECTION, STATUS, XYGENI_CONTEXT } from '../common/constants';
 import { Commands, XyContext } from '../common/interfaces';
 
 
@@ -36,11 +36,13 @@ export default class ConfigurationView implements vscode.TreeDataProvider<Config
             // Root level - show configuration items
             const xygeniUrl = ConfigManager.getXygeniUrl();
             const xygeniToken = await ConfigManager.getXygeniToken(this.context);
+            const isLicenseIdeAvailable = this.xygeniContext.getKey(XYGENI_CONTEXT.LICENSE_IDE_AVAILABLE);
             const isConfigValid = await ConfigManager.isConfigValid(this.context);
             const isConnectionValid = this.xygeniContext.getKey(XYGENI_CONTEXT.CONNECTION_READY);
             const isXygeniInstalled = this.xygeniContext.getKey(XYGENI_CONTEXT.INSTALL_READY);
             const isConnecting = this.xygeniContext.getKey(XYGENI_CONTEXT.CONNECTING);
             const isInstalling = this.xygeniContext.getKey(XYGENI_CONTEXT.INSTALLING);
+            const overrideInstallation = true;
 
             this.configItems = [
                 // Xygeni API Url field
@@ -75,14 +77,25 @@ export default class ConfigurationView implements vscode.TreeDataProvider<Config
                     isConnecting ? 'status-loading' : isConnectionValid ? 'status-ok' : isConfigValid ? 'status-unknown' : 'status-error',
                     {
                         command: COMMAND_TEST_XYGENI_CONNECTION,
-                        title: 'Check Connect Status',
-                        arguments: [true]
+                        title: 'Refresh Connection',
+                        arguments: [overrideInstallation]
                     },
                 )
             ];
 
+            // TODO: enable when license validation was implemented
+            if (!isLicenseIdeAvailable && false) {
+                this.configItems.push(
+                    new ConfigItem(
+                        'Ide License Not Available.',
+                        'Max Xygeni Ide Licenses reached. Contact administrator to increase limit.',
+                        vscode.TreeItemCollapsibleState.None,
+                        'status-error'
+                    )
+                );
+            }
 
-            if (this.xygeniContext.getKey(XYGENI_CONTEXT.CONNECTION_READY)) {
+            if (isConnectionValid) {
                 this.configItems.push(
                     // Install Scanner
                     new ConfigItem(
@@ -94,17 +107,6 @@ export default class ConfigurationView implements vscode.TreeDataProvider<Config
                             command: COMMAND_INSTALL_SCANNER,
                             title: 'Install Scan',
                             arguments: []
-                        }
-                    ),
-                    new ConfigItem(
-                        '    Show Output Channel',
-                        'Click to Open Output',
-                        vscode.TreeItemCollapsibleState.None,
-                        'show',
-                        {
-                            command: 'xygeni.showOutput',
-                            title: 'Open Extension Output Channel',
-                            arguments: [],
                         }
                     )
                 );

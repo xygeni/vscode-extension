@@ -164,6 +164,10 @@ class MockXygeniMedia implements XygeniMedia {
     getIconPath(iconname: string): string {
         return '';
     }
+
+    getIconsPath(): string {
+        return '';
+    }
     getXygeniCss(): string {
         return '';
     }

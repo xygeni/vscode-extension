@@ -121,8 +121,14 @@ export class VulnerabilitiesService {
             cve: rawVuln.cveidentification,
             severity: rawVuln.xygeniSeverity ? rawVuln.xygeniSeverity : 'info',
             description: rawVuln.description,
-            url: rawVuln.url
-          };
+            url: rawVuln.url,
+            xygeniSeverity: rawVuln.xygeniSeverity,
+            baseScore: rawVuln.baseScore,
+            publicationDate: rawVuln.publicationDate,
+            tags: rawVuln.tags,
+            cveidentification: rawVuln.cveidentification,
+            weakness: this.readWeakness(rawVuln.weakness)
+ };
           addVulnerabilityFunction(dependency, vuln);
           countV++;
         }
@@ -132,5 +138,23 @@ export class VulnerabilitiesService {
     if (countV > 0) {
       this.logger.log('  ' + countV + ' vulnerabilities found');
     }
+  }
+
+  readWeakness(rawWeakness: any): string[] {
+    if (!rawWeakness) {
+      return [];
+    }
+
+    if (Array.isArray(rawWeakness)) {
+      return rawWeakness.map((weakness: any) => {
+        return {
+          weaknessId: weakness.weaknessId,
+          source: weakness.source,
+          type: weakness.type,
+          description: weakness.description
+        }.description; // return only the description
+      });
+    }
+    return [];
   }
 }

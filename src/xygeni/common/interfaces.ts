@@ -37,6 +37,9 @@ export interface WorkspaceFiles {
   storeFile(filename: string, content: string): Promise<void>;
   readFile(filename: string): Promise<string>;
   fileExists(filename: string): Promise<boolean>;
+  storeGlobalFile(filename: string, content: string): Promise<void>;
+  readGlobalFile(filename: string): Promise<string>;
+  globalFileExists(filename: string): Promise<boolean>;
   getWsLocalStorage(): string;
 }
 
@@ -54,7 +57,7 @@ export interface Commands extends WorkspaceFiles {
 
   getHttpClient(url: string): IHttpClient;
 
-  testConnection(): Promise<unknown>;
+  refreshAndInstall(): Promise<unknown>;
 
   getScans(): ScanResult[];
   getIssues(): XygeniIssue[];
@@ -64,6 +67,10 @@ export interface Commands extends WorkspaceFiles {
   getXygeniMedia(): XygeniMedia;
 
   getXygeniCss(): string;
+
+  getIconPath(iconname: string): string;
+  getExtensionPath(): string;
+  getIconsPath(): string;
 
 }
 
@@ -83,6 +90,7 @@ export interface IHttpClient {
 
 export interface XygeniMedia {
   getIconPath(iconname: string): string;
+  getIconsPath(): string;
   getXygeniCss(): string
 }
 
@@ -98,13 +106,14 @@ export interface XygeniIssueData {
   category: 'secrets' | 'misconf' | 'iac' | 'sast' | 'sca';
   categoryName: 'Secret' | 'Misconfiguration' | 'IaC' | 'SAST' | 'Vulnerability';
   file?: string;
-  beginLine?: number;
-  endLine?: number;
-  beginColumn?: number;
-  endColumn?: number;
+  beginLine: number;
+  endLine: number;
+  beginColumn: number;
+  endColumn: number;
   code?: string;
   tags?: string[];
   explanation: string;
+  url: string;
 }
 
 export interface XygeniIssue extends XygeniIssueData {

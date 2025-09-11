@@ -19,12 +19,15 @@ import { IssueDecorator } from './views/issueDecorator';
 import { DiagnosticProvider } from './views/diagnosticProvider';
 import { IacXygeniIssue } from './service/iac-issue';
 import { VulnerabilitiesService } from './service/vulnerabilities';
+import LicenseService from './service/license';
 
 
 
 class XygeniExtension {
 
   public async activate(context: vscode.ExtensionContext): Promise<void> {
+
+    const xygeniVersion = context.extension.packageJSON.version;
 
     const xygeniContext = XyContextImpl.getInstance();
     const commands = CommandsImpl.getInstance(context, xygeniContext);
@@ -45,9 +48,11 @@ class XygeniExtension {
     const issueDecorator = new IssueDecorator();
     const diagnosticProvider = new DiagnosticProvider();
 
+    const licenseService = LicenseService.getInstance(context.extensionPath, Logger, commands);
+
     context.subscriptions.push(
       // Register help webview provider
-      vscode.window.registerWebviewViewProvider(HelpView.viewType, new HelpView()),
+      vscode.window.registerWebviewViewProvider(HelpView.viewType, new HelpView(xygeniVersion)),
 
       // Register welcome view provider
       vscode.window.createTreeView('xygeni.views.welcome', {
@@ -108,7 +113,7 @@ class XygeniExtension {
       }),
 
       vscode.commands.registerCommand(COMMAND_TEST_XYGENI_CONNECTION, async (override?: boolean) => {
-        await commands.testConnection(override);
+        await commands.refreshAndInstall(override);
       }),
 
       // scanner commands
@@ -135,12 +140,12 @@ class XygeniExtension {
       }),
 
       issueDecorator,
-      diagnosticProvider
+      diagnosticProvider,
+      licenseService
 
     );
 
     try {
-      this.initChecks();
       this.initXygeni(commands, issueDecorator, diagnosticProvider, context, xygeniContext);
 
       // state init
@@ -152,7 +157,7 @@ class XygeniExtension {
 
       if (xygeniUrl && xygeniToken) {
         commands.showConfigView();
-        commands.testConnection().then(() => {
+        commands.refreshAndInstall().then(() => {
           commands.readIssues();
         });
       } else {
@@ -205,9 +210,7 @@ class XygeniExtension {
 
   }
 
-  private initChecks() {
 
-  }
 }
 
 export default XygeniExtension;

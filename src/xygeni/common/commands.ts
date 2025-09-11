@@ -16,6 +16,7 @@ import { ScanViewEmitter } from '../views/scan-view';
 import { IssueViewEmitter } from '../views/issue-view';
 import { ConfigurationViewEmitter } from '../views/configuration-view';
 import { DetailsView } from '../views/details-view';
+import LicenseService from '../service/license';
 
 
 
@@ -24,7 +25,8 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
 
   private static instance: CommandsImpl;
 
-  private readonly wsLocalStorage: string;
+  private readonly wsLocalStoragePath: string; // unique to each workspace
+  private readonly globalStoragePath: string;  // common to all workspaces
   private readonly xygeniMedia: XygeniMedia;
   private scanOutputChannel: OutputChannelWrapper | undefined;
 
@@ -41,16 +43,20 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
 
   constructor(private readonly context: vscode.ExtensionContext, private readonly xygeniContext: XyContext) {
     if (this.context.storageUri === undefined) {
-      // if no workspace storage availabele, use global storage and create a random folder
+      // if no workspace storage availabele, use global storage and create a random folder each time a workspace is opened
       const path = this.context.globalStorageUri.fsPath + "/" + _.random(0, 1000);
-      this.wsLocalStorage = path;
+      this.wsLocalStoragePath = path;
     }
     else {
       const path = this.context.storageUri.fsPath;
-      this.wsLocalStorage = path;
+      this.wsLocalStoragePath = path;
     }
-    vscode.workspace.fs.createDirectory(vscode.Uri.file(this.wsLocalStorage)); // ensure output directory is create before running scanner
+    this.globalStoragePath = this.context.globalStorageUri.fsPath;
 
+    vscode.workspace.fs.createDirectory(vscode.Uri.file(this.globalStoragePath)); // ensure output directory is create before running scanner
+    vscode.workspace.fs.createDirectory(vscode.Uri.file(this.wsLocalStoragePath)); // ensure output directory is create before running scanner
+
+    //Logger.log(`Workspace storage path: ${this.wsLocalStoragePath}`);
     this.xygeniMedia = new XygeniMediaImpl(this.context);
 
   }
@@ -104,7 +110,7 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
       await ConfigManager.setToken(newToken, this.context);
 
       vscode.window.showInformationMessage('Xygeni Token updated successfully');
-      this.connectionChanged();
+      this.resetConnectionStatus();
     }
   }
 
@@ -128,17 +134,31 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     return HttpClientFactory.getClient(url, this);
   }
 
+  public async checkLicense(): Promise<boolean> {
+    return LicenseService.getInstance().isValidLicense().then(
+      (isAvailable) => {
+        this.updateLicenseIdeAvailability(isAvailable);
+        Logger.log(' === IDE License available  ===');
+        return isAvailable || true; // TODO: enable when license is available
+      }
+    )
+      .catch(() => {
+        this.updateLicenseIdeAvailability(false);
+        return false || true; // TODO: enable when license is available
+      });
+  }
 
   /**
-   * Check connection to Xygeni
+   * Refresh connection and run installer 
    * @returns 
    */
-  public async testConnection(override?: boolean): Promise<unknown> {
+  public async refreshAndInstall(override?: boolean): Promise<unknown> {
 
     const xygeniUrl = ConfigManager.getXygeniUrl();
     const xygeniToken = await ConfigManager.getXygeniToken(this.context);
 
-    this.connectionChanged();
+    this.resetConnectionStatus();
+    this.updateLicenseIdeAvailability(true); // consider a valid license is available by default until not checked
 
     if (!xygeniUrl || !xygeniToken) {
       throw new Error('Xygeni API URL and token are required');
@@ -149,13 +169,18 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
 
       this.connecting();
       if (!await InstallerService.getInstance().isValidApiUrl(xygeniUrl)) {
-        this.connectionChanged();
+        this.resetConnectionStatus();
         throw new Error('Xygeni API URL is not valid or not reachable.');
       }
 
       if (!await InstallerService.getInstance().isValidToken(xygeniUrl, xygeniToken)) {
-        this.connectionChanged();
+        this.resetConnectionStatus();
         throw new Error('Xygeni Token not valid. Cannot connect to Xygeni API');
+      }
+
+      if (!await this.checkLicense()) {
+        this.resetConnectionStatus();
+        throw new Error('No Ide License available. Please contact administrator for more details.');
       }
 
       this.connectionReady();
@@ -166,9 +191,9 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
       });
 
     } catch (error: any) {
-      Logger.error(error, "Error testing connection. ");
-      vscode.window.showErrorMessage("Error testing connection");
-      this.connectionChanged();
+      Logger.error(error, "Error while opening Xygeni connection. ");
+      vscode.window.showErrorMessage("Xygeni Connection Error: " + error.message);
+      this.resetConnectionStatus();
       return Promise.reject(error.message);
     }
   }
@@ -231,7 +256,7 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
         status: STATUS.RUNNING
       };
     }
-    this.initInstaller();
+    this.resetInstaller();
 
 
     const xygeniUrl = ConfigManager.getXygeniUrl();
@@ -370,6 +395,9 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     // is a workspace is opened
     this.xygeniContext.setKey(XYGENI_CONTEXT.WORKSPACE_FOUND, !!this.getWorkspaceFolders().length);
 
+    // license not valid until checked
+    this.xygeniContext.setKey(XYGENI_CONTEXT.LICENSE_IDE_AVAILABLE, true); // consider a valid license is available by default until not checked
+
     // is xygeni config shown
     this.xygeniContext.setKey(XYGENI_CONTEXT.SHOW_CONFIG, false);
 
@@ -392,10 +420,15 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
 
   }
 
-  connectionChanged(): void {
+  updateLicenseIdeAvailability(isAvailable: boolean): void {
+    this.xygeniContext.setKey(XYGENI_CONTEXT.LICENSE_IDE_AVAILABLE, isAvailable);
+    this.refreshConfigView();
+  }
+
+  resetConnectionStatus(): void {
     this.xygeniContext.setKey(XYGENI_CONTEXT.CONNECTION_READY, false);
     this.xygeniContext.setKey(XYGENI_CONTEXT.CONNECTING, false);
-    this.initInstaller();
+    this.resetInstaller();
     this.refreshAllViews();
   }
 
@@ -408,7 +441,7 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
   connectionReady(): void {
     this.xygeniContext.setKey(XYGENI_CONTEXT.CONNECTING, false);
     this.xygeniContext.setKey(XYGENI_CONTEXT.CONNECTION_READY, true);
-    this.initInstaller();
+    this.resetInstaller();
 
     Logger.log("");
     Logger.log(" === Connection ready. Xygeni credentials are valid. ===");
@@ -416,7 +449,7 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     this.refreshAllViews();
   }
 
-  initInstaller(): void {
+  resetInstaller(): void {
     this.xygeniContext.setKey(XYGENI_CONTEXT.INSTALL_READY, false);
     this.xygeniContext.setKey(XYGENI_CONTEXT.INSTALL_ERROR, false);
     this.xygeniContext.setKey(XYGENI_CONTEXT.SHOW_CONFIG, true); // show config
@@ -479,7 +512,7 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
 
   readFile(filename: string): Promise<string> {
     return new Promise((resolve, reject) => {
-      const fileUri: vscode.Uri = vscode.Uri.file(this.wsLocalStorage + "/" + filename);
+      const fileUri: vscode.Uri = vscode.Uri.file(this.wsLocalStoragePath + "/" + filename);
 
       return vscode.workspace.fs.readFile(fileUri)
         .then((content: Uint8Array) => {
@@ -496,7 +529,45 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
 
   async fileExists(filename: string): Promise<boolean> {
     try {
-      const fileUri = vscode.Uri.file(this.wsLocalStorage + "/" + filename);
+      const fileUri = vscode.Uri.file(this.wsLocalStoragePath + "/" + filename);
+      await vscode.workspace.fs.stat(fileUri);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  storeGlobalFile(filename: string, content: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const fileUri: vscode.Uri = vscode.Uri.file(this.globalStoragePath + "/" + filename);
+      return vscode.workspace.fs.writeFile(fileUri, Buffer.from(content))
+        .then(() => {
+          return Promise.resolve();
+        },
+          (error: any) => {
+            throw error; // Re-throw the error so the consumer can handle it
+          });
+    });
+  }
+
+  readGlobalFile(filename: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const fileUri: vscode.Uri = vscode.Uri.file(this.globalStoragePath + "/" + filename);
+
+      return vscode.workspace.fs.readFile(fileUri)
+        .then((content: Uint8Array) => {
+          // Decode the Uint8Array to a string (assuming UTF-8 encoding)
+          return resolve(new TextDecoder('utf-8').decode(content));
+        },
+          (error: any) => {
+            throw error; // Re-throw the error so the consumer can handle it
+          });
+    });
+  }
+
+  async globalFileExists(filename: string): Promise<boolean> {
+    try {
+      const fileUri = vscode.Uri.file(this.globalStoragePath + "/" + filename);
       await vscode.workspace.fs.stat(fileUri);
       return true;
     } catch {
@@ -506,7 +577,7 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
 
   getWsLocalStorage(): string {
     // the scanner will export reports using the suffix
-    return this.wsLocalStorage;
+    return this.wsLocalStoragePath;
   }
 
   // ========================================================
@@ -522,6 +593,12 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
 
   getIconPath(iconname: string): string {
     return this.xygeniMedia.getIconPath(iconname);
+  }
+  getExtensionPath(): string {
+    return this.context.extensionPath;
+  }
+  getIconsPath(): string {
+    return this.xygeniMedia.getIconsPath();
   }
 
 }

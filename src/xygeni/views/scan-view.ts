@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ScanResult } from '../common/interfaces';
-import { COMMAND_RUN_SCANNER, COMMAND_SHOW_SCAN_OUTPUT } from '../common/constants';
+import { COMMAND_RUN_SCANNER } from '../common/constants';
 
 
 export interface ScanViewEmitter {
@@ -51,19 +51,7 @@ export class ScanView implements vscode.TreeDataProvider<ScanItem> {
                     )
                 ];
 
-            }
-            children.push(
-                new CommandItem(
-                    '   Show Scanner Ouput',
-                    vscode.TreeItemCollapsibleState.None,
-                    {
-                        command: COMMAND_SHOW_SCAN_OUTPUT,
-                        title: 'Click to open Scanner Output',
-                        arguments: []
-                    },
-                    new vscode.ThemeIcon('eye')
-                )
-            );
+            }            
             return children;
         }
 

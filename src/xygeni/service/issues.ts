@@ -4,7 +4,7 @@ import { IacXygeniIssue } from './iac-issue';
 import { MisconfXygeniIssue } from './misconf-issue';
 import { SastXygeniIssue } from './sast-issue';
 import { SecretsXygeniIssue } from './secrets-issue';
-import { DepsXygeniIssue } from './vuln-issue';
+import { VulnXygeniIssue } from './vuln-issue';
 import { VulnerabilitiesService } from './vulnerabilities';
 import { XygeniIssue } from '../common/interfaces';
 
@@ -211,13 +211,15 @@ export default class IssuesService {
 
     return VulnerabilitiesService.getInstance().getVulnerabilities(dependenciesByGavt, (dep, vuln) => {
 
+      const location = dep.paths ? dep.paths.locations ? dep.paths.locations[0] : null : null;
       // for each vulnerability, create an issue      
-      const issue = new DepsXygeniIssue({
+      const issue = new VulnXygeniIssue({
         id: vuln.cve,
         type: vuln.cve,
         virtual: dep.virtual,
+        fixedVersion: dep.fixedVersion,
         url: vuln.url,
-        detector: vuln.cve,
+        detector: vuln.cveidentification,
         tool: tool,
         kind: 'sca_vulnerability',
         repositoryType: dep.repositoryType,
@@ -227,17 +229,22 @@ export default class IssuesService {
         version: dep.version,
         dependencyPaths: dep.paths.dependencyPaths,
         directDependency: dep.paths.directDependency,
-        severity: vuln.severity,
+        severity: vuln.xygeniSeverity,
         confidence: dep.confidence ? dep.confidence as 'highest' | 'high' | 'medium' | 'low' : 'high',
         category: 'sca',
         categoryName: 'Vulnerability',
-        file: dep.location ? dep.location.filepath ? dep.location.filepath : '' : dep.fileName ? dep.fileName : dep.displayFileName,
-        beginLine: dep.location ? dep.location.beginLine ? dep.location.beginLine : 0 : 0,
-        endLine: dep.location ? dep.location.endLine ? dep.location.endLine : 0 : 0,
-        beginColumn: dep.location ? dep.location.beginColumn ? dep.location.beginColumn : 0 : 0,
-        endColumn: dep.location ? dep.location.endColumn ? dep.location.endColumn : 0 : 0,
+        file: location ? location.filepath : dep.fileName ? dep.fileName : dep.displayFileName,
+        beginLine: location ? location.beginLine ? location.beginLine : 0 : 0,
+        endLine: location ? location.endLine ? location.endLine : 0 : 0,
+        beginColumn: location ? location.beginColumn ? location.beginColumn : 0 : 0,
+        endColumn: location ? location.endColumn ? location.endColumn : 0 : 0,
+        code: location ? location.code ? location.code : '' : '',
         explanation: vuln.description ? vuln.description : 'Vulnerability ' + vuln.cve,
-        tags: dep.tags?.length > 0 ? dep.tags : undefined,
+        tags: vuln.tags?.length > 0 ? vuln.tags : undefined,
+        
+        baseScore: vuln.baseScore,
+        publicationDate: vuln.publicationDate,
+        weakness: vuln.weakness
       });
       this.issues.push(issue);
     });
@@ -270,6 +277,12 @@ export default class IssuesService {
         code: rawSecret.location ? rawSecret.location.code ? rawSecret.location.code : '' : '',
         explanation: `Secret of type '${rawSecret.type}' detected by '${rawSecret.detector}'`,
         tags: rawSecret.tags?.length > 0 ? rawSecret.tags : undefined,
+        url: rawSecret.url ? rawSecret.url : '',
+        secret: rawSecret.location ? rawSecret.location.secret ? rawSecret.location.secret : '' : '',
+        timeAdded: rawSecret.location ? rawSecret.location.timeAdded ? rawSecret.location.timeAdded : 0 : 0,
+        branch: rawSecret.location ? rawSecret.location.branch ? rawSecret.location.branch : '' : '',
+        commitHash: rawSecret.location ? rawSecret.location.commitHash ? rawSecret.location.commitHash : '' : '',
+        user: rawSecret.location ? rawSecret.location.user ? rawSecret.location.user : '' : ''
       });
       this.issues.push(issue);
 
@@ -297,7 +310,14 @@ export default class IssuesService {
         beginColumn: raw_vuln.location ? raw_vuln.location.beginColumn ? raw_vuln.location.beginColumn : 0 : 0,
         endColumn: raw_vuln.location ? raw_vuln.location.endColumn ? raw_vuln.location.endColumn : 0 : 0,
         code: raw_vuln.location ? raw_vuln.location.code ? raw_vuln.location.code : '' : '',
-        explanation: raw_vuln.explanation
+        explanation: raw_vuln.explanation,
+        url: raw_vuln.url ? raw_vuln.url : '',
+        tags: raw_vuln.tags?.length > 0 ? raw_vuln.tags : undefined,
+        branch: sast_vuln.currentBranch ? sast_vuln.currentBranch : '',
+        cwe: raw_vuln.cwe,
+        cwes: raw_vuln.cwes,
+        container: raw_vuln.container,
+        language: raw_vuln.language
       });
       this.issues.push(issue);
     });
@@ -326,7 +346,9 @@ export default class IssuesService {
         beginColumn: rawMisconf.location ? rawMisconf.location.beginColumn ? rawMisconf.location.beginColumn : 0 : 0,
         endColumn: rawMisconf.location ? rawMisconf.location.endColumn ? rawMisconf.location.endColumn : 0 : 0,
         code: rawMisconf.location ? rawMisconf.location.code ? rawMisconf.location.code : '' : '',
-        explanation: rawMisconf.explanation
+        explanation: rawMisconf.explanation,
+        url: rawMisconf.url ? rawMisconf.url : '',
+        currentBranch: jsonRaw.currentBranch ? jsonRaw.currentBranch : ''
       });
       this.issues.push(issue);
     });
@@ -360,7 +382,9 @@ export default class IssuesService {
         endColumn: flaw.location ? flaw.location.endColumn ? flaw.location.endColumn : 0 : 0,
         code: flaw.location ? flaw.location.code ? flaw.location.code : '' : '',
         tags: flaw.tags?.length > 0 ? flaw.tags : undefined,
-        explanation: flaw.explanation
+        explanation: flaw.explanation,
+        url: flaw.url ? flaw.url : '',
+        branch: jsonRaw.currentBranch ? jsonRaw.currentBranch : ''
       });
       this.issues.push(issue);
     });

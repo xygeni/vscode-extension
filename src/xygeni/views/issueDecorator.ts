@@ -125,12 +125,11 @@ export class IssueDecorator {
             }
 
             const decorations: vscode.DecorationOptions[] = severityIssues.map(issue => {
-                const line = Math.max(0, (issue.beginLine || 1) - 1); // Convert to 0-based indexing
-                const range = new vscode.Range(line, 0, line, editor.document.lineAt(line).text.length);
+                const range = new vscode.Range(issue.beginLine, issue.beginColumn, issue.endLine, issue.endColumn);
 
                 // Create hover message with issue details
                 const hoverMessage = new vscode.MarkdownString();
-                hoverMessage.appendMarkdown(`**${this.getSeverityIcon(issue.severity)} ${issue.severity.toUpperCase()} SEVERITY**\n\n`);
+                hoverMessage.appendMarkdown(`**${this.getSeverityIcon(issue.severity)} ${issue.severity ? issue.severity.toUpperCase() : ''} - ${issue.severity.toUpperCase()} SEVERITY**\n\n`);
                 hoverMessage.appendMarkdown(`**Issue:** ${issue.type}\n\n`);
                 hoverMessage.appendMarkdown(`**Description:** ${issue.explanation}\n\n`);
                 hoverMessage.appendMarkdown(`**File:** ${issue.file}\n\n`);

@@ -80,14 +80,9 @@ export class DiagnosticProvider {
      * Create a VSCode diagnostic from a security issue
      */
     private createDiagnostic(issue: XygeniIssue): vscode.Diagnostic {
-        // Convert 1-based line number to 0-based
-        const beginLine = Math.max(0, (issue.beginLine || 1) - 1);
-        const endLine = Math.max(0, (issue.endLine || issue.beginLine || 1) - 1);
-        const begingColumn = Math.max(0, (issue.beginColumn || 1) - 1);
-        const endColumn = issue.endColumn || Number.MAX_SAFE_INTEGER;
-
+        
         // Create range for the entire line (we could make this more specific if we had column info)
-        const range = new vscode.Range(beginLine, begingColumn, endLine, endColumn);
+        const range = new vscode.Range(issue.beginLine, issue.beginColumn, issue.endLine, issue.endColumn);
 
         // Map severity to VSCode diagnostic severity
         const severity = this.mapSeverityToDiagnosticSeverity(issue.severity);

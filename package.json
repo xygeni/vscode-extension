@@ -3,13 +3,10 @@
   "displayName": "Xygeni Security Scanner",
   "description": "Secure your codebase with Secrets, SAST, SCA, IaC & Supply Chain scanning",
   "publisher": "xygeni-security",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/xygeni/vscode-extension.git"
-  },
+  
   "license": "MIT",
   "icon": "media/images/logo_xy.png",
-  "version": "0.6.0",
+  "version": "1.1.0",
   "engines": {
     "vscode": "^1.99.2"
   },
@@ -33,7 +30,8 @@
         {
           "id": "xygeni.views.welcome",
           "name": "Xygeni",
-          "when": "xygeni:welcome || !xygeni:workspaceFound || xygeni:error"
+          "when": "xygeni:welcome || !xygeni:workspaceFound || xygeni:error",
+          "icon": "media/images/xy_icon_white.svg"
         },
         {
           "id": "xygeni.views.configuration",
@@ -110,6 +108,16 @@
           "command": "xygeni.scan.run",
           "when": "view == 'xygeni.views.scan'",
           "group": "navigation"
+        },
+        {
+          "command": "xygeni.showOutput",
+          "when": "view == 'xygeni.views.configuration'",
+          "group": "navigation"
+        },
+        {
+          "command": "xygeni.showScanOutput",
+          "when": "view == 'xygeni.views.scan'",
+          "group": "navigation"
         }
       ]
     },
@@ -152,13 +160,13 @@
       },
       {
         "command": "xygeni.showOutput",
-        "title": "Open Extension Output",
-        "icon": "$(eye)"
+        "title": "View Extension Output",
+        "icon": "$(output)"
       },
       {
         "command": "xygeni.showScanOutput",
-        "title": "Open Scanner Output",
-        "icon": "$(eye)"
+        "title": "View Scanner Output",
+        "icon": "$(output)"
       },
       {
         "command": "xygeni.scan.openIssue",
@@ -292,8 +300,9 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
-    "axios": "^1.11.0",
-    "https-proxy-agent": "^7.0.6",
-    "lodash": "^4.17.21"
+    "axios": "1.11.0",
+    "https-proxy-agent": "7.0.6",
+    "lodash": "4.17.21",
+    "marked": "16.2.1"
   }
 }

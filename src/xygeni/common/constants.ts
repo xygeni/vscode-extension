@@ -41,6 +41,7 @@ export const XYGENI_CONTEXT = {
     WELCOME: 'welcome',
     API_ERROR: 'apiError',
     WORKSPACE_FOUND: 'workspaceFound',
+    LICENSE_IDE_AVAILABLE: 'licenseIdeAvailable',
     SHOW_CONFIG: 'showConfig',
     CONNECTION_READY: 'connectionReady',
     CONNECTING: 'connecting',

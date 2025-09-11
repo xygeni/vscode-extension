@@ -2,6 +2,9 @@ import * as vscode from 'vscode';
 import { Commands } from "../common/interfaces";
 import { ConfigManager } from '../config/xygeni-configuration';
 import { XygeniIssue } from '../common/interfaces';
+import { Logger } from '../common/logger';
+import path from 'path';
+import { MarkdownParser } from '../common/markdown';
 
 
 export class DetailsView {
@@ -14,11 +17,6 @@ export class DetailsView {
 
     if (issue.file) {
 
-      const beginLine = Math.max(0, (issue.beginLine || 1) - 1);
-      const endLine = Math.max(0, (issue.endLine || issue.beginLine || 1) - 1);
-      const beginColumn = Math.max(0, (issue.beginColumn || 1) - 1);
-      const endColumn = issue.endColumn || Number.MAX_SAFE_INTEGER;
-
       const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
       const fileUri = workspaceFolder
         ? vscode.Uri.joinPath(workspaceFolder.uri, issue.file)
@@ -28,7 +26,7 @@ export class DetailsView {
       vscode.workspace.fs.stat(fileUri).then(() => {
         vscode.workspace.openTextDocument(fileUri).then(document => {
           vscode.window.showTextDocument(document, {
-            selection: new vscode.Range(beginLine, beginColumn, endLine, endColumn),
+            selection: new vscode.Range(issue.beginLine, issue.beginColumn, issue.endLine, issue.endColumn),
             viewColumn: vscode.ViewColumn.One
           });
         });
@@ -50,14 +48,23 @@ export class DetailsView {
       this.panel.onDidDispose(() => {
         this.panel = undefined;
       });
+      this.panel.webview.options = {
+        enableScripts: true,
+        localResourceRoots: [vscode.Uri.joinPath( vscode.Uri.file(commands.getExtensionPath()), 'media')]
+      };
     }
 
     const nonce = this.getNonce();
-    let html = issue.getWebviewContent()
-      .replaceAll('{{nonce}}', nonce)
-      .replace('{{meta-security-policy}}', this.getMetaSecurityPolicy(nonce))
-      .replace('{{xygeniStyle}}', commands.getXygeniCss());
+  
 
+    let html = issue.getWebviewContent()
+      .replace('{{meta-security-policy}}', this.getMetaSecurityPolicy(nonce, this.panel.webview.cspSource))
+      .replace('{{iconsPath}}', this.panel.webview.asWebviewUri(vscode.Uri.file(commands.getIconsPath())).toString())  
+      .replace('{{xygeniCss}}', this.panel.webview.asWebviewUri(vscode.Uri.file(path.join(commands.getExtensionPath(), 'media', 'css', 'xygeni.css'))).toString())          
+      .replace('{{xygeniStyle}}', commands.getXygeniCss())
+      .replaceAll('{{nonce}}', nonce);
+
+  
     this.panel.webview.html = html;
 
     const xygeniUrl = ConfigManager.getXygeniUrl();
@@ -104,7 +111,7 @@ export class DetailsView {
     return text;
   }
 
-  private static getMetaSecurityPolicy(nonce: string): string {
-    return `<meta http-equiv="Content-Security-Policy" content="style-src 'self' 'nonce-${nonce}'; font-src 'self' https://fonts.gstatic.com;" />`;
+  private static getMetaSecurityPolicy(nonce: string, cspSource: string): string {
+    return `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src ${cspSource}; img-src ${cspSource} https:; style-src ${cspSource} 'nonce-${nonce}'; font-src ${cspSource} https://fonts.gstatic.com;" />`;
   }
 } 

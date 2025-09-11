@@ -6,6 +6,7 @@ export interface IacXygeniIssueData extends XygeniIssueData {
   resource: string;
   provider: string;
   foundBy: string;
+  branch: string;
 }
 
 export class IacXygeniIssue extends AbstractXygeniIssue {
@@ -13,12 +14,14 @@ export class IacXygeniIssue extends AbstractXygeniIssue {
   resource: string;
   provider: string;
   foundBy: string;
+  branch: string;
 
   constructor(issue: IacXygeniIssueData) {
     super(issue);
     this.resource = issue.resource;
     this.provider = issue.provider;
     this.foundBy = issue.foundBy;
+    this.branch = issue.branch;
   }
 
 
@@ -26,29 +29,16 @@ export class IacXygeniIssue extends AbstractXygeniIssue {
     return `
       <div id="tab-content-1">
       <table>
-                  <tr>
-                    <th>Resource</th>
-                    <td>${this.resource}</td>
-                  </tr>
-                  <tr>
-                    <th>Found by</th>
-                    <td>${this.foundBy}</td>
-                  </tr>
-                  ${this.file ?
-        '<tr><th>File</th>' +
-        '<td>' + this.file + '</td></tr>'
-        : ''}
-                  ${this.tags ?
-        '<tr><th>Tags</th>' +
-        '<td>' + this.tags.join(', ') + '</td></tr>'
-        : ''}
-                  <tr>
-                    <th>Description</th>
-                    <td>${this.explanation}</td>
-                  </tr>                  
+                  ${this.field(this.type, 'Type')}               
+                  ${this.field(this.provider, 'Provider')}
+                  ${this.field(this.where(this.branch, undefined, undefined), 'Where')}
+                  ${this.field(this.file, 'Location')}
+                  ${this.field(this.resource, 'Resource')}
+                  ${this.field(this.detector, 'Found By')}
+
+                  ${this.fieldTags(this.tags)}
                 </table>
                 
-                <p>Details:</p>
                 <p><span>Loading...</span></p>
       </div>`;
   }
@@ -57,18 +47,12 @@ export class IacXygeniIssue extends AbstractXygeniIssue {
     <input type="radio" name="tabs" id="tab-2">
     <label for="tab-2">CODE SNIPPET</label>`;
   }
-  getCodeSnippetHtml(): string {
-    return `
-    <div id="tab-content-2">
-    <p class="file">${this.file ? this.file : ''}</p>
-    <pre><code class="code language-js">${this.code}</code></pre>
-    </div>`;
+  getFixSnippetHtmlTab(): string {
+    return ``;
+  }
+  getFixSnippetHtml(): string {
+    return ``;
   }
 
-  getDetectorDetails(doc: any): string {
-    return `    
-    <p><a href="${doc.linkDocumentation}" target="_blank">Link to documentation</a></p>
-    `;
-  }
-
+  
 }
