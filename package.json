@@ -1,12 +1,12 @@
 {
   "name": "xygeni-scanner-vscode",
-  "displayName": "Xygeni Security Scanner",
+  "displayName": "Xygeni Security for VSCode",
   "description": "Secure your codebase with Secrets, SAST, SCA, IaC & Supply Chain scanning",
   "publisher": "xygeni-security",
   
   "license": "MIT",
   "icon": "media/images/logo_xy.png",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "engines": {
     "vscode": "^1.99.2"
   },
