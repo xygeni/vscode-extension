@@ -1,10 +1,6 @@
-![Xygeni Security Scanner](https://raw.githubusercontent.com/xygeni/vscode-extension/main/media/images/logo_xy.png)
-
-# Xygeni Security Scanner
+# Xygeni Security Extension for Visual Studio Code
 
 [![Version](https://img.shields.io/visual-studio-marketplace/v/xygeni-security.xygeni-scanner-vscode)](https://marketplace.visualstudio.com/items?itemName=xygeni-security.xygeni-scanner-vscode)
-[![Installs](https://img.shields.io/visual-studio-marketplace/i/xygeni-security.xygeni-scanner-vscode)](https://marketplace.visualstudio.com/items?itemName=xygeni-security.xygeni-scanner-vscode)
-[![License](https://img.shields.io/github/license/xygeni/vscode-extension)](https://github.com/xygeni/vscode-extension/blob/main/LICENSE)
 
 **Secure your codebase with Secrets, SAST, SCA, IaC & Supply Chain scanning directly within your VS Code environment.**
 
