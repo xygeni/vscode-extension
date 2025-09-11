@@ -1,9 +1,11 @@
-# Change Log
+# Xygeni Security Change Log
 
-All notable changes to the "vscode-extension" extension will be documented in this file.
 
-Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
-
-## [Unreleased]
+## [1.0.0]
 
 - Initial release
+- Configure and Run Xygeni Scanner in your workspace
+- 
+## [1.1.0]
+
+- Extension homepage README and CHANGELOG minor changes
