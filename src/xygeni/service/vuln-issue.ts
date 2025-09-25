@@ -17,6 +17,9 @@ export interface VulnXygeniIssueData extends XygeniIssueData {
   baseScore: number;
   publicationDate: string;
   weakness: string[];
+  references: string[];
+  versions: string;
+  vector: string;
 }
 
 export class VulnXygeniIssue extends AbstractXygeniIssue {
@@ -35,6 +38,10 @@ export class VulnXygeniIssue extends AbstractXygeniIssue {
   baseScore: number;
   publicationDate: string;
   weakness: string[];
+  references: string[];
+  versions: string;
+  vector: string;
+  
 
   constructor(issue: VulnXygeniIssueData) {
     super(issue);
@@ -52,6 +59,9 @@ export class VulnXygeniIssue extends AbstractXygeniIssue {
     this.baseScore = issue.baseScore;
     this.publicationDate = issue.publicationDate;
     this.weakness = issue.weakness? issue.weakness : [];
+    this.references = issue.references? issue.references : [];
+    this.versions = issue.versions;
+    this.vector = issue.vector;
   }
 
   override getSubtitleLineHtml(): string {
@@ -87,14 +97,16 @@ export class VulnXygeniIssue extends AbstractXygeniIssue {
         <table>
                     
                     ${this.field(this.publicationDate, 'Published')}
-                    ${this.field(this.group ? this.group + ':' + this.name  : this.name , 'Affecting')}
-                    ${this.field(this.version, 'Versions')}
+                    ${this.field(this.group ? this.group + ':' + this.name + ':' + this.version : (this.name + ':' + this.version) , 'Affecting')}
+                    ${this.field(this.versions, 'Versions')}
                     ${this.field(this.fixedVersion, 'Fixed at')}
                     ${this.field(this.file ? this.file : '', 'File')}
                     ${this.field(this.directDependency, 'Direct Dependency')}
+                    ${this.field(this.vector, 'Vector')}
                
-                    
+                  
                     ${this.fieldTags(this.tags)}  
+                    
                     
 
                   </table>
@@ -102,6 +114,8 @@ export class VulnXygeniIssue extends AbstractXygeniIssue {
                   ${this.explanation ? `<p>${MarkdownParser.parse(this.explanation)}</p>` : ''}                       
 
                   ${this.url ? `<p><a href="${this.url}" target="_blank">Link to documentation</a></p>` : ''}
+
+                  ${this.fieldReferences(this.references)}
                  
         </div>`;
   }
@@ -121,7 +135,7 @@ export class VulnXygeniIssue extends AbstractXygeniIssue {
     return ``;
   }
   getFixSnippetHtml(): string {
-    if (this.fixedVersion && false) {  // TODO : enable when fix is available
+    if (this.fixedVersion) {  // TODO : enable when fix is available
       return `<div id="tab-content-3">
       <p>Fix this version: ${this.group}:${this.name}:${this.version} to ${this.fixedVersion}</p>
       <pre><code class="code language-js">${this.code}</code></pre>
@@ -130,6 +144,13 @@ export class VulnXygeniIssue extends AbstractXygeniIssue {
     </div>`;
     }
     return ``;
+  }
+
+  public fieldReferences(references: string[] | undefined): string {
+    return references ?
+      '<p>References</p>' +
+      references.map(reference => `<p><a href="${reference}" target="_blank">${reference}</a></p>`).join(' ') 
+      : '';
   }
   
   

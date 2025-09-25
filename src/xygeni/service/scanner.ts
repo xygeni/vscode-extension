@@ -127,7 +127,8 @@ class XygeniScannerService extends EventEmitter {
             const reportOutputPath = XYGENI_SCANNER_REPORT_SUFFIX;
 
 
-            const args = ['scan', '--run=deps,secrets,misconf,iac,suspectdeps,sast', '-f', 'json', '-o', reportOutputPath, '-d', sourceFolder, '--no-upload'];
+            const args = ['scan', '--run=deps,secrets,misconf,iac,suspectdeps,sast', '-f', 'json', '-o', 
+                reportOutputPath, '-d', sourceFolder, '--no-upload', '--include-vulnerabilities'];
 
             this.logger.log('  Running scanner command ' + scannerScriptPath + ' ' + args.join(' '));
 

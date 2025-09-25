@@ -5,7 +5,6 @@ import { MisconfXygeniIssue } from './misconf-issue';
 import { SastXygeniIssue } from './sast-issue';
 import { SecretsXygeniIssue } from './secrets-issue';
 import { VulnXygeniIssue } from './vuln-issue';
-import { VulnerabilitiesService } from './vulnerabilities';
 import { XygeniIssue } from '../common/interfaces';
 
 
@@ -204,49 +203,117 @@ export default class IssuesService {
 
     const dependenciesByGavt = new Map<string, any>();
 
+    this.processVulnInDepsReport(dependencies, tool);
+
+  }
+
+
+  /* vulnerability example
+          {
+  "id": "CVE-2019-1010266",
+  "source": {
+    "name": "NVD",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-2019-1010266"
+  },
+  "severity": "low",
+  "ratings": [
+    {
+      "score": 4.0,
+      "severity": "MEDIUM",
+      "method": "CVSSV2",
+      "vector": "AV:N/AC:L/Au:S/C:N/I:N/A:P",
+      "justification": null
+    },
+    {
+      "score": 6.5,
+      "severity": "MEDIUM",
+      "method": "CVSSV31",
+      "vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:H",
+      "justification": null
+    }
+  ],
+  "cwes": ["CWE-400", "CWE-770"],
+  "description": "lodash prior to 4.17.11 is affected by: CWE-400: Uncontrolled Resource Consumption. The impact is: Denial of service. The component is: Date handler. The attack vector is: Attacker provides very long strings, which the library attempts to match using a regular expression. The fixed version is: 4.17.11.",
+  "detail": null,
+  "created": null,
+  "published": "2019-07-17T19:15:11.000+00:00",
+  "updated": "2020-09-30T11:40:44.000+00:00",
+  "rejected": null,
+  "references": [
+    {
+      "name": "GITHUB",
+      "url": "https://github.com/lodash/lodash/issues/3359"
+    },
+    {
+      "name": null,
+      "url": "https://github.com/lodash/lodash/wiki/Changelog"
+    },
+    {
+      "name": "ADVISORY",
+      "url": "https://security.netapp.com/advisory/ntap-20190919-0004/"
+    },
+    {
+      "name": null,
+      "url": "https://snyk.io/vuln/SNYK-JS-LODASH-73639"
+    }
+  ],
+  "versions": [
+    {
+      "startVersion": "0",
+      "versionStartExcluded": false,
+      "endVersion": null,
+      "versionEndExcluded": false
+    }
+  ]
+}
+        */
+  processVulnInDepsReport(dependencies: any[], tool: string): void {
     dependencies.forEach((dep: any) => {
-      const gavt = `${dep.group}:${dep.name}:${dep.version}:${dep.language}`;
-      dependenciesByGavt.set(gavt, dep);
-    });
+      if (dep.vulnerabilities) {
+        dep.vulnerabilities.forEach((vuln: any) => {
+          const location = dep.paths ? dep.paths.locations ? dep.paths.locations[0] : null : null;
+          // for each vulnerability, create an issue   
+          const publishDate = vuln.published ? new Date(vuln.published) : new Date();
 
-    return VulnerabilitiesService.getInstance().getVulnerabilities(dependenciesByGavt, (dep, vuln) => {
+          const issue = new VulnXygeniIssue({
+            id: vuln.id,
+            type: vuln.id,           
+            virtual: dep.virtual,
+            fixedVersion: dep.fixedVersion,
+            url: vuln.source ? vuln.source.url : '',
+            detector: vuln.source ? vuln.source.name : 'unknown',
+            tool: tool,
+            kind: 'sca_vulnerability',
+            repositoryType: dep.repositoryType,
+            displayFileName: dep.displayFileName,
+            group: dep.group,
+            name: dep.name,
+            version: dep.version,
+            dependencyPaths: dep.paths.dependencyPaths,
+            directDependency: dep.paths.directDependency,
+            severity: vuln.severity,
+            confidence: dep.confidence ? dep.confidence as 'highest' | 'high' | 'medium' | 'low' : 'high',
+            category: 'sca',
+            categoryName: 'Vulnerability',
+            file: location ? location.filepath : dep.fileName ? dep.fileName : dep.displayFileName,
+            beginLine: location ? location.beginLine ? location.beginLine : 0 : 0,
+            endLine: location ? location.endLine ? location.endLine : 0 : 0,
+            beginColumn: location ? location.beginColumn ? location.beginColumn : 0 : 0,
+            endColumn: location ? location.endColumn ? location.endColumn : 0 : 0,
+            code: location ? location.code ? location.code : '' : '',
+            explanation: vuln.description ? vuln.description : 'Vulnerability ' + vuln.cve,
+            tags: dep.remediable ? [dep.remediable.remediableLevel] : undefined,
 
-      const location = dep.paths ? dep.paths.locations ? dep.paths.locations[0] : null : null;
-      // for each vulnerability, create an issue      
-      const issue = new VulnXygeniIssue({
-        id: vuln.cve,
-        type: vuln.cve,
-        virtual: dep.virtual,
-        fixedVersion: dep.fixedVersion,
-        url: vuln.url,
-        detector: vuln.cveidentification,
-        tool: tool,
-        kind: 'sca_vulnerability',
-        repositoryType: dep.repositoryType,
-        displayFileName: dep.displayFileName,
-        group: dep.group,
-        name: dep.name,
-        version: dep.version,
-        dependencyPaths: dep.paths.dependencyPaths,
-        directDependency: dep.paths.directDependency,
-        severity: vuln.xygeniSeverity,
-        confidence: dep.confidence ? dep.confidence as 'highest' | 'high' | 'medium' | 'low' : 'high',
-        category: 'sca',
-        categoryName: 'Vulnerability',
-        file: location ? location.filepath : dep.fileName ? dep.fileName : dep.displayFileName,
-        beginLine: location ? location.beginLine ? location.beginLine : 0 : 0,
-        endLine: location ? location.endLine ? location.endLine : 0 : 0,
-        beginColumn: location ? location.beginColumn ? location.beginColumn : 0 : 0,
-        endColumn: location ? location.endColumn ? location.endColumn : 0 : 0,
-        code: location ? location.code ? location.code : '' : '',
-        explanation: vuln.description ? vuln.description : 'Vulnerability ' + vuln.cve,
-        tags: vuln.tags?.length > 0 ? vuln.tags : undefined,
-        
-        baseScore: vuln.baseScore,
-        publicationDate: vuln.publicationDate,
-        weakness: vuln.weakness
-      });
-      this.issues.push(issue);
+            baseScore: vuln.cvss ? vuln.cvss.score.baseScore : undefined,
+            versions: this.summarizeVersionRange(vuln.versions),
+            publicationDate: publishDate.toLocaleString(), //  format '2021-01-29T21:15:08Z' as '29 ene, 2021, 21: 15' 
+            weakness: vuln.cwes,
+            references: vuln.references,
+            vector: this.getVector(vuln.ratings),
+          });
+          this.issues.push(issue);
+        });
+      }
     });
   }
 
@@ -424,6 +491,44 @@ export default class IssuesService {
     });
   }
 
+  
+  summarizeVersionRange(versions: any[]): string {
+    if (!versions || versions.length === 0) {
+      return "";
+    }
+
+    let versionsParts: string[] = [];
+
+    for (let i = 0; i < versions.length; i++) {
+      
+      const version = versions[i];
+      let parts: string[] = [];
+
+      if (version.startVersion && version.startVersion.trim() !== "") {
+        parts.push(
+          ">" + (version.versionStartExcluded ? "" : "=") + version.startVersion
+        );
+      }
+
+      if (version.endVersion && version.endVersion.trim() !== "") {
+        parts.push(
+          "<" + (version.versionEndExcluded ? "" : "=") + version.endVersion
+        );
+      }
+      versionsParts.push(parts.join(" "));
+    }
+
+    return versionsParts.join(" | ");
+  }
+
+  getVector(ratings: any[]): string {
+
+    if (ratings && ratings.length > 0) {
+      // read the last rating (most recent)
+      return ratings[ratings.length -1].vector;
+    }
+    return "";
+  }
 
   clear(): void {
     this.issues = [];
