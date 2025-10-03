@@ -13,13 +13,12 @@ import XygeniScannerService from './service/scanner';
 import GlobalContextImpl from './service/global-context';
 import { ConfigManager } from './config/xygeni-configuration';
 import IssuesService from './service/issues';
-import { log } from 'console';
 import EventEmitterImpl from './common/event-emitter';
 import { IssueDecorator } from './views/issueDecorator';
 import { DiagnosticProvider } from './views/diagnosticProvider';
-import { IacXygeniIssue } from './service/iac-issue';
-import { VulnerabilitiesService } from './service/vulnerabilities';
+import { RemediationDiffContentProvider } from './views/remediation-providers';
 import LicenseService from './service/license';
+import { RemediationService } from './service/remediation';
 
 
 
@@ -47,6 +46,7 @@ class XygeniExtension {
 
     const issueDecorator = new IssueDecorator();
     const diagnosticProvider = new DiagnosticProvider();
+    const remediationDiffProvider = new RemediationDiffContentProvider(xygeniContext, commands);
 
     const licenseService = LicenseService.getInstance(context.extensionPath, Logger, commands);
 
@@ -141,8 +141,11 @@ class XygeniExtension {
 
       issueDecorator,
       diagnosticProvider,
-      licenseService
+      licenseService,
 
+      // register diff preview provider
+      vscode.workspace.registerTextDocumentContentProvider('preview-fix', remediationDiffProvider)
+      
     );
 
     try {
@@ -150,6 +153,8 @@ class XygeniExtension {
 
       // state init
       await commands.initState();
+
+      commands.setRemediationDiffProvider(remediationDiffProvider);
 
       // show welcome or config
       const xygeniUrl = ConfigManager.getXygeniUrl();
@@ -206,8 +211,9 @@ class XygeniExtension {
       commands.issuesAvailable();
     });
     IssuesService.getInstance(Logger, issuesEmitter, commands);
-    VulnerabilitiesService.getInstance(context, Logger, commands);
 
+    // init remediation
+    RemediationService.getInstance(commands, Logger);
   }
 
 

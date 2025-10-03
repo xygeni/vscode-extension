@@ -32,7 +32,7 @@ export class MisconfXygeniIssue extends AbstractXygeniIssue {
         ${this.fieldTags(this.tags)}
       </table>
                 
-                <p><span>Loading...</span></p>
+                <p><span id="xy-detector-doc">Loading...</span></p>
       </div>`;
   }
   getCodeSnippetHtmlTab(): string {

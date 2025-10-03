@@ -93,10 +93,16 @@ export default class InstallerService {
 
             const installPath = this.getScannerInstallationDir();
 
+            // remove installPath if exists, force fresh install
+            if (fs.existsSync(installPath)) {
+                this.logger.log(`  Removing existing installation at: ${installPath}`);
+                fs.rmdirSync(installPath, { recursive: true });
+            }
+
             const args: string[] = [];
 
             if (token) {
-                args.push(`-t '${token}'`);
+                args.push(`-t ${token}`);
             }
 
             if (apiUrl) {

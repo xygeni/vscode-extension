@@ -11,22 +11,30 @@ import IssuesService from './issues';
 import { ProxyConfigManager } from '../config/proxy-configuration';
 
 
-/**
- * Run scanner using workspace storage as working directory. 
- * Allow only one scanner running at a time.
- * Issues reports are persisted in workspace storage.
- * Scanner command (no report is uploaded, generate issues reports in json format at working directory):
- *   scan --run=deps,secrets,misconf,iac,suspectdeps,sast -f json -o <reportOutputPath> -d <sourceFolder> --no-upload
- */
+    /**
+     * Run scanner using workspace storage as working directory.
+     * Allow only one scanner running at a time.
+     * Issues reports are persisted in workspace storage.
+     * Scanner command (no report is uploaded, generate issues reports in json format at working directory):
+     *   scan --run=deps,secrets,misconf,iac,suspectdeps,sast -f json -o <reportOutputPath> -d <sourceFolder> --no-upload
+     */
 class XygeniScannerService extends EventEmitter {
 
     private static instance: XygeniScannerService;
 
     readonly timeout = 1800000; // 30 minutes
-
     readonly output_suffix = '/scanner.report.json';
 
+    readonly run_analysis_args = ['scan', '--run=deps,secrets,misconf,iac,suspectdeps,sast', '-f', 'json', '-o',
+        XYGENI_SCANNER_REPORT_SUFFIX, '--no-upload', '--include-vulnerabilities'];
+
+    readonly run_rectify_sca_args = ['util', 'rectify', '--sca'];    
+    readonly run_rectify_sast_args = ['util', 'rectify', '--sast'];
+
     private scannerRunning = false;
+    private scannerQueue: Array<() => Promise<void>> = [];
+    private maxConcurrentScanners = 3;
+    private activeScannerCount = 0;
 
     private exitCode: number | undefined;
 
@@ -51,11 +59,8 @@ class XygeniScannerService extends EventEmitter {
         super();
     }
 
-    async run(sourceFolder: string, xygeniScannerPath: string, output: OutputChannelWrapper) {
-        if (this.scannerRunning) {
-            return Promise.resolve('Scanner is already running');
-        }
-        this.scannerRunning = true;
+    async runAnalysis(sourceFolder: string, xygeniScannerPath: string, output: IOutputChannel) {
+        
         this.exitCode = undefined;
         output.clear();
         output.show();
@@ -67,24 +72,21 @@ class XygeniScannerService extends EventEmitter {
             this.scans.shift(); // remove the oldest scan
         }
 
-        this.logger.log('');
-        this.logger.log('================================');
-
-
-        const workingDir = this.commands.getWsLocalStorage();
-        this.logger.log(`Running scanner on folder: ${sourceFolder}. Output path: ${workingDir}`);
+        this.logger.log('');        
+        this.logger.log('================================');       
+        this.logger.log(`Running scan on source folder: ${sourceFolder}`);
 
         this.scans.push({ timestamp: timestamp, status: 'running', issuesFound: undefined, summary: '' });
         this.emitChange();
 
-        return this.runAnalysis(sourceFolder, xygeniScannerPath, workingDir, output).then(() => {
+        return this.runAnalysisCommand(sourceFolder, xygeniScannerPath, output).then(() => {
 
             this.logger.log('  Scanner finished');
             this.scans.pop();
             const totalTimeInSeconds = (new Date().getTime() - timestamp.getTime()) / 1000;
             this.scans.push({ timestamp: timestamp, status: 'completed', issuesFound: undefined, summary: 'Duration: ' + totalTimeInSeconds + 's' });
 
-            this.scannerRunning = false;
+            
             this.exitCode = 0;
 
             this.emitChange();
@@ -92,7 +94,7 @@ class XygeniScannerService extends EventEmitter {
             return;
         }).catch((error) => {
             this.logger.error('Error running scanner', error);
-            this.scannerRunning = false;
+            
             this.exitCode = 1;
             this.scans.pop();
             this.scans.push(
@@ -102,11 +104,31 @@ class XygeniScannerService extends EventEmitter {
         });
     }
 
+    
     public isScannerRunning() {
         return this.scannerRunning;
     }
 
+    /**
+     * Check if there are any queued or active scanners from rectification calls
+     */
+    public hasQueuedScanners(): boolean {
+        return this.scannerQueue.length > 0 || this.activeScannerCount > 0;
+    }
+
+    /**
+     * Get the current number of active and queued scanners
+     */
+    public getScannerStats(): { active: number; queued: number; maxConcurrent: number } {
+        return {
+            active: this.activeScannerCount,
+            queued: this.scannerQueue.length,
+            maxConcurrent: this.maxConcurrentScanners
+        };
+    }
+
     public getExitCode(): number | undefined {
+        this.scannerRunning = false;
         return this.exitCode;
     }
 
@@ -115,22 +137,54 @@ class XygeniScannerService extends EventEmitter {
     }
 
 
-    private runAnalysis(sourceFolder: string, xygeniInstallPath: string, workingDir: string, output: OutputChannelWrapper): Promise<void> {
-        return new Promise((resolve, reject) => {
+    public runAnalysisCommand(sourceFolder: string, xygeniInstallPath: string, output: IOutputChannel): Promise<void> {        
+        const args = [...this.run_analysis_args, '-d', sourceFolder];
+        return this.callScanner(xygeniInstallPath, args, output);
+    }
 
+    public runRectifyScaCommand(filePath: string, dependency: string, xygeniInstallPath: string, output: IOutputChannel): Promise<void> {
+        const args = [...this.run_rectify_sca_args, '--file-path', filePath, '--dependency', dependency];
+        return this.callScanner(xygeniInstallPath, args, output);
+    }
+
+    public runRectifySastCommand(filePath: string, detector: string, line: string, xygeniInstallPath: string, output: IOutputChannel): Promise<void> {
+        const args = [...this.run_rectify_sast_args, '--file-path', filePath, '--detector', detector, '--line', line];
+        return this.callScanner(xygeniInstallPath, args, output);
+    }
+
+    
+
+    // call scanner executable at xygeniInstallPath from workingDir with args
+    private callScanner(xygeniInstallPath: string, args: string[], output: IOutputChannel): Promise<void> {
+        
+        if (this.scannerRunning) {
+            return Promise.reject('Scanner is already running');
+        }
+        this.scannerRunning = true;
+
+        return this.executeScannerCall(xygeniInstallPath, args, output)
+            .finally(() => {
+                this.scannerRunning = false;
+            });
+               
+        
+    }
+
+    // execute the actual scanner process
+    private executeScannerCall(xygeniInstallPath: string, args: string[], output: IOutputChannel): Promise<void> {
+        return new Promise((resolve, reject) => {
+            
             if (!xygeniInstallPath) {
                 reject(new Error('Xygeni scanner path not configured'));
                 return;
             }
 
-            const scannerScriptPath = this.getScannerScriptPath(xygeniInstallPath);
-            const reportOutputPath = XYGENI_SCANNER_REPORT_SUFFIX;
-
-
-            const args = ['scan', '--run=deps,secrets,misconf,iac,suspectdeps,sast', '-f', 'json', '-o', 
-                reportOutputPath, '-d', sourceFolder, '--no-upload', '--include-vulnerabilities'];
-
+            const workingDir = this.commands.getWsLocalStorage();
+            
+            const scannerScriptPath = this.getScannerScriptPath(xygeniInstallPath);            
+           
             this.logger.log('  Running scanner command ' + scannerScriptPath + ' ' + args.join(' '));
+            //this.logger.log(`Running scanner working dir: ${workingDir}`);
 
             const proxySettings = this.commands.getProxySettings();
             const env: NodeJS.ProcessEnv = {
@@ -178,7 +232,7 @@ class XygeniScannerService extends EventEmitter {
             scannerProcess.on('close', (code) => {
                 clearTimeout(timeout);
                 if (code !== null && (code === 0 || code > 128)) {
-                    resolve();
+                    resolve(); // Scanner process completed successfully
                 } else {
                     reject(new Error(`Scanner process failed with exit code ${code}`));
                 }

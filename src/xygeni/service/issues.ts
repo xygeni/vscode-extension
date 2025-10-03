@@ -201,85 +201,73 @@ export default class IssuesService {
     const dependencies = Array.isArray(jsonRaw.dependencies) ? jsonRaw.dependencies : [jsonRaw.dependencies];
     const tool = jsonRaw.metadata.reportProperties['tool.name'];
 
-    const dependenciesByGavt = new Map<string, any>();
-
     this.processVulnInDepsReport(dependencies, tool);
 
   }
 
 
-  /* vulnerability example
+  /* vulnerability example:
           {
-  "id": "CVE-2019-1010266",
-  "source": {
-    "name": "NVD",
-    "url": "https://nvd.nist.gov/vuln/detail/CVE-2019-1010266"
-  },
-  "severity": "low",
-  "ratings": [
-    {
-      "score": 4.0,
-      "severity": "MEDIUM",
-      "method": "CVSSV2",
-      "vector": "AV:N/AC:L/Au:S/C:N/I:N/A:P",
-      "justification": null
-    },
-    {
-      "score": 6.5,
-      "severity": "MEDIUM",
-      "method": "CVSSV31",
-      "vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:H",
-      "justification": null
-    }
-  ],
-  "cwes": ["CWE-400", "CWE-770"],
-  "description": "lodash prior to 4.17.11 is affected by: CWE-400: Uncontrolled Resource Consumption. The impact is: Denial of service. The component is: Date handler. The attack vector is: Attacker provides very long strings, which the library attempts to match using a regular expression. The fixed version is: 4.17.11.",
-  "detail": null,
-  "created": null,
-  "published": "2019-07-17T19:15:11.000+00:00",
-  "updated": "2020-09-30T11:40:44.000+00:00",
-  "rejected": null,
-  "references": [
-    {
-      "name": "GITHUB",
-      "url": "https://github.com/lodash/lodash/issues/3359"
-    },
-    {
-      "name": null,
-      "url": "https://github.com/lodash/lodash/wiki/Changelog"
-    },
-    {
-      "name": "ADVISORY",
-      "url": "https://security.netapp.com/advisory/ntap-20190919-0004/"
-    },
-    {
-      "name": null,
-      "url": "https://snyk.io/vuln/SNYK-JS-LODASH-73639"
-    }
-  ],
-  "versions": [
-    {
-      "startVersion": "0",
-      "versionStartExcluded": false,
-      "endVersion": null,
-      "versionEndExcluded": false
-    }
-  ]
-}
-        */
+                "id" : "CVE-2021-34551",
+                "severity" : "high",
+                "cve" : "CVE-2021-34551",
+                "cwes" : [ "CWE-434" ],
+                "identifiers" : { },
+                "userId" : "CVE-2021-34551",
+                "source" : {
+                  "name" : "NVD",
+                  "url" : "https://nvd.nist.gov/vuln/detail/CVE-2021-34551"
+                },
+                "versions" : [ {
+                  "versionStartExcluded" : false,
+                  "endVersion" : "6.5.0",
+                  "versionEndExcluded" : true
+                } ],
+                "ratings" : [ {
+                  "score" : 5.1,
+                  "severity" : "MEDIUM",
+                  "method" : "CVSSV2",
+                  "vector" : "AV:N/AC:H/Au:N/C:P/I:P/A:P"
+                }, {
+                  "score" : 8.1,
+                  "severity" : "HIGH",
+                  "method" : "CVSSV31",
+                  "vector" : "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:H"
+                } ],
+                "references" : [ "https://github.com/PHPMailer/PHPMailer/blob/master/SECURITY.md", "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/3YRMWGA4VTMXFB22KICMB7YMFZNFV3EJ/", "https:/
+          /lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/FJYSOFCUBS67J3TKR74SD3C454N7VTYM/" ],
+                "name" : "CVE-2021-34551",
+                "description" : "PHPMailer before 6.5.0 on Windows allows remote code execution if lang_path is untrusted data and has a UNC pathname.",
+                "publishDate" : "2021-06-16T16:15:10Z",
+                "lastModified" : "2023-11-07T02:36:01Z",
+                "cvss" : {
+                  "score" : {
+                    "baseScore" : 5.1,
+                    "impactSubScore" : -1.0,
+                    "exploitabilitySubScore" : -1.0,
+                    "temporalScore" : -1.0,
+                    "environmentalScore" : -1.0,
+                    "modifiedImpactSubScore" : -1.0
+                  }
+                },
+                "properties" : { },
+                "issueId" : "SCA.CVE-2021-34551",
+                "overallCvssScore" : 5.1
+              }
+  */
   processVulnInDepsReport(dependencies: any[], tool: string): void {
     dependencies.forEach((dep: any) => {
       if (dep.vulnerabilities) {
         dep.vulnerabilities.forEach((vuln: any) => {
           const location = dep.paths ? dep.paths.locations ? dep.paths.locations[0] : null : null;
-          // for each vulnerability, create an issue   
+          // for each vulnerability, create an issue
           const publishDate = vuln.published ? new Date(vuln.published) : new Date();
 
           const issue = new VulnXygeniIssue({
             id: vuln.id,
-            type: vuln.id,           
+            type: vuln.id,
             virtual: dep.virtual,
-            fixedVersion: dep.fixedVersion,
+            remediableLevel: dep.remediable?.remediableLevel,
             url: vuln.source ? vuln.source.url : '',
             detector: vuln.source ? vuln.source.name : 'unknown',
             tool: tool,
@@ -302,14 +290,15 @@ export default class IssuesService {
             endColumn: location ? location.endColumn ? location.endColumn : 0 : 0,
             code: location ? location.code ? location.code : '' : '',
             explanation: vuln.description ? vuln.description : 'Vulnerability ' + vuln.cve,
-            tags: dep.remediable ? [dep.remediable.remediableLevel] : undefined,
+            tags: this.getTags(dep.tags, dep.remediable?.remediableLevel),
 
-            baseScore: vuln.cvss ? vuln.cvss.score.baseScore : undefined,
+            baseScore: this.getBaseScore(vuln.ratings),
             versions: this.summarizeVersionRange(vuln.versions),
-            publicationDate: publishDate.toLocaleString(), //  format '2021-01-29T21:15:08Z' as '29 ene, 2021, 21: 15' 
+            publicationDate: publishDate.toLocaleString(), //  format '2021-01-29T21:15:08Z' as '29 ene, 2021, 21: 15'
             weakness: vuln.cwes,
             references: vuln.references,
             vector: this.getVector(vuln.ratings),
+            language: dep.language
           });
           this.issues.push(issue);
         });
@@ -349,7 +338,8 @@ export default class IssuesService {
         timeAdded: rawSecret.location ? rawSecret.location.timeAdded ? rawSecret.location.timeAdded : 0 : 0,
         branch: rawSecret.location ? rawSecret.location.branch ? rawSecret.location.branch : '' : '',
         commitHash: rawSecret.location ? rawSecret.location.commitHash ? rawSecret.location.commitHash : '' : '',
-        user: rawSecret.location ? rawSecret.location.user ? rawSecret.location.user : '' : ''
+        user: rawSecret.location ? rawSecret.location.user ? rawSecret.location.user : '' : '',
+        remediableLevel: 'none' // TODO
       });
       this.issues.push(issue);
 
@@ -384,7 +374,8 @@ export default class IssuesService {
         cwe: raw_vuln.cwe,
         cwes: raw_vuln.cwes,
         container: raw_vuln.container,
-        language: raw_vuln.language
+        language: raw_vuln.language,
+        remediableLevel: 'AUTO' // all issues are candidate for IA remediation
       });
       this.issues.push(issue);
     });
@@ -415,7 +406,8 @@ export default class IssuesService {
         code: rawMisconf.location ? rawMisconf.location.code ? rawMisconf.location.code : '' : '',
         explanation: rawMisconf.explanation,
         url: rawMisconf.url ? rawMisconf.url : '',
-        currentBranch: jsonRaw.currentBranch ? jsonRaw.currentBranch : ''
+        currentBranch: jsonRaw.currentBranch ? jsonRaw.currentBranch : '',
+        remediableLevel: 'none' // TODO
       });
       this.issues.push(issue);
     });
@@ -451,7 +443,8 @@ export default class IssuesService {
         tags: flaw.tags?.length > 0 ? flaw.tags : undefined,
         explanation: flaw.explanation,
         url: flaw.url ? flaw.url : '',
-        branch: jsonRaw.currentBranch ? jsonRaw.currentBranch : ''
+        branch: jsonRaw.currentBranch ? jsonRaw.currentBranch : '',
+        remediableLevel: 'none' // TODO
       });
       this.issues.push(issue);
     });
@@ -491,7 +484,9 @@ export default class IssuesService {
     });
   }
 
-  
+  /**
+   * Format version ranges
+   */
   summarizeVersionRange(versions: any[]): string {
     if (!versions || versions.length === 0) {
       return "";
@@ -500,17 +495,17 @@ export default class IssuesService {
     let versionsParts: string[] = [];
 
     for (let i = 0; i < versions.length; i++) {
-      
+
       const version = versions[i];
       let parts: string[] = [];
 
-      if (version.startVersion && version.startVersion.trim() !== "") {
+      if (version.startVersion && version.startVersion.trim() !== "" && version.startVersion !== '0') {
         parts.push(
           ">" + (version.versionStartExcluded ? "" : "=") + version.startVersion
         );
       }
 
-      if (version.endVersion && version.endVersion.trim() !== "") {
+      if (version.endVersion && version.endVersion.trim() !== "" && version.endVersion !== '0') {
         parts.push(
           "<" + (version.versionEndExcluded ? "" : "=") + version.endVersion
         );
@@ -530,8 +525,28 @@ export default class IssuesService {
     return "";
   }
 
+  getBaseScore(ratings: any[]): number {
+
+    if (ratings && ratings.length > 0) {
+      // read the last rating (most recent)
+      return ratings[ratings.length -1].score;
+    }
+    return 0;
+  }
+
   clear(): void {
     this.issues = [];
+  }
+
+  getTags(tags: any, remediable: any): string[] {
+    let tagsArray = [];
+    if (tags && tags.length > 0) {
+      tagsArray = tags.map((tag: any) => tag);
+    }
+    if (remediable) {
+      tagsArray.push(remediable);
+    }
+    return tagsArray;
   }
 
 }

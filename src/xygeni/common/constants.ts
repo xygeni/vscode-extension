@@ -59,3 +59,7 @@ export const STATUS = {
     UNKNOWN: 'unknown'
 };
 
+export const ISSUE_DETAILS_REMEDIATE_FUNCTION = "runRemediation";
+export const ISSUE_DETAILS_SAST_REMEDIATE_FUNCTION = "runSASTRemediation";
+export const ISSUE_DETAILS_SAVE_FUNCTION = "runSaveRemediation";
+

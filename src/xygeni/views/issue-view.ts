@@ -64,26 +64,27 @@ export class XygeniIssueItem extends vscode.TreeItem {
         private commands: IssueViewEmitter
     ) {
         super(issue.type, collapsibleState);
+        const remediableSufix = ""; // TODO - use fix icons
 
         this.tooltip = issue.explanation;
         this.description = `${issue.severity ? issue.severity.toUpperCase() : ''}${issue.file ? ` - ${issue.file}` : ''}`;
-
+        
         // Set icon based on severity
         switch (issue.severity) {
             case 'critical':
-                this.iconPath = this.commands.getIconPath("critical.png");
+                this.iconPath = this.commands.getIconPath(`critical${remediableSufix}.svg`);
                 break;
             case 'high':
-                this.iconPath = this.commands.getIconPath("high.png");
+                this.iconPath = this.commands.getIconPath(`high${remediableSufix}.svg`);
                 break;
             case 'medium':
-                this.iconPath = this.commands.getIconPath("low.png");
+                this.iconPath = this.commands.getIconPath(`low${remediableSufix}.svg`);
                 break;
             case 'low':
-                this.iconPath = this.commands.getIconPath("low.png");
+                this.iconPath = this.commands.getIconPath(`low${remediableSufix}.svg`);
                 break;
             case 'info':
-                this.iconPath = this.commands.getIconPath("info.png");
+                this.iconPath = this.commands.getIconPath(`info${remediableSufix}.svg`);
                 break;
         }
 

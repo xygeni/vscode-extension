@@ -36,17 +36,24 @@ export interface EventEmitter {
 export interface WorkspaceFiles {
   storeFile(filename: string, content: string): Promise<void>;
   readFile(filename: string): Promise<string>;
+  readFileFromRoot(filename: string): Promise<string>;
   fileExists(filename: string): Promise<boolean>;
+  fileExistsInProject(filename: string): Promise<boolean>;
+  getAbsolutePathForSourceFile(filename: string): string;
   storeGlobalFile(filename: string, content: string): Promise<void>;
   readGlobalFile(filename: string): Promise<string>;
   globalFileExists(filename: string): Promise<boolean>;
+  copyFileToFolder(fromFilePath: string, toFolder: string): Promise<string>;
+  copyFile(fromFilePath: string, toFile: string): Promise<string>;
   getWsLocalStorage(): string;
 }
 
 export interface Commands extends WorkspaceFiles {
-
   refreshAllViews(): void;
   showIssueDetails(issue: XygeniIssue): void;
+  saveRemediationChanges(fileUri: string): Promise<void>;
+  openDiffViewCommand(uri: string, tempFile: string): void
+  
 
   editUrl(): Promise<void>;
   editToken(): Promise<void>;
@@ -63,6 +70,8 @@ export interface Commands extends WorkspaceFiles {
   getIssues(): XygeniIssue[];
   getIssuesByCategory(category: string): XygeniIssue[];
   getDetectorDoc(url: URL, token: string): Promise<string>
+  getScanOutputChannel(): IOutputChannel
+  isInstallReady(): boolean;
 
   getXygeniMedia(): XygeniMedia;
 
@@ -114,6 +123,8 @@ export interface XygeniIssueData {
   tags?: string[];
   explanation: string;
   url: string;
+  remediableLevel: string;
+  
 }
 
 export interface XygeniIssue extends XygeniIssueData {
@@ -125,6 +136,10 @@ export interface XygeniIssue extends XygeniIssueData {
   getDetectorDetails(doc: any): string
 }
 
+export interface FixData {
+  tempFile: string | undefined;
+  explanation: string | undefined;
+}
 
 export interface IssueDoc {
   linkDocumentation: string;
@@ -165,4 +180,3 @@ export enum Kind {
   ul,
   ol
 }
-

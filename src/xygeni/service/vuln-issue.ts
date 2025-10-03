@@ -10,7 +10,6 @@ export interface VulnXygeniIssueData extends XygeniIssueData {
   group: string;
   name: string;
   version: string;
-  fixedVersion: string;
   dependencyPaths: string;
   directDependency: string;
 
@@ -20,6 +19,8 @@ export interface VulnXygeniIssueData extends XygeniIssueData {
   references: string[];
   versions: string;
   vector: string;
+  remediableLevel: string;
+  language: string;
 }
 
 export class VulnXygeniIssue extends AbstractXygeniIssue {
@@ -31,7 +32,6 @@ export class VulnXygeniIssue extends AbstractXygeniIssue {
   group: string;
   name: string;
   version: string;
-  fixedVersion: string;
   dependencyPaths: string;
   directDependency: string;
 
@@ -41,8 +41,9 @@ export class VulnXygeniIssue extends AbstractXygeniIssue {
   references: string[];
   versions: string;
   vector: string;
+  remediableLevel: string;
+  language: string;
   
-
   constructor(issue: VulnXygeniIssueData) {
     super(issue);
     this.virtual = issue.virtual;
@@ -52,7 +53,6 @@ export class VulnXygeniIssue extends AbstractXygeniIssue {
     this.group = issue.group;
     this.name = issue.name;
     this.version = issue.version;
-    this.fixedVersion = issue.fixedVersion;
     this.dependencyPaths = issue.dependencyPaths;
     this.directDependency = issue.directDependency;
 
@@ -62,6 +62,8 @@ export class VulnXygeniIssue extends AbstractXygeniIssue {
     this.references = issue.references? issue.references : [];
     this.versions = issue.versions;
     this.vector = issue.vector;
+    this.remediableLevel = issue.remediableLevel;
+    this.language = issue.language;
   }
 
   override getSubtitleLineHtml(): string {
@@ -99,24 +101,25 @@ export class VulnXygeniIssue extends AbstractXygeniIssue {
                     ${this.field(this.publicationDate, 'Published')}
                     ${this.field(this.group ? this.group + ':' + this.name + ':' + this.version : (this.name + ':' + this.version) , 'Affecting')}
                     ${this.field(this.versions, 'Versions')}
-                    ${this.field(this.fixedVersion, 'Fixed at')}
                     ${this.field(this.file ? this.file : '', 'File')}
                     ${this.field(this.directDependency, 'Direct Dependency')}
                     ${this.field(this.vector, 'Vector')}
-               
-                  
+
                     ${this.fieldTags(this.tags)}  
-                    
-                    
+                  
 
                   </table>
 
                   ${this.explanation ? `<p>${MarkdownParser.parse(this.explanation)}</p>` : ''}                       
 
+                  <p><span id="xy-detector-doc"></span></p>
+
                   ${this.url ? `<p><a href="${this.url}" target="_blank">Link to documentation</a></p>` : ''}
 
                   ${this.fieldReferences(this.references)}
-                 
+
+                  
+
         </div>`;
   }
 
@@ -127,31 +130,22 @@ export class VulnXygeniIssue extends AbstractXygeniIssue {
     }
     return ``;
   }
-  getFixSnippetHtmlTab(): string {
-    if (this.fixedVersion && false) { // TODO: enable when fix is available
-      return `<input type="radio" name="tabs" id="tab-3">
-    <label for="tab-3">FIX IT</label>`;
-    }
-    return ``;
-  }
-  getFixSnippetHtml(): string {
-    if (this.fixedVersion) {  // TODO : enable when fix is available
-      return `<div id="tab-content-3">
-      <p>Fix this version: ${this.group}:${this.name}:${this.version} to ${this.fixedVersion}</p>
-      <pre><code class="code language-js">${this.code}</code></pre>
-      <pre><code class="code language-js">${this.code?.replace(this.version, this.fixedVersion)}</code></pre>
-      <button id="fix-it">FIX IT</button>
-    </div>`;
-    }
-    return ``;
-  }
+  
+  
+  
 
   public fieldReferences(references: string[] | undefined): string {
     return references ?
       '<p>References</p>' +
-      references.map(reference => `<p><a href="${reference}" target="_blank">${reference}</a></p>`).join(' ') 
+      references.map(reference => {
+        if (reference.startsWith('[')) {
+          const mdRef = MarkdownParser.parse(reference); // to html link
+          return `<p>${mdRef}</p>`;
+        }
+        else {
+          return `<p><a href="${reference}" target="_blank">${reference}</a></p>`;
+        }
+      }).join(' ') 
       : '';
   }
-  
-  
 }

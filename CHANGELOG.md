@@ -9,3 +9,8 @@
 ## [1.1.0]
 
 - Extension homepage README and CHANGELOG minor changes
+
+## [1.2.0]
+
+- Auto-Fix Code Issues for SCA and SAST added
+- 

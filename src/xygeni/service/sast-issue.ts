@@ -67,7 +67,7 @@ export class SastXygeniIssue extends AbstractXygeniIssue {
                                  
       </table>
                 
-        <p><span>Loading...</span></p>
+        <p><span id="xy-detector-doc">Loading...</span></p>
       </div>`;
   }
   getCodeSnippetHtmlTab(): string {
@@ -75,12 +75,7 @@ export class SastXygeniIssue extends AbstractXygeniIssue {
     <input type="radio" name="tabs" id="tab-2">
     <label for="tab-2">CODE SNIPPET</label>`;
   }
-  getFixSnippetHtmlTab(): string {
-    return ``;
-  }
-  getFixSnippetHtml(): string {
-    return ``;
-  }
+  
 
   
 }

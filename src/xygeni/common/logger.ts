@@ -2,6 +2,11 @@ import * as vscode from 'vscode';
 import { ILogger, IOutputChannel } from './interfaces';
 import { XYGENI_EXTENSION_OUTPUT_NAME } from './constants';
 
+function getTimestamp(): string {
+    const now = new Date();
+    return now.toISOString().slice(0, 19).replace('T', ' ');
+}
+
 
 
 class LoggerImpl implements ILogger {
@@ -14,7 +19,7 @@ class LoggerImpl implements ILogger {
 
 
     public log(message: string) {
-        this.output.appendLine(message);
+        this.output.appendLine(`[${getTimestamp()}] ${message}`);
     }
 
     public error(error: Error | unknown, message: string) {
@@ -23,7 +28,7 @@ class LoggerImpl implements ILogger {
             emsg += error ? error.message : ' Unknown error ';
         }
         console.error(error);
-        this.output.appendLine(emsg);
+        this.output.appendLine(`[${getTimestamp()}] ${emsg}`);
     }
 
     showOutput() {

@@ -64,7 +64,7 @@ export class SecretsXygeniIssue extends AbstractXygeniIssue {
                   ${this.fieldTags(this.tags)}
 
                 </table>
-                <p><span>Loading...</span></p>
+                <p><span id="xy-detector-doc">Loading...</span></p>
       </div>`;
   }
 

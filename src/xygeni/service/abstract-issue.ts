@@ -1,3 +1,4 @@
+import { ISSUE_DETAILS_SAVE_FUNCTION, ISSUE_DETAILS_REMEDIATE_FUNCTION } from '../common/constants';
 import { Commands, XygeniIssue, XygeniIssueData } from '../common/interfaces';
 import { MarkdownParser } from '../common/markdown';
 
@@ -21,6 +22,10 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
   tags?: string[];
   explanation: string;
   url: string;
+  remediableLevel: string; // none, MANUAL, AUTO
+
+  public static REMEDIABLE_AUTO = 'AUTO';
+  public static REMEDIABLE_MANUAL = 'MANUAL';
 
   constructor(issue: XygeniIssueData) {
     this.id = issue.id;
@@ -48,16 +53,15 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
     this.tags = issue.tags;
     this.explanation = issue.explanation;
     this.url = issue.url;
+    this.remediableLevel = issue.remediableLevel;
   }
 
   public showIssueDetails(commands: Commands): void {
     commands.showIssueDetails(this);
   }
 
-  abstract getIssueDetailsHtml(): string;
-  abstract getCodeSnippetHtmlTab(): string;
-  abstract getFixSnippetHtmlTab(): string;
-  abstract getFixSnippetHtml(): string;
+  abstract getIssueDetailsHtml(): string;   // tab-content-1 implementation
+  abstract getCodeSnippetHtmlTab(): string; // tab-title-2 implementation
 
   public getSubtitleLineHtml(): string {
 
@@ -72,6 +76,7 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
     return subtitle;
   }
 
+  // tab-content-2 implementation
   public getCodeSnippetHtml(): string {
     const codeLines = this.code?.split('\n') || [];
     const codeSnippet = codeLines.map((line, index) => {
@@ -98,7 +103,7 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
   }
 
   public getWebviewContent(): string {
-    
+
     return `
       <!DOCTYPE html>
       <html lang="en">
@@ -106,9 +111,11 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         {{meta-security-policy}}
-        <title>Xygeni Issue Details</title>        
+        <title>Xygeni Issue Details</title>
         <style nonce="{{nonce}}">{{xygeniStyle}}</style>
-        
+        <script nonce="{{nonce}}">
+          const vscode = acquireVsCodeApi();
+        </script>
       </head>
       <body>
             <h1>Xygeni ${this.categoryName} Issue</h1>
@@ -118,16 +125,100 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
             <input type="radio" name="tabs" id="tab-1" checked>
             <label for="tab-1">ISSUE DETAILS</label>
             ${this.getCodeSnippetHtmlTab()}
-            ${this.getFixSnippetHtmlTab()}
-            
-            ${this.getIssueDetailsHtml()}
-            ${this.getCodeSnippetHtml()}
-            ${this.getFixSnippetHtml()}
+            ${this.getFixSnippetHtmlTab()}  
+
+            ${this.getIssueDetailsHtml()}  
+            ${this.getCodeSnippetHtml()}   
+            ${this.getFixSnippetHtml()}  
+            <script nonce="{{nonce}}">
+            window.onmessage = function(event) {
+                const message = event.data;
+                if (message.status === 'remediationReady') {
+                      document.getElementById('rem-buttons').innerHTML = '<button id="rem-save-button" nonce="{{nonce}}" class="xy-button">Save</button><p>Preview generated. You can now save the changes.</p>';
+                      document.getElementById('rem-save-button').onclick = saveSendEvent;
+                } else if (message.status === 'remediationError') {
+                      document.getElementById('rem-buttons').innerHTML = '<p>An error occured. Please try again.</p><button id="rem-preview-button" type="submit" nonce="{{nonce}}" class="xy-button">Remediate with Xygeni Agent</button>';
+                } else if (message.status === 'remediationComplete') {
+                      document.getElementById('rem-buttons').innerHTML = '<p>Fix done.</p>';
+                }  
+                
+                if (message.status === 'UPDATE_DETECTOR_DOC_FUNCTION') {             
+                  document.getElementById('xy-detector-doc').innerHTML = message.details;                
+                }
+                return false;
+            }
+            </script>   
 
             </section>
       </body>
       </html>
     `;
+  }
+
+  // tab-title-3 implementation
+  public getFixSnippetHtmlTab(): string {
+    if (this.remediableLevel === AbstractXygeniIssue.REMEDIABLE_AUTO) { // TODO: enable when remediable
+      return `<input type="radio" name="tabs" id="tab-3">
+    <label id="tab-3-label" for="tab-3">FIX IT</label>`;
+    }
+    return ``;
+  }
+
+  // tab-content-3 implementation
+  public getFixSnippetHtml(): string {
+    if (this.remediableLevel === AbstractXygeniIssue.REMEDIABLE_AUTO) {  // TODO : enable when remediable
+
+      return `<div id="tab-content-3">
+      <p>XYGENI AGENT - REMEDIATE ISSUE</p>
+      <form id="remediation-form" nonce="{{nonce}}">
+        <p>This vulnerability is fixable. Run Xygeni Agent to get fixed version preview.</p>
+        <br>
+        <div id="rem-buttons"></div>
+        
+      </form>
+      <script nonce="{{nonce}}">
+        
+        window.onload = function () {
+                document.getElementById('rem-buttons').innerHTML =
+                '<button id="rem-preview-button" type="submit" nonce="{{nonce}}" class="xy-button">Remediate with Xygeni Agent</button>';
+        }
+      
+        function formSubmitHandler(e) {
+          e.preventDefault();
+
+          document.getElementById('rem-buttons').innerHTML =
+            '<button id="rem-processing-button" type="submit" nonce="{{nonce}}" disabled class="xy-button">Processing...</button>';
+
+          const formData = new FormData(e.target);
+          vscode.postMessage({
+              command: '${ISSUE_DETAILS_REMEDIATE_FUNCTION}',
+              issueId: '${this.id}',
+              kind: '${this.kind}',
+              file: '${this.file}'
+          });
+          return false;
+        }
+
+        // start remediation
+        document.getElementById('remediation-form').onsubmit = formSubmitHandler;
+
+        function saveSendEvent(event) {
+                  vscode.postMessage({
+                    command: '${ISSUE_DETAILS_SAVE_FUNCTION}',
+                    issueId: '${this.id}',
+                    kind: '${this.kind}',
+                    file: '${this.file}'
+                  });
+                  return false;
+                }   
+
+
+        
+
+      </script>
+    </div>`;
+    }
+    return `Fix not available.`;
   }
 
   public field(value: string | undefined, title: string): string {

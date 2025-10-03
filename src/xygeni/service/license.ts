@@ -2,6 +2,7 @@
 import * as os from 'os';
 import * as crypto from 'crypto';
 import { Commands, ILogger } from '../common/interfaces';
+import { Logger } from '../common/logger';
 
 export const MACHINE_FINGERPRINT_FILE: string = 'fingerprint.dat';
 
@@ -58,7 +59,7 @@ export default class LicenseService {
       }
     )
       .catch(
-        (err) => { return Promise.reject(new Error(`Error checking Xygeni IDE License: ${err.message}`)); }
+        (err) => { return Promise.reject(new Error(`Error validating Xygeni IDE License: ${err.message}`)); }
       );
   }
 
@@ -95,19 +96,20 @@ export default class LicenseService {
   private callInstallLicense(data: any, xygeniApiUrl: string): Promise<boolean> {
     const ideLicenseUrl = `${xygeniApiUrl}/internal/license/ideaccess`;
 
+    Logger.log(`Installing Xygeni IDE License: ${data}`);
     return new Promise<boolean>((resolve, reject) => {
       const request = this.commands.getHttpClient(ideLicenseUrl)
         .post(ideLicenseUrl, data, (res) => {
           if (res.statusCode !== 200) {
-            this.logger.log(`Error checking Xygeni IDE License: ${res.statusCode}`);
-            reject(new Error(`Cannot check Xygeni IDE License`));
+            this.logger.log(`Error response installing Xygeni IDE License: ${res.statusCode}`);
+            reject(new Error(`Error response installing Xygeni IDE License`));
           }
           resolve(res.statusCode === 200);
         });
 
       request.on('error', (error) => {
-        this.logger.error(error, 'Error checking Xygeni IDE License');
-        reject(new Error(`Unable to check Xygeni IDE License`));
+        this.logger.error(error, 'Error installing Xygeni IDE License');
+        reject(new Error(`Unable installing Xygeni IDE License`));
       });
     });
   }
@@ -119,20 +121,24 @@ export default class LicenseService {
       const request = this.commands.getHttpClient(ideLicenseUrl)
         .post(ideLicenseUrl, data, (res) => {
           if (res.statusCode !== 200) {
-            this.logger.log(`Error checking Xygeni IDE License: ${res.statusCode}`);
-            reject(new Error(`Cannot check Xygeni IDE License`));
+            this.logger.log(`Error response uninstalling Xygeni IDE License: ${res.statusCode}`);
+            reject(new Error(`Error response uninstalling Xygeni IDE License`));
           }
           resolve(res.statusCode === 200);
         });
 
       request.on('error', (error) => {
-        this.logger.error(error, 'Error checking Xygeni IDE License');
-        reject(new Error(`Unable to check Xygeni IDE License`));
+        this.logger.error(error, 'Error uninstalling Xygeni IDE License');
+        reject(new Error(`Unable to uninstalling Xygeni IDE License`));
       });
     });
   }
 
 
+  /** 
+   * Generate a request object with machine fingerprint.
+   *  Format { hostname: hostname, platform: platform, mac: mac, fingerprint: fingerprint }
+   */
   private getMachineFingerprint(): { hostname: string; platform: string, mac: string; fingerprint: string } {
     const hostname = os.hostname();
     const mac = this.getPrimaryMac();
@@ -144,8 +150,7 @@ export default class LicenseService {
     const rawData = [
       hostname,
       mac || '',
-      platform,
-      release,
+      platform,      
       arch
     ].join('|');
 

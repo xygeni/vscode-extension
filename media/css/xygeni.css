@@ -164,3 +164,29 @@ vscode-panel-view {
   white-space: pre;
   font-family: var(--vscode-editor-font-family);
 }
+
+.xy-button {
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border: 1px solid var(--vscode-button-border);
+  padding: 6px 12px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  margin: 4px 4px 4px 0;
+}
+
+.xy-button:hover {
+  background-color: var(--vscode-button-hoverBackground);
+}
+
+.xy-button:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+.xy-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

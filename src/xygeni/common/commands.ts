@@ -1,8 +1,10 @@
+/* eslint-disable curly */
 import * as vscode from 'vscode';
 // eslint-disable-next-line @typescript-eslint/naming-convention
 import * as _ from 'lodash';
+import * as os from 'os';
 import { ConfigManager, ProxySettings } from "../config/xygeni-configuration";
-import { STATUS, XYGENI_CONTEXT, XYGENI_SCANNER_OUTPUT_NAME, XYGENI_SCANNER_REPORT_SUFFIX } from './constants';
+import { ISSUE_DETAILS_REMEDIATE_FUNCTION, ISSUE_DETAILS_SAVE_FUNCTION, STATUS, XYGENI_CONTEXT, XYGENI_SCANNER_OUTPUT_NAME, XYGENI_SCANNER_REPORT_SUFFIX } from './constants';
 import { EventEmitter } from 'vscode';
 import { Commands, XyContext, ScanResult, IHttpClient, XygeniMedia, XygeniIssue } from './interfaces';
 import InstallerService from '../service/installer';
@@ -16,19 +18,22 @@ import { ScanViewEmitter } from '../views/scan-view';
 import { IssueViewEmitter } from '../views/issue-view';
 import { ConfigurationViewEmitter } from '../views/configuration-view';
 import { DetailsView } from '../views/details-view';
+import { RemediationDiffContentProvider } from '../views/remediation-providers';
 import LicenseService from '../service/license';
+import { VulnXygeniIssue } from '../service/vuln-issue';
+import { RemediationService } from '../service/remediation';
 
 
 
 export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter, ConfigurationViewEmitter {
-
-
+  
   private static instance: CommandsImpl;
 
   private readonly wsLocalStoragePath: string; // unique to each workspace
   private readonly globalStoragePath: string;  // common to all workspaces
   private readonly xygeniMedia: XygeniMedia;
   private scanOutputChannel: OutputChannelWrapper | undefined;
+  private remediationDiffProvider: RemediationDiffContentProvider | undefined;
 
   public static getInstance(context: vscode.ExtensionContext, xygeniContext: XyContext): CommandsImpl {
     if (!CommandsImpl.instance) {
@@ -223,6 +228,19 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     return IssuesService.getInstance().getDetectorDoc(url, token);
   }
 
+  setRemediationDiffProvider(remediationDiffProvider: RemediationDiffContentProvider) {
+    this.remediationDiffProvider = remediationDiffProvider;
+  }
+
+  public saveRemediationChanges(fileUri: string): Promise<void> {
+    if(this.remediationDiffProvider === undefined) {
+      return Promise.resolve();
+    }
+    return this.remediationDiffProvider?.saveRemediationChanges(fileUri);
+  }
+
+  
+
   // ============================================================================
   // Scanner Command handlers
   // ==========================================================================
@@ -236,11 +254,15 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     return InstallerService.getInstance().getScannerInstallationDir();
   }
 
-  showScanOutput() {
+  public getScanOutputChannel(): OutputChannelWrapper {
     if (this.scanOutputChannel === undefined) {
       this.scanOutputChannel = new OutputChannelWrapper(vscode.window.createOutputChannel(XYGENI_SCANNER_OUTPUT_NAME));
     }
-    this.scanOutputChannel.show();
+    return this.scanOutputChannel;
+  }
+
+  showScanOutput() {    
+    this.getScanOutputChannel().show();
   }
 
   /**
@@ -292,13 +314,8 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     // TODO: works with multiple workspace folders and trusted
     const sourceFolder = this.getWorkspaceFolders()[0];
 
-
-    if (!this.scanOutputChannel) {
-      this.scanOutputChannel = new OutputChannelWrapper(vscode.window.createOutputChannel(XYGENI_SCANNER_OUTPUT_NAME));
-    }
-
     try {
-      await scanner.run(sourceFolder, this.getXygeniInstallPath(), this.scanOutputChannel);
+      await scanner.runAnalysis(sourceFolder, this.getXygeniInstallPath(), this.getScanOutputChannel());
       this.readIssues();
       this.refreshAllViews();
     } catch (error) {
@@ -353,6 +370,38 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     this.refreshScannerView();
   }
 
+  isInstallReady(): boolean {
+    const isXygeniInstalled = this.xygeniContext.getKey(XYGENI_CONTEXT.INSTALL_READY);
+    if(isXygeniInstalled) {
+      return true;
+    }
+    return false;
+  }
+
+  openDiffViewCommand(uri: string, tempFile: string): void {
+
+    const previewUri =  `preview-fix:${uri}.fixed`;
+
+    this.readFileFromRoot(tempFile)
+    .then(
+      (proposedText) => {
+        if (this.remediationDiffProvider) {
+          this.remediationDiffProvider.setContent(previewUri, proposedText);
+          vscode.commands.executeCommand(
+            'vscode.diff',
+            vscode.Uri.parse(uri),
+            vscode.Uri.parse(previewUri),
+            'Xygeni Fix Preview',
+            { viewColumn: vscode.ViewColumn.One }
+          );
+        }
+      }
+    );
+    
+  }
+
+  
+
   // ========================================================
   // refresh views methods
 
@@ -383,6 +432,7 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     this.refreshScannerView();
     this.refreshIssuesView();
   }
+
 
   // ========================================================
   // state
@@ -527,6 +577,33 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     });
   }
 
+  readFileFromRoot(filepath: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const fileUri: vscode.Uri = vscode.Uri.file(filepath);
+
+      return vscode.workspace.fs.readFile(fileUri)
+        .then((content: Uint8Array) => {
+          // Decode the Uint8Array to a string (assuming UTF-8 encoding)
+
+          return resolve(new TextDecoder('utf-8').decode(content));
+        },
+          (error: any) => {
+
+            throw error; // Re-throw the error so the consumer can handle it
+          });
+    });
+  }
+
+  async fileExistsInProject(filename: string): Promise<boolean> {
+    try {
+      const fileUri = vscode.Uri.file(this.getWorkspaceFolders()[0] + "/" + filename);
+      await vscode.workspace.fs.stat(fileUri);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async fileExists(filename: string): Promise<boolean> {
     try {
       const fileUri = vscode.Uri.file(this.wsLocalStoragePath + "/" + filename);
@@ -535,6 +612,10 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     } catch {
       return false;
     }
+  }
+
+  getAbsolutePathForSourceFile(filename: string): string {
+    return this.getWorkspaceFolders()[0] + "/" + filename;
   }
 
   storeGlobalFile(filename: string, content: string): Promise<void> {
@@ -573,6 +654,33 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     } catch {
       return false;
     }
+  }
+
+  copyFileToFolder(fromFilePath: string, toFolder: string): Promise<string> {
+   
+    const sourceUri = vscode.Uri.file(fromFilePath);
+    const toFile = toFolder + "/" + sourceUri.path.split('/').pop();
+    
+    return this.copyFile(fromFilePath, toFile);
+  }
+
+  copyFile(fromFilePath: string, toFilePath: string): Promise<string> {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const sourceUri = vscode.Uri.file(fromFilePath);
+        const destUri = vscode.Uri.file(toFilePath);
+
+        // Read the source file
+        const content = await vscode.workspace.fs.readFile(sourceUri);
+
+        // Write to destination file
+        await vscode.workspace.fs.writeFile(destUri, content);
+
+        resolve(toFilePath);
+      } catch (error: any) {
+        reject(error);
+      }
+    });
   }
 
   getWsLocalStorage(): string {
