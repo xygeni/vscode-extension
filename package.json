@@ -175,6 +175,10 @@
       {
         "command": "xygeni.scan.openIssueInEditor",
         "title": "Open Issue in Editor"
+      },
+      {
+        "command": "xygeni.showMcpSetup",
+        "title": "Xygeni: Show Xygeni MCP Server Setup Guide"
       }
     ],
     "configuration": [
@@ -272,7 +276,7 @@
     "watch:esbuild": "node esbuild.js --watch",
     "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
     "package": "npm run check-types && npm run lint && node esbuild.js --production",
-    "package:vsix": "vsce package",
+    "package:vsix": "vsce package --allow-missing-repository",
     "compile-tests": "tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",
     "pretest": "npm run cleanup && npm run compile-tests && npm run compile",

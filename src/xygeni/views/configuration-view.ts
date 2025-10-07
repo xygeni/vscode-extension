@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ConfigManager } from '../config/xygeni-configuration';
-import { COMMAND_EDIT_XYGENI_API_URL, COMMAND_INSTALL_SCANNER, COMMAND_TEST_XYGENI_CONNECTION, STATUS, XYGENI_CONTEXT } from '../common/constants';
+import { COMMAND_EDIT_XYGENI_API_URL, COMMAND_INSTALL_SCANNER, COMMAND_SHOW_MCP_SETUP, COMMAND_TEST_XYGENI_CONNECTION, STATUS, XYGENI_CONTEXT } from '../common/constants';
 import { Commands, XyContext } from '../common/interfaces';
 
 
@@ -12,6 +12,7 @@ export default class ConfigurationView implements vscode.TreeDataProvider<Config
 
     private readonly CONNECTION_ITEM_LABEL = '  Connection Status => ';
     private readonly INSTALL_ITEM_LABEL = '  Scanner Status => ';
+    private readonly MCP_SETUP_ITEM_LABEL = '  MCP Setup => ';
 
     private _onDidChangeTreeData: vscode.EventEmitter<ConfigItem | undefined> = new vscode.EventEmitter<ConfigItem | undefined>();
     readonly onDidChangeTreeData: vscode.Event<ConfigItem | undefined> = this._onDidChangeTreeData.event;
@@ -42,6 +43,7 @@ export default class ConfigurationView implements vscode.TreeDataProvider<Config
             const isXygeniInstalled = this.xygeniContext.getKey(XYGENI_CONTEXT.INSTALL_READY);
             const isConnecting = this.xygeniContext.getKey(XYGENI_CONTEXT.CONNECTING);
             const isInstalling = this.xygeniContext.getKey(XYGENI_CONTEXT.INSTALLING);
+            const isMcpLibraryInstalled = this.xygeniContext.getKey(XYGENI_CONTEXT.MCP_LIBRARY_INSTALLED);
             const overrideInstallation = true;
 
             this.configItems = [
@@ -111,6 +113,24 @@ export default class ConfigurationView implements vscode.TreeDataProvider<Config
                     )
                 );
             }
+
+            if (isMcpLibraryInstalled) {
+                this.configItems.push(
+                    // Install Scanner
+                    new ConfigItem(
+                        this.MCP_SETUP_ITEM_LABEL,
+                        'Click to Setup Xygeni MCP Server',
+                        vscode.TreeItemCollapsibleState.None,
+                        'status-unknown',
+                        {
+                            command: COMMAND_SHOW_MCP_SETUP,
+                            title: 'Guide for Install Xygeni MCP Server',
+                            arguments: []
+                        }
+                    )
+                );
+            }
+            
 
             return this.configItems;
         }

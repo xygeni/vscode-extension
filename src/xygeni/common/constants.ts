@@ -25,6 +25,7 @@ export const XYGENI_CLOSE_CONFIG_COMMAND = 'xygeni.closeConfig';
 export const COMMAND_EDIT_XYGENI_API_URL = 'xygeni.config.editUrl';
 export const COMMAND_EDIT_XYGENI_TOKEN = 'xygeni.config.editToken';
 export const COMMAND_TEST_XYGENI_CONNECTION = 'xygeni.config.testConnection';
+export const COMMAND_SHOW_MCP_SETUP = 'xygeni.showMcpSetup';
 
 export const COMMAND_INSTALL_SCANNER = 'xygeni.scan.install';
 export const COMMAND_RUN_SCANNER = 'xygeni.scan.run';
@@ -49,7 +50,8 @@ export const XYGENI_CONTEXT = {
     INSTALL_READY: 'installReady',
     INSTALLING: 'installing',
     SCANNER_RESULTS: 'scannerResults',
-    SCANNING: 'scanning'
+    SCANNING: 'scanning',
+    MCP_LIBRARY_INSTALLED: 'mcpLibraryInstalled'
 };
 
 export const STATUS = {

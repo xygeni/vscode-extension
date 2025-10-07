@@ -20,7 +20,13 @@ export default class InstallerService {
 
     private readonly xygeniGetScannerUrl = 'https://get.xygeni.io/latest/scanner/';
 
+    private readonly xygeniMCPLibraryUrl = 'https://get.xygeni.io/latest/mcp-server/xygeni-mcp-server.jar';
+    private readonly xygeniMCPLibraryName = 'xygeni-mcp-server.jar';
+
     private static instance: InstallerService;
+
+    /** Path to the MCP library if downloaded */
+    private mcpLibraryPath: string | undefined;
 
     public installationRunning: boolean | undefined;
     public status: string | undefined;
@@ -62,6 +68,18 @@ export default class InstallerService {
         return this.extensionPath + '/.xygeni';
     }
 
+    public getMcpLibratyInstallationDir(): string {
+        return this.extensionPath + '/.xygeni-mcp';
+    }
+
+    public getMcpLibraryPath(): string | undefined {
+        return this.mcpLibraryPath;
+    }
+
+    public isMcpLibraryInstalled(): boolean {
+        return this.mcpLibraryPath !== undefined;
+    }
+
     async install(apiUrl?: string, token?: string, override?: boolean): Promise<void> {
 
         this.status = 'running';
@@ -84,7 +102,7 @@ export default class InstallerService {
             this.logger.log(`  Downloading install from: ${scannerInstallUrl}  to: ${this.tempDir}`);
 
             // Download the install script
-            const scriptPath = await this.downloadScript(scannerInstallUrl, this.getInstallName());
+            const scriptPath = await this.downloadFile(scannerInstallUrl, this.tempDir, this.getInstallName());
 
             // Make script executable (Unix-like systems)
             if (Platform.get() !== 'win32') {
@@ -147,6 +165,47 @@ export default class InstallerService {
         }
     }
 
+    public async downloadMCPLibrary(): Promise<void> {
+
+        
+        const installMcpPath = this.getMcpLibratyInstallationDir();
+        this.mcpLibraryPath = `${installMcpPath}/${this.xygeniMCPLibraryName}`;
+
+        this.logger.log("");
+        this.logger.log("============================================================");
+
+        // remove installPath if exists, force fresh install
+        if (fs.existsSync(this.mcpLibraryPath)) {
+            this.logger.log(`  MCP Library already exist at: ${installMcpPath}`);
+            this.logger.log(`   Check Xygeni MCP Setup to configure it.`);
+            this.logger.log("============================================================");
+            return Promise.resolve();
+        }
+        // create folder if not yet
+        if (!fs.existsSync(installMcpPath)){
+            fs.mkdirSync(installMcpPath);
+        }
+
+        this.logger.log(`  Downloading MCP library... from : ${this.xygeniMCPLibraryUrl}  to: ${installMcpPath}`);
+
+        // Download the install script
+        await this.downloadFile(this.xygeniMCPLibraryUrl, installMcpPath, this.xygeniMCPLibraryName);
+
+        if (!fs.existsSync(this.mcpLibraryPath)) {
+            this.logger.log(`  MCP Library not found at: ${installMcpPath}. MCP server is not Available.`);
+            return Promise.resolve();
+        }
+        // Make script executable (Unix-like systems)
+        if (Platform.get() !== 'win32') {
+            await this.makeExecutable(this.mcpLibraryPath);
+        }
+
+        this.logger.log(`  Xygeni MCP Library Downloaded to: ${installMcpPath}`);
+        this.logger.log(`   Check Xygeni MCP Setup to configure it.`);
+        this.logger.log("============================================================");
+        
+    }
+
 
     public async isValidToken(xygeniApiUrl: string, xygeniToken: string): Promise<boolean> {
         const testApiUrl = `${xygeniApiUrl}/language`;
@@ -195,12 +254,12 @@ export default class InstallerService {
 
 
 
-    private async downloadScript(scriptUrl: string, installName: string): Promise<string> {
+    private async downloadFile(scriptUrl: string, targetDir: string, installName: string): Promise<string> {
         return new Promise((resolve, reject) => {
 
             // local path            
-            const scriptPath = path.join(this.tempDir, installName);
-            const file = fs.createWriteStream(scriptPath);
+            const filePath = path.join(targetDir, installName);
+            const file = fs.createWriteStream(filePath);
 
             //this.logger.log(`  Downloading install script from: ${scriptUrl}`);
 
@@ -212,8 +271,8 @@ export default class InstallerService {
                     const redirectUrl = response.headers.location;
                     if (redirectUrl) {
                         file.close();
-                        fs.unlinkSync(scriptPath);
-                        this.downloadScript(redirectUrl, installName).then(resolve).catch(reject);
+                        fs.unlinkSync(filePath);
+                        this.downloadFile(redirectUrl, targetDir, installName).then(resolve).catch(reject);
                         return;
                     }
                 }
@@ -221,8 +280,8 @@ export default class InstallerService {
                 // Check for successful response
                 if (response.statusCode !== 200) {
                     file.close();
-                    fs.unlinkSync(scriptPath);
-                    reject(new Error(`Failed to download script: HTTP ${response.statusCode}`));
+                    fs.unlinkSync(filePath);
+                    reject(new Error(`Failed to download file: HTTP ${response.statusCode}`));
                     return;
                 }
 
@@ -230,32 +289,32 @@ export default class InstallerService {
 
                 file.on('finish', () => {
                     file.close();
-                    resolve(scriptPath);
+                    resolve(filePath);
                 });
 
                 file.on('error', (err) => {
                     file.close();
-                    fs.unlinkSync(scriptPath);
+                    fs.unlinkSync(filePath);
                     reject(new Error(`File write error: ${err.message}`));
                 });
             });
 
             request.on('error', (err) => {
                 file.close();
-                if (fs.existsSync(scriptPath)) {
-                    fs.unlinkSync(scriptPath);
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
                 }
                 reject(new Error(`Download error: ${err.message}`));
             });
 
             // Set timeout for the request
-            request.setTimeout(30000, () => {
+            request.setTimeout(60000, () => {
                 request.destroy();
                 file.close();
-                if (fs.existsSync(scriptPath)) {
-                    fs.unlinkSync(scriptPath);
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
                 }
-                reject(new Error('Download timeout: Request took longer than 30 seconds'));
+                reject(new Error('Download timeout: Request took longer than 60 seconds'));
             });
         });
     }
@@ -407,7 +466,7 @@ export default class InstallerService {
     }
 
     private stripAnsiEscapeSequences(text: string): string {
-        return text.replace(/\u001b\[m|\u001b\[\d+m/g, '');
+        return text.replace(/\u001b\[m|\u001b\[1m|\u001b\[0m|\u001b\[\d+m/g, '');
     }
 }
 

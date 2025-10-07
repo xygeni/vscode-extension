@@ -3,7 +3,7 @@ import ConfigurationView from './views/configuration-view';
 import { ScanView } from './views/scan-view';
 import { IaCIssueView, IssueView, MisconfIssueView, SastIssueView, ScaIssueView, SecretsIssueView } from './views/issue-view';
 import { HelpView } from './views/help-view';
-import { XYGENI_SHOW_CONFIG_COMMAND, XYGENI_CONTEXT, COMMAND_EDIT_XYGENI_API_URL, COMMAND_EDIT_XYGENI_TOKEN, COMMAND_TEST_XYGENI_CONNECTION, COMMAND_INSTALL_SCANNER, XYGENI_CLOSE_CONFIG_COMMAND, COMMAND_RUN_SCANNER, COMMAND_SHOW_OUTPUT, COMMAND_OPEN_PROXY_CONFIG, COMMAND_SHOW_SCAN_OUTPUT } from './common/constants';
+import { XYGENI_SHOW_CONFIG_COMMAND, XYGENI_CONTEXT, COMMAND_EDIT_XYGENI_API_URL, COMMAND_EDIT_XYGENI_TOKEN, COMMAND_TEST_XYGENI_CONNECTION, COMMAND_INSTALL_SCANNER, XYGENI_CLOSE_CONFIG_COMMAND, COMMAND_RUN_SCANNER, COMMAND_SHOW_OUTPUT, COMMAND_OPEN_PROXY_CONFIG, COMMAND_SHOW_SCAN_OUTPUT, COMMAND_SHOW_MCP_SETUP } from './common/constants';
 import { XyContextImpl } from './common/context';
 import InstallerService from './service/installer';
 import { Logger } from './common/logger';
@@ -122,6 +122,10 @@ class XygeniExtension {
       }),
       vscode.commands.registerCommand(COMMAND_RUN_SCANNER, async () => {
         await commands.runScanner();
+      }),
+
+      vscode.commands.registerCommand(COMMAND_SHOW_MCP_SETUP, (issue) => {
+        commands.showMcpSetupView();
       }),
 
       vscode.commands.registerCommand('xygeni.showIssueDetails', (issue) => {

@@ -22,6 +22,7 @@ import { RemediationDiffContentProvider } from '../views/remediation-providers';
 import LicenseService from '../service/license';
 import { VulnXygeniIssue } from '../service/vuln-issue';
 import { RemediationService } from '../service/remediation';
+import { McpSetupView } from '../views/mcp-setup-view';
 
 
 
@@ -140,10 +141,18 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
   }
 
   public async checkLicense(): Promise<boolean> {
-    return LicenseService.getInstance().isValidLicense().then(
+
+    const xygeniToken = await ConfigManager.getXygeniToken(this.context);
+    if (!xygeniToken) {
+      Logger.log(' === No token available  ===');
+      return false;
+    }
+    return LicenseService.getInstance().isValidLicense(xygeniToken).then(
       (isAvailable) => {
         this.updateLicenseIdeAvailability(isAvailable);
-        Logger.log(' === IDE License available  ===');
+        Logger.log(' ==============================');
+        Logger.log('     IDE License available     ');
+        Logger.log(' ==============================');
         return isAvailable || true; // TODO: enable when license is available
       }
     )
@@ -254,6 +263,11 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     return InstallerService.getInstance().getScannerInstallationDir();
   }
 
+  public getMcpLibraryPath(): string | undefined {
+    return InstallerService.getInstance().getMcpLibraryPath();
+  }
+
+
   public getScanOutputChannel(): OutputChannelWrapper {
     if (this.scanOutputChannel === undefined) {
       this.scanOutputChannel = new OutputChannelWrapper(vscode.window.createOutputChannel(XYGENI_SCANNER_OUTPUT_NAME));
@@ -284,14 +298,27 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     const xygeniUrl = ConfigManager.getXygeniUrl();
     return ConfigManager.getXygeniToken(this.context).then(xygeniToken => {
 
+      // Install scanner
       this.installing();
+
       installer.install(xygeniUrl, xygeniToken, override).then(() => {
+
         setTimeout(() => {
-          this.installerOk();
+          this.installerOk(); 
+          
+          // Download MCP library
+          installer.downloadMCPLibrary()
+            .then(() => {
+              this.setMcpLibraryInstalled();
+              return Promise.resolve();
+            })
+            .catch((error) => {
+              Logger.log(" Error downloading Xygeni MCP library. MCP Server will not be available: " + error);
+            });
+
         }, 500); // allow user see transition
 
-      }
-      ).catch((error) => {
+      }).catch((error) => {
         setTimeout(() => {
           this.installerError();
         }, 500); // allow user see transition
@@ -376,6 +403,10 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
       return true;
     }
     return false;
+  }
+
+  showMcpSetupView() {
+    McpSetupView.showMcpSetup(this);
   }
 
   openDiffViewCommand(uri: string, tempFile: string): void {
@@ -502,6 +533,7 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
   resetInstaller(): void {
     this.xygeniContext.setKey(XYGENI_CONTEXT.INSTALL_READY, false);
     this.xygeniContext.setKey(XYGENI_CONTEXT.INSTALL_ERROR, false);
+    this.xygeniContext.setKey(XYGENI_CONTEXT.MCP_LIBRARY_INSTALLED, false);
     this.xygeniContext.setKey(XYGENI_CONTEXT.SHOW_CONFIG, true); // show config
 
     this.refreshAllViews();
@@ -541,6 +573,11 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     this.xygeniContext.setKey(XYGENI_CONTEXT.SCANNER_RESULTS, false);
     this.refreshAllViews();
   }
+
+  setMcpLibraryInstalled(): void {
+    this.xygeniContext.setKey(XYGENI_CONTEXT.MCP_LIBRARY_INSTALLED, true);
+  }
+
 
   // ========================================================
   // workspace xygeni files storage

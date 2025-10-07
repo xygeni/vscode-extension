@@ -45,7 +45,7 @@ export class DetailsView {
         const sourceFile = message.file;
         if (await commands.fileExistsInProject(sourceFile)) {
             const filePath = commands.getAbsolutePathForSourceFile(sourceFile);
-            Logger.log(`Remediation message... ${issueId} ${message.kind} ${message.file}  `);
+            //Logger.log(`Remediation message... ${issueId} ${message.kind} ${message.file}  `);
             this.handleRemediationView(this.panel, message, filePath, commands);
         }
 

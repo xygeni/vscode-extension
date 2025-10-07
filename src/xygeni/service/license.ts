@@ -40,7 +40,7 @@ export default class LicenseService {
     this.uninstallLicense();
   }
 
-  public async isValidLicense(): Promise<boolean> {
+  public async isValidLicense(token: string): Promise<boolean> {
     const xygeniApiUrl = this.commands.getXygeniUrl();
     if (!xygeniApiUrl) {
       this.logger.log('Xygeni url not found, license cannot be checked, stopping...');
@@ -49,11 +49,11 @@ export default class LicenseService {
     return this.commands.globalFileExists(MACHINE_FINGERPRINT_FILE).then(
       (exists) => {
         if (!exists) {
-          return this.generateAndEval(xygeniApiUrl);
+          return this.generateAndEval(xygeniApiUrl, token);
         }
         return this.commands.readGlobalFile(MACHINE_FINGERPRINT_FILE).then(
           (fingerprint) => {
-            return this.callInstallLicense(fingerprint, xygeniApiUrl);
+            return this.callInstallLicense(fingerprint, xygeniApiUrl, token);
           }
         );
       }
@@ -63,10 +63,10 @@ export default class LicenseService {
       );
   }
 
-  private generateAndEval(xygeniApiUrl: string): Promise<boolean> {
+  private generateAndEval(xygeniApiUrl: string, xygeniToken: string): Promise<boolean> {
     const fingerprint = this.generateMachineFingerprint();
     this.commands.storeGlobalFile(MACHINE_FINGERPRINT_FILE, fingerprint);
-    return this.callInstallLicense(fingerprint, xygeniApiUrl);
+    return this.callInstallLicense(fingerprint, xygeniApiUrl, xygeniToken);
   }
 
   private generateMachineFingerprint(): string {
@@ -93,17 +93,18 @@ export default class LicenseService {
   }
 
 
-  private callInstallLicense(data: any, xygeniApiUrl: string): Promise<boolean> {
+  private callInstallLicense(data: any, xygeniApiUrl: string, xygeniToken: string): Promise<boolean> {
     const ideLicenseUrl = `${xygeniApiUrl}/internal/license/ideaccess`;
 
-    Logger.log(`Installing Xygeni IDE License: ${data}`);
     return new Promise<boolean>((resolve, reject) => {
       const request = this.commands.getHttpClient(ideLicenseUrl)
+        .setAuthToken(xygeniToken)
         .post(ideLicenseUrl, data, (res) => {
           if (res.statusCode !== 200) {
             this.logger.log(`Error response installing Xygeni IDE License: ${res.statusCode}`);
             reject(new Error(`Error response installing Xygeni IDE License`));
           }
+          //Logger.log(`Xygeni IDE License installed successfully.`);
           resolve(res.statusCode === 200);
         });
 

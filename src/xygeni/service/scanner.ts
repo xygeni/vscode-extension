@@ -183,9 +183,9 @@ class XygeniScannerService extends EventEmitter {
             
             const scannerScriptPath = this.getScannerScriptPath(xygeniInstallPath);            
            
-            this.logger.log('  Running scanner command ' + scannerScriptPath + ' ' + args.join(' '));
-            //this.logger.log(`Running scanner working dir: ${workingDir}`);
-
+            this.logger.log(`  Xygeni Working dir: ${workingDir}`);
+            this.logger.log('  Running scanner command: ' + scannerScriptPath + ' ' + args.join(' '));
+            
             const proxySettings = this.commands.getProxySettings();
             const env: NodeJS.ProcessEnv = {
                 ...process.env,

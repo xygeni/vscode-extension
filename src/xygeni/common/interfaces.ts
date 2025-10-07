@@ -72,6 +72,8 @@ export interface Commands extends WorkspaceFiles {
   getDetectorDoc(url: URL, token: string): Promise<string>
   getScanOutputChannel(): IOutputChannel
   isInstallReady(): boolean;
+  getScannerInstallationDir(): string;
+  getMcpLibraryPath(): string | undefined;
 
   getXygeniMedia(): XygeniMedia;
 

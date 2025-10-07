@@ -54,7 +54,7 @@ export class RemediationDiffContentProvider implements vscode.TextDocumentConten
       // Apply the edit
       await vscode.workspace.applyEdit(workspaceEdit);
 
-      Logger.log(`File saved: ${fileUri}`);
+      //Logger.log(`File saved: ${fileUri}`);
       this.closeTabDiff(previewUri);      
     }
     return Promise.resolve();
