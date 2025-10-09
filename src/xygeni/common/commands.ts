@@ -153,12 +153,12 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
         Logger.log(' ==============================');
         Logger.log('     IDE License available     ');
         Logger.log(' ==============================');
-        return isAvailable || true; // TODO: enable when license is available
+        return isAvailable; 
       }
     )
       .catch(() => {
         this.updateLicenseIdeAvailability(false);
-        return false || true; // TODO: enable when license is available
+        return false; 
       });
   }
 

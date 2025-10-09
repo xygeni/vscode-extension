@@ -84,9 +84,8 @@ export default class ConfigurationView implements vscode.TreeDataProvider<Config
                     },
                 )
             ];
-
-            // TODO: enable when license validation was implemented
-            if (!isLicenseIdeAvailable && false) {
+           
+            if (!isLicenseIdeAvailable) {
                 this.configItems.push(
                     new ConfigItem(
                         'Ide License Not Available.',

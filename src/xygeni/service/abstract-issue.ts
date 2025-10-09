@@ -157,7 +157,7 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
 
   // tab-title-3 implementation
   public getFixSnippetHtmlTab(): string {
-    if (this.remediableLevel === AbstractXygeniIssue.REMEDIABLE_AUTO) { // TODO: enable when remediable
+    if (this.remediableLevel === AbstractXygeniIssue.REMEDIABLE_AUTO) { 
       return `<input type="radio" name="tabs" id="tab-3">
     <label id="tab-3-label" for="tab-3">FIX IT</label>`;
     }
@@ -166,7 +166,7 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
 
   // tab-content-3 implementation
   public getFixSnippetHtml(): string {
-    if (this.remediableLevel === AbstractXygeniIssue.REMEDIABLE_AUTO) {  // TODO : enable when remediable
+    if (this.remediableLevel === AbstractXygeniIssue.REMEDIABLE_AUTO) { 
 
       return `<div id="tab-content-3">
       <p>XYGENI AGENT - REMEDIATE ISSUE</p>
