@@ -6,7 +6,7 @@
   
   "license": "MIT",
   "icon": "media/images/logo_xy.png",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "engines": {
     "vscode": "^1.99.2"
   },
