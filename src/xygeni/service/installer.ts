@@ -354,8 +354,8 @@ export default class InstallerService {
 
             // Determine command based on platform
             if (platform === 'win32') {
-                command = 'cmd';
-                args = ['/c', installCommand];
+                command = 'powershell';
+                args = ['-ep','Bypass', installCommand];
             } else {
                 command = 'sh';
                 args = ['-c', installCommand];

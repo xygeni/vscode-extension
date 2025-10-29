@@ -181,11 +181,8 @@ class XygeniScannerService extends EventEmitter {
 
             const workingDir = this.commands.getWsLocalStorage();
             
-            const scannerScriptPath = this.getScannerScriptPath(xygeniInstallPath);            
-           
-            this.logger.log(`  Xygeni Working dir: ${workingDir}`);
-            this.logger.log('  Running scanner command: ' + scannerScriptPath + ' ' + args.join(' '));
-            
+            const scannerScriptPath = this.getScannerScriptPath(xygeniInstallPath);
+
             const proxySettings = this.commands.getProxySettings();
             const env: NodeJS.ProcessEnv = {
                 ...process.env,
@@ -213,10 +210,26 @@ class XygeniScannerService extends EventEmitter {
                 }
             }
 
+            let shellCommand;
+            let shellArgs = [];
 
-            const scannerProcess = spawn(scannerScriptPath, args, {
+            // Determine command based on platform
+            if (Platform.get() === 'win32') {
+                shellCommand = 'powershell';
+                shellArgs = ["-NoProfile","-ExecutionPolicy", "Bypass", "-File", scannerScriptPath, ...args];
+            }
+            else {
+                shellCommand = scannerScriptPath;
+                shellArgs = [...args];
+
+            }
+
+            this.logger.log(`  Xygeni Working dir: ${workingDir}`);
+            this.logger.log('  Running scanner command: ' + shellCommand + ' ' + shellArgs.join(' '));
+
+            const scannerProcess = spawn(shellCommand, shellArgs, {
                 stdio: ['pipe', 'pipe', 'pipe'],
-                shell: false,
+                shell: false, // Disable shell for cross-platform compatibility and security
                 cwd: workingDir,
                 env: env
             });
