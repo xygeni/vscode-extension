@@ -184,8 +184,8 @@ export class McpSetupView {
 
                 <div class="code-block"><pre>
 {
-  "mcpServers": {
-    "xygeni-scanner": {
+  "servers": {
+    "xygeni-mcp-server": {
       "timeout": 60,
       "type": "stdio",
       "command": "java",
