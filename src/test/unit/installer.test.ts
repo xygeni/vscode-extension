@@ -219,7 +219,7 @@ suite('Installer Test Suite', () => {
             // Act & Assert
             await assert.rejects(
                 installer.install(),
-                /Failed to download script: HTTP 404/
+                /Failed to download file: HTTP 404/
             );
         });
 
@@ -231,7 +231,7 @@ suite('Installer Test Suite', () => {
             // Act & Assert
             await assert.rejects(
                 installer.install(),
-                /Error: Failed to download script: HTTP 401/
+                /Error: Failed to download file: HTTP 401/
             );
         });
 
@@ -328,8 +328,8 @@ suite('Installer Test Suite', () => {
 
             await installPromise;
 
-            // Assert - should use cmd on Windows
-            assert.ok(spawnStub.calledWith('cmd'));
+            // Assert - should use powershell on Windows
+            assert.ok(spawnStub.calledWith('powershell'));
         });
 
 

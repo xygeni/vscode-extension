@@ -38,15 +38,10 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
     this.category = issue.category;
     this.categoryName = issue.categoryName;
     this.file = issue.file;
-    if (this.category === 'sca') {
-      this.beginLine = Math.max(0, issue.beginLine ? issue.beginLine : 0);
-      this.endLine = Math.max(0, issue.endLine ? issue.endLine : this.beginLine);;
-    }
-    else {
-      // normalize line numbers to 0-based
-      this.beginLine = Math.max(0, issue.beginLine ? issue.beginLine - 1 : 0);
-      this.endLine = Math.max(0, issue.endLine ? issue.endLine - 1 : this.beginLine);
-    }
+    // normalize line numbers to 0-based
+    this.beginLine = Math.max(0, issue.beginLine ? issue.beginLine - 1 : 0);
+    this.endLine = Math.max(0, issue.endLine ? issue.endLine - 1 : this.beginLine);
+
     this.beginColumn = Math.max(0, issue.beginColumn ? issue.beginColumn - 1 : 0);
     this.endColumn = Math.max(0, issue.endColumn ? issue.endColumn - 1 : Number.MAX_SAFE_INTEGER);
     this.code = issue.code;
@@ -157,7 +152,7 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
 
   // tab-title-3 implementation
   public getFixSnippetHtmlTab(): string {
-    if (this.remediableLevel === AbstractXygeniIssue.REMEDIABLE_AUTO) { 
+    if (this.remediableLevel === AbstractXygeniIssue.REMEDIABLE_AUTO) {
       return `<input type="radio" name="tabs" id="tab-3">
     <label id="tab-3-label" for="tab-3">FIX IT</label>`;
     }
@@ -166,7 +161,7 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
 
   // tab-content-3 implementation
   public getFixSnippetHtml(): string {
-    if (this.remediableLevel === AbstractXygeniIssue.REMEDIABLE_AUTO) { 
+    if (this.remediableLevel === AbstractXygeniIssue.REMEDIABLE_AUTO) {
 
       return `<div id="tab-content-3">
       <p>XYGENI AGENT - REMEDIATE ISSUE</p>
@@ -232,7 +227,7 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
     return tags ?
       '<tr><th>Tags</th>' +
       '<td><div class="xy-container-chip">' + tags.map(tag => `<div class="xy-blue-chip">${this.tagNames(tag)}</div>`).join(' ') + '</div></td></tr>'
-      : '';    
+      : '';
   }
 
   public fieldLinkDoc(url: string | undefined): string {
@@ -253,7 +248,7 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
     const texts: Record<string, string> = {
       "manual_fix": "Manual Fix",
       "potential_reachable": "Potential Reachable",
-      "in-app-code": "In-App Code",      
+      "in-app-code": "In-App Code",
       "generic": "Generic"
     } as const;
 
@@ -272,11 +267,11 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
     if (branch) {
       where += '<img src="{{iconsPath}}/branch.svg" alt="Branch"></img> ' + branch + ' &nbsp;&nbsp; ';
     }
-    if (commitHash) { 
+    if (commitHash) {
       where += '<img src="{{iconsPath}}/branch.svg" alt="Commit"></i> ' + commitHash + ' &nbsp;&nbsp; ';
     }
     if (user) {
-      where += '<img src="{{iconsPath}}/account.svg" alt="User"></img> ' + user ;
+      where += '<img src="{{iconsPath}}/account.svg" alt="User"></img> ' + user;
     }
     return where;
   }
