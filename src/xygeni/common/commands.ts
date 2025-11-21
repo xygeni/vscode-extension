@@ -364,7 +364,7 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
   }
 
   private getWorkspaceFolders(): string[] {
-    return (vscode.workspace.workspaceFolders || []).map(f => f.uri.fsPath);
+    return (vscode.workspace.workspaceFolders || []).map(f => f.uri.path);
   }
 
 
@@ -411,17 +411,16 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
 
   openDiffViewCommand(uri: string, tempFile: string): void {
 
-    const previewUri =  `preview-fix:${uri}.fixed`;
-
     this.readFileFromRoot(tempFile)
     .then(
       (proposedText) => {
         if (this.remediationDiffProvider) {
+            const previewUri =  this.remediationDiffProvider.getPreviewFixUri(uri);
           this.remediationDiffProvider.setContent(previewUri, proposedText);
           vscode.commands.executeCommand(
             'vscode.diff',
             vscode.Uri.parse(uri),
-            vscode.Uri.parse(previewUri),
+            vscode.Uri.parse(previewUri.toString()),
             'Xygeni Fix Preview',
             { viewColumn: vscode.ViewColumn.One }
           );

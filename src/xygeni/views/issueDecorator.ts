@@ -160,7 +160,7 @@ export class IssueDecorator {
         // Normalize file path to handle different path formats
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (workspaceFolder) {
-            const workspacePath = workspaceFolder.uri.fsPath;
+            const workspacePath = workspaceFolder.uri.path;
             if (filePath.startsWith(workspacePath)) {
                 return filePath.substring(workspacePath.length + 1).replace(/\\/g, '/');
             }
