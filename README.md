@@ -16,6 +16,7 @@ Xygeni Security Scanner is a powerful extension that brings comprehensive securi
   - **SCA (Software Composition Analysis):** Identify vulnerabilities in your open-source dependencies.
   - **IaC (Infrastructure as Code):** Scan your IaC files (e.g., Terraform, CloudFormation) for misconfigurations.
   - **Misconfigurations:** Detect security misconfigurations in your application and services.
+- **Remediation actions for SCA and SAST Issues:** Automatically detect and provide remediation guidance for vulnerabilities found in your source code and dependencies, enabling quick fixes directly within VS Code.
 - **Seamless Integration:** The extension adds a dedicated Xygeni view to your activity bar for easy access.
 - **Guided Setup:** A simple configuration process to connect to the Xygeni service.
 - **In-Editor Issue Highlighting:** View security findings directly in your code, making it easy to pinpoint and fix issues.

@@ -19,7 +19,12 @@ export class RemediationDiffContentProvider implements vscode.TextDocumentConten
   constructor(private xygeniContext: XyContext,
     private commands: Commands) {
     // Clean up old entries periodically
-    setInterval(() => this.cleanup(), 300000); // Clean every minute
+    setInterval(() => this.cleanup(), 300000); // Clean every 5 minute
+  }
+
+  public getPreviewFixUri(fileUri: string): vscode.Uri {
+    // preview-fix: prefix required for preview
+    return  vscode.Uri.parse(`preview-fix:${fileUri}.fixed`);
   }
 
   /** Copy and save changes to fileUri if proposed remediation content is available */
@@ -28,8 +33,7 @@ export class RemediationDiffContentProvider implements vscode.TextDocumentConten
     const uri = vscode.Uri.parse(fileUri);
     const document = await vscode.workspace.openTextDocument(uri);
 
-    const previewUri = vscode.Uri.parse(`preview-fix:${uri.path}.fixed`);
-
+    const previewUri = this.getPreviewFixUri(fileUri);    
     // Access the private remediationData set from the provider
     const content = this.provideTextDocumentContent(previewUri);
     if (!content) {
@@ -77,10 +81,10 @@ export class RemediationDiffContentProvider implements vscode.TextDocumentConten
   // ===============================================
   // content provider functions
 
-  setContent(previewUri: string, content: string) {
+  setContent(previewUri: vscode.Uri, content: string) {
     this.cleanupIfNeeded();
-    this.contentMap.set(previewUri, { content, timestamp: Date.now() });
-    this._onDidChange.fire(vscode.Uri.parse(previewUri));
+    this.contentMap.set(previewUri.toString(), { content, timestamp: Date.now() });
+    this._onDidChange.fire(previewUri);
   }
 
   provideTextDocumentContent(uri: vscode.Uri): string {

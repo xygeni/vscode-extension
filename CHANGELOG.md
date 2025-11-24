@@ -13,4 +13,12 @@
 ## [1.2.0]
 
 - Auto-Fix Code Issues for SCA and SAST added
-- 
+
+
+## [1.2.1]
+
+- Fix scan executions on Windows
+
+## [1.2.2]
+
+- Fix remediation executions on Windows

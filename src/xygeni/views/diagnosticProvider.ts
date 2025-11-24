@@ -142,7 +142,7 @@ export class DiagnosticProvider {
     private normalizeFilePath(filePath: string): string {
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (workspaceFolder) {
-            const workspacePath = workspaceFolder.uri.fsPath;
+            const workspacePath = workspaceFolder.uri.path;
             if (filePath.startsWith(workspacePath)) {
                 return filePath.substring(workspacePath.length + 1).replace(/\\/g, '/');
             }

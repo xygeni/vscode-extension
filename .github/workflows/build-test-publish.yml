@@ -1,9 +1,7 @@
-name: Publish Xygeni Scanner VS Code Extension
+name: Publish VS Code Extension to Marketplace
 
 on:
-  push:
-    tags:
-      - 'v*.*.*' # Trigger only on version tags like v1.2.3
+  workflow_dispatch:
 
 jobs:
   publish:
@@ -28,9 +26,23 @@ jobs:
         run: npm run test:unit
 
       - name: Package extension
-        run: vsce package
+        run: npx vsce package --allow-missing-repository
 
-      - name: Publish Xygeni Scanner to Marketplace
+      - name: Upload extension artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-vsix
+          path: "*.vsix"
+
+      - uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ github.TOKEN }}
+          approvers: fcarnicero,nanoalbelda,vdlr
+          minimum-approvals: 1
+          timeout-minutes: 5    
+
+      - name: Publish extension to Marketplace
+        if: success()
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: vsce publish --pat $VSCE_PAT
+        run: npx vsce publish --pat $VSCE_PAT

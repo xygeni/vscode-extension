@@ -74,7 +74,8 @@ export class RemediationService {
       }
       
       // generate temp folder and copy file
-      const tempDir = os.tmpdir() + '/' + Math.floor(Math.random() * 100000);
+      let tempDir = os.tmpdir() + '/' + Math.floor(Math.random() * 10000000);
+      tempDir = tempDir.replace(/\\/g, '/'); // always use linux paths style
       return this.commands.copyFileToFolder(fileUri, tempDir)
         .then(
           async (tempFile) => {
@@ -88,7 +89,11 @@ export class RemediationService {
             return { tempFile: tempFile, explanation: explanation };
 
           }
-        );
+        )
+        .catch((error) => {
+          this.logger.log(`Error applying remediation on file ${fileUri}: ${error}`);
+          throw error;
+        });
 
 
     } catch (error) {
@@ -111,9 +116,10 @@ export class RemediationService {
 
       let dependencyGavt =  vulnIssue.name + ':' + vulnIssue.version + ':' + vulnIssue.language;
       if (vulnIssue.group) dependencyGavt = vulnIssue.group + ':' + dependencyGavt;
-      
+       
       // generate temp folder and copy file
-      const tempDir = os.tmpdir() + '/' + Math.floor(Math.random() * 100000);
+      let tempDir = os.tmpdir() + '/' + Math.floor(Math.random() * 10000000);
+      tempDir = tempDir.replace(/\\/g, '/'); // always use linux paths style
       return this.commands.copyFileToFolder(fileUri, tempDir)
       .then(
         async (tempFile) => {
