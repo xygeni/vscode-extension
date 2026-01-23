@@ -9,6 +9,10 @@ import { commands, Event } from 'vscode';
 import { ProxySettings } from '../../xygeni/config/xygeni-configuration';
 import { AbstractXygeniIssue } from '../../xygeni/service/abstract-issue';
 import { getHttpClient } from '../../xygeni/common/https';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as yauzl from 'yauzl';
+import * as crypto from 'crypto';
 
 // Mock vscode module
 class GlobalContextMock implements GlobalContext {
@@ -120,6 +124,16 @@ class MockWriteStream extends VscodeEventEmitter {
         this.closed = true;
         this.emit('close');
     }
+
+    write(data: any, cb?: any): boolean {
+        if (cb) { cb(); }
+        return true;
+    }
+
+    end(cb?: any): void {
+        if (cb) { cb(); }
+        this.emit('finish');
+    }
 }
 
 
@@ -222,6 +236,44 @@ suite('Installer Test Suite', () => {
                 /Failed to download file: HTTP 404/
             );
         });
+        test('should handle checksum validation failure', async () => {
+            const mockResponse = new MockResponse(200);
+            const mockRequest = new MockRequest();
+            commandsMock.getHttpClient = () => { return new MockHttpClient(mockResponse, mockRequest); };
+
+            sandbox.stub(installer as any, 'downloadFile').callsFake((url: any, targetDir: any, name: any) => {
+                const filePath = path.join(targetDir, name);
+                fs.writeFileSync(filePath, 'expected-checksum');
+                return Promise.resolve(filePath);
+            });
+            sandbox.stub(installer as any, 'calculateChecksum').resolves('wrong-checksum');
+
+            // Act & Assert
+            await assert.rejects(
+                installer.install(),
+                /Checksum validation failed/
+            );
+        });
+
+        test('should handle unzip failure', async () => {
+            const mockResponse = new MockResponse(200);
+            const mockRequest = new MockRequest();
+            commandsMock.getHttpClient = () => { return new MockHttpClient(mockResponse, mockRequest); };
+
+            sandbox.stub(installer as any, 'downloadFile').callsFake((url: any, targetDir: any, name: any) => {
+                const filePath = path.join(targetDir, name);
+                fs.writeFileSync(filePath, 'matching-checksum');
+                return Promise.resolve(filePath);
+            });
+            sandbox.stub(installer as any, 'calculateChecksum').resolves('matching-checksum');
+            sandbox.stub(installer as any, 'unzip').rejects(new Error('Unzip failed'));
+
+            // Act & Assert
+            await assert.rejects(
+                installer.install(),
+                /Unzip failed/
+            );
+        });
 
         test('should handle network error during download', async () => {
             const mockRequest = new MockRequest();
@@ -235,105 +287,135 @@ suite('Installer Test Suite', () => {
             );
         });
 
-        test('should handle script execution failure', async () => {
-            const mockResponse = new MockResponse(200);
-            const mockRequest = new MockRequest();
-            const mockChildProcess = new MockChildProcess();
-            commandsMock.getHttpClient = () => { return new MockHttpClient(mockResponse, mockRequest); };
-
-
-            sandbox.stub(Platform, 'get').returns('linux');
-
-            sandbox.stub(require('child_process'), 'spawn').returns(mockChildProcess);
-
-            // Act
-            const installPromise = installer.install();
-
-            // Simulate script execution failure
-            setTimeout(() => {
-                mockChildProcess.stderr.emit('data', Buffer.from('Script failed\n'));
-                mockChildProcess.emit('close', 1); // Non-zero exit code
-            }, 30);
-
-            // Assert
-            await assert.rejects(
-                installPromise,
-                /Installation script failed/
-            );
-        });
-
         test('should handle HTTP redirects', async () => {
             // Arrange
-            const scriptUrl = 'https://example.com/install.sh';
-            const redirectUrl = 'https://cdn.example.com/install.sh';
-            const mockRedirectResponse = new MockResponse(302);
-            mockRedirectResponse.headers.location = redirectUrl;
+            const redirectUrl = 'https://cdn.example.com/xygeni_scanner.zip';
+            sandbox.stub(Platform, 'get').returns('linux');
+            
+            // Stub downloadFile to avoid real network but simulate file creation
+            let callCount = 0;
+            sandbox.stub(installer as any, 'downloadFile').callsFake((url: any, targetDir: any, name: any) => {
+                callCount++;
+                if (callCount === 1 && url.includes('xygeni_scanner.zip') && !url.includes('cdn')) {
+                    // simulate redirect by having subsequent calls
+                    return (installer as any).downloadFile(redirectUrl, targetDir, name);
+                }
+                const filePath = path.join(targetDir, name);
+                fs.writeFileSync(filePath, 'hash');
+                return Promise.resolve(filePath);
+            });
 
-            const mockFinalResponse = new MockResponse(200);
-            const mockRequest = new MockRequest();
+            // Stub subsequent steps
+            sandbox.stub(installer as any, 'calculateChecksum').resolves('hash');
+            sandbox.stub(installer as any, 'unzip').callsFake((zip: any, dest: any) => {
+                const root = path.join(dest, 'xygeni_scanner');
+                if (!fs.existsSync(root)) { fs.mkdirSync(root, { recursive: true }); }
+                return Promise.resolve();
+            });
+            sandbox.stub(installer as any, 'copyDirectoryContents').returns(undefined);
+            sandbox.stub(installer as any, 'makeBinaryExecutable').resolves();
+
+            // Act
+            await installer.install();
+
+            // Assert
+            // 1st call for zip (redirects to 2nd call), 3rd call for checksum
+            assert.strictEqual(callCount, 3);
+        });
+
+        test('should install successfully', async () => {
+            // Arrange
+            sandbox.stub(Platform, 'get').returns('linux');
+            
+            sandbox.stub(installer as any, 'downloadFile').callsFake((url: any, targetDir: any, name: any) => {
+                const filePath = path.join(targetDir, name);
+                fs.writeFileSync(filePath, 'matching-hash');
+                return Promise.resolve(filePath);
+            });
+            sandbox.stub(installer as any, 'calculateChecksum').resolves('matching-hash');
+            sandbox.stub(installer as any, 'unzip').callsFake((zip: any, dest: any) => {
+                const root = path.join(dest, 'xygeni_scanner');
+                if (!fs.existsSync(root)) { fs.mkdirSync(root, { recursive: true }); }
+                return Promise.resolve();
+            });
+            sandbox.stub(installer as any, 'copyDirectoryContents').returns(undefined);
+            const makeExecStub = sandbox.stub(installer as any, 'makeBinaryExecutable').resolves();
+
+            // Act
+            await installer.install();
+
+            // Assert
+            assert.strictEqual(installer.status, 'success');
+            assert.ok(makeExecStub.calledOnce);
+        });
+
+        test('should not make executable on Windows', async () => {
+            // Arrange
+            sandbox.stub(Platform, 'get').returns('win32');
+            
+            sandbox.stub(installer as any, 'downloadFile').callsFake((url: any, targetDir: any, name: any) => {
+                const filePath = path.join(targetDir, name);
+                fs.writeFileSync(filePath, 'hash');
+                return Promise.resolve(filePath);
+            });
+            sandbox.stub(installer as any, 'calculateChecksum').resolves('hash');
+            sandbox.stub(installer as any, 'unzip').callsFake((zip: any, dest: any) => {
+                const root = path.join(dest, 'xygeni_scanner');
+                if (!fs.existsSync(root)) { fs.mkdirSync(root, { recursive: true }); }
+                return Promise.resolve();
+            });
+            sandbox.stub(installer as any, 'copyDirectoryContents').returns(undefined);
+            const makeExecStub = sandbox.stub(installer as any, 'makeBinaryExecutable').resolves();
+
+            // Act
+            await installer.install();
+
+            // Assert
+            assert.ok(makeExecStub.notCalled);
+        });
+    });
+
+    suite('validation methods', () => {
+        test('isValidToken should return true for status 200', async () => {
             const mockResponse = new MockResponse(200);
-            const mockChildProcess = new MockChildProcess();
+            const mockRequest = new MockRequest();
             const mockHttpClient = new MockHttpClient(mockResponse, mockRequest);
             commandsMock.getHttpClient = () => mockHttpClient;
 
-            sandbox.stub(Platform, 'get').returns('linux');
-
-            let callCount = 0;
-            sandbox.stub(mockHttpClient, 'get').callsFake((url: any, callback: any) => {
-                callCount++;
-                if (callCount === 1) {
-                    setTimeout(() => callback(mockRedirectResponse), 10);
-                } else {
-                    setTimeout(() => callback(mockFinalResponse), 10);
-                }
-                return mockRequest as any;
-            });
-
-            sandbox.stub(require('child_process'), 'spawn').returns(mockChildProcess);
-
-            // Act
-            const installPromise = installer.install();
-
-            // Simulate successful script execution
-            setTimeout(() => {
-                mockChildProcess.emit('close', 0);
-            }, 40);
-
-            // Assert
-            await installPromise;
-
-            assert.strictEqual(callCount, 2);
+            const result = await installer.isValidToken('http://api', 'token');
+            assert.strictEqual(result, true);
         });
 
-        test('should handle Windows platform correctly', async () => {
-            // Arrange
-            const scriptUrl = 'https://example.com/install.bat';
+        test('isValidToken should return false for non-200 status', async () => {
+            const mockResponse = new MockResponse(401);
+            const mockRequest = new MockRequest();
+            const mockHttpClient = new MockHttpClient(mockResponse, mockRequest);
+            commandsMock.getHttpClient = () => mockHttpClient;
+
+            const result = await installer.isValidToken('http://api', 'token');
+            assert.strictEqual(result, false);
+        });
+
+        test('isValidApiUrl should return true for status 200', async () => {
             const mockResponse = new MockResponse(200);
             const mockRequest = new MockRequest();
-            const mockChildProcess = new MockChildProcess();
-            commandsMock.getHttpClient = () => { return new MockHttpClient(mockResponse, mockRequest); };
+            const mockHttpClient = new MockHttpClient(mockResponse, mockRequest);
+            commandsMock.getHttpClient = () => mockHttpClient;
 
-            sandbox.stub(Platform, 'get').returns('win32');
-
-
-            const spawnStub = sandbox.stub(require('child_process'), 'spawn').returns(mockChildProcess);
-
-            // Act
-            const installPromise = installer.install();
-
-            // Simulate successful script execution
-            setTimeout(() => {
-                mockChildProcess.emit('close', 0);
-            }, 30);
-
-            await installPromise;
-
-            // Assert - should use powershell on Windows
-            assert.ok(spawnStub.calledWith('powershell'));
+            const result = await installer.isValidApiUrl('http://api');
+            assert.strictEqual(result, true);
         });
 
+        test('isValidApiUrl should reject for non-200 status', async () => {
+            const mockResponse = new MockResponse(500);
+            const mockRequest = new MockRequest();
+            const mockHttpClient = new MockHttpClient(mockResponse, mockRequest);
+            commandsMock.getHttpClient = () => mockHttpClient;
 
+            await assert.rejects(
+                installer.isValidApiUrl('http://api'),
+                /Error checking Xygeni API URL: 500/
+            );
+        });
     });
-
-
 });

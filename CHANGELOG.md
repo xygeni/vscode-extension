@@ -22,3 +22,7 @@
 ## [1.2.2]
 
 - Fix remediation executions on Windows
+
+## [1.2.3]
+
+- Fix scanner compatibility with asdf CLI manager
