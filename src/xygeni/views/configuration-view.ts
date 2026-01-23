@@ -74,7 +74,7 @@ export default class ConfigurationView implements vscode.TreeDataProvider<Config
                 // Connection Status
                 new ConfigItem(
                     this.CONNECTION_ITEM_LABEL,
-                    isConnecting ? 'Connecting...' : isConnectionValid ? 'Connection Ready' : isConfigValid ? 'Disconnected. Click to reconnect' : 'Not configured',
+                    isConnecting ? 'Connecting...' : isConnectionValid ? 'Connection Ready. Click to reinstall.' : isConfigValid ? 'Disconnected. Click to reconnect' : 'Not configured',
                     vscode.TreeItemCollapsibleState.None,
                     isConnecting ? 'status-loading' : isConnectionValid ? 'status-ok' : isConfigValid ? 'status-unknown' : 'status-error',
                     {

@@ -3,10 +3,9 @@
   "displayName": "Xygeni Security for VSCode",
   "description": "Secure your codebase with Secrets, SAST, SCA, IaC & Supply Chain scanning",
   "publisher": "xygeni-security",
-  
   "license": "MIT",
   "icon": "media/images/logo_xy.png",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "engines": {
     "vscode": "^1.99.2"
   },
@@ -292,6 +291,7 @@
     "@types/node": "20.x",
     "@types/sinon": "^17.0.4",
     "@types/vscode": "^1.99.2",
+    "@types/yauzl": "^2.10.3",
     "@typescript-eslint/eslint-plugin": "^8.31.1",
     "@typescript-eslint/parser": "^8.31.1",
     "@vscode/test-cli": "^0.0.10",
@@ -307,6 +307,7 @@
     "axios": "1.11.0",
     "https-proxy-agent": "7.0.6",
     "lodash": "4.17.21",
-    "marked": "16.2.1"
+    "marked": "16.2.1",
+    "yauzl": "^3.2.0"
   }
 }

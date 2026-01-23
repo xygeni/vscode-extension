@@ -150,9 +150,9 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     return LicenseService.getInstance().isValidLicense(xygeniToken).then(
       (isAvailable) => {
         this.updateLicenseIdeAvailability(isAvailable);
-        Logger.log(' ==============================');
-        Logger.log('     IDE License available     ');
-        Logger.log(' ==============================');
+        Logger.log('==============================');
+        Logger.log('    IDE License available     ');
+        Logger.log('==============================');
         return isAvailable; 
       }
     )
@@ -164,6 +164,7 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
 
   /**
    * Refresh connection and run installer 
+   * @param override if true, force installation even if scanner is already installed
    * @returns 
    */
   public async refreshAndInstall(override?: boolean): Promise<unknown> {
@@ -198,6 +199,12 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
       }
 
       this.connectionReady();
+
+      if (!override && await InstallerService.getInstance().isScannerInstalled()) {
+        Logger.log('=== Xygeni Scanner already installed ===');
+        this.installerOk();
+        return Promise.resolve();
+      }
 
       // if connection is ready, auto run installer
       return this.installScanner(override).then(() => {
@@ -524,7 +531,7 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     this.resetInstaller();
 
     Logger.log("");
-    Logger.log(" === Connection ready. Xygeni credentials are valid. ===");
+    Logger.log("=== Connection ready. Xygeni credentials are valid. ===");
 
     this.refreshAllViews();
   }

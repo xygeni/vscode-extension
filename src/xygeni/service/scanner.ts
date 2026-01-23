@@ -183,33 +183,10 @@ class XygeniScannerService extends EventEmitter {
             
             const scannerScriptPath = this.getScannerScriptPath(xygeniInstallPath);
 
-            const proxySettings = this.commands.getProxySettings();
             const env: NodeJS.ProcessEnv = {
                 ...process.env,
             };
-
-            if (proxySettings.host) {
-                env.PROXY_HOST = proxySettings.host;
-                if (proxySettings.protocol) {
-                    env.PROXY_PROTOCOL = proxySettings.protocol;
-                }
-                if (proxySettings.port) {
-                    env.PROXY_PORT = proxySettings.port.toString();
-                }
-                if (proxySettings.authentication) {
-                    env.PROXY_AUTH = proxySettings.authentication;
-                }
-                if (proxySettings.username) {
-                    env.PROXY_USERNAME = proxySettings.username;
-                }
-                if (proxySettings.password) {
-                    env.PROXY_PASSWORD = proxySettings.password;
-                }
-                if (proxySettings.nonProxyHosts) {
-                    env.NO_PROXY = proxySettings.nonProxyHosts;
-                }
-            }
-
+            
             let shellCommand;
             let shellArgs = [];
 
@@ -227,40 +204,74 @@ class XygeniScannerService extends EventEmitter {
             this.logger.log(`  Xygeni Working dir: ${workingDir}`);
             this.logger.log('  Running scanner command: ' + shellCommand + ' ' + shellArgs.join(' '));
 
-            const scannerProcess = spawn(shellCommand, shellArgs, {
-                stdio: ['pipe', 'pipe', 'pipe'],
-                shell: false, // Disable shell for cross-platform compatibility and security
-                cwd: workingDir,
-                env: env
-            });
+            this.getEnvVariables(env).then((env) => {
+                    
+                const scannerProcess = spawn(shellCommand, shellArgs, {
+                    stdio: ['pipe', 'pipe', 'pipe'],
+                    shell: false, // Disable shell for cross-platform compatibility and security
+                    cwd: workingDir,
+                    env: env
+                });
 
-            scannerProcess.stdout.on('data', (data) => {
-                output.append(this.stripAnsiEscapeSequences(data.toString()));
-            });
+                scannerProcess.stdout.on('data', (data) => {
+                    output.append(this.stripAnsiEscapeSequences(data.toString()));
+                });
 
-            scannerProcess.stderr.on('data', (data) => {
-                output.append(this.stripAnsiEscapeSequences(data.toString()));
-            });
+                scannerProcess.stderr.on('data', (data) => {
+                    output.append(this.stripAnsiEscapeSequences(data.toString()));
+                });
 
-            scannerProcess.on('close', (code) => {
-                clearTimeout(timeout);
-                if (code !== null && (code === 0 || code > 128)) {
-                    resolve(); // Scanner process completed successfully
-                } else {
-                    reject(new Error(`Scanner process failed with exit code ${code}`));
-                }
-            });
+                scannerProcess.on('close', (code) => {
+                    clearTimeout(timeout);
+                    if (code !== null && (code === 0 || code > 128)) {
+                        resolve(); // Scanner process completed successfully
+                    } else {
+                        reject(new Error(`Scanner process failed with exit code ${code}`));
+                    }
+                });
 
-            scannerProcess.on('error', (err) => {
-                reject(new Error(`Failed to start scanner process: ${err.message}`));
-            });
+                scannerProcess.on('error', (err) => {
+                    reject(new Error(`Failed to start scanner process: ${err.message}`));
+                });
 
-            const timeout = setTimeout(() => {
-                scannerProcess.kill('SIGTERM');
-                this.logger.log('  Scanner process stopped due to timeout.');
-                reject(new Error('Scanner process timeout'));
-            }, this.timeout);
+                const timeout = setTimeout(() => {
+                    scannerProcess.kill('SIGTERM');
+                    this.logger.log('  Scanner process stopped due to timeout.');
+                    reject(new Error('Scanner process timeout'));
+                }, this.timeout);
+            });
         });
+    }
+
+    async getEnvVariables(env: NodeJS.ProcessEnv): Promise<NodeJS.ProcessEnv> {
+        env.XYGENI_URL = this.commands.getXygeniUrl();
+        await this.commands.getToken().then(token => env.XYGENI_TOKEN = token);
+
+        const proxySettings = this.commands.getProxySettings();
+
+        if (proxySettings.host) {
+            env.PROXY_HOST = proxySettings.host;
+            if (proxySettings.protocol) {
+                env.PROXY_PROTOCOL = proxySettings.protocol;
+            }
+            if (proxySettings.port) {
+                env.PROXY_PORT = proxySettings.port.toString();
+            }
+            if (proxySettings.authentication) {
+                env.PROXY_AUTH = proxySettings.authentication;
+            }
+            if (proxySettings.username) {
+                env.PROXY_USERNAME = proxySettings.username;
+            }
+            if (proxySettings.password) {
+                env.PROXY_PASSWORD = proxySettings.password;
+            }
+            if (proxySettings.nonProxyHosts) {
+                env.NO_PROXY = proxySettings.nonProxyHosts;
+            }
+        }
+
+        return env;
     }
 
     private getScannerScriptPath(xygeniScannerPath: string): string {

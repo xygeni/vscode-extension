@@ -1,6 +1,8 @@
 import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as yauzl from 'yauzl';
+import * as crypto from 'crypto';
 import { spawn } from 'child_process';
 import { ILogger, IOutputChannel, EventEmitter, Commands } from '../common/interfaces';
 import { Platform } from '../common/platform';
@@ -18,7 +20,10 @@ import { reject } from 'lodash';
 export default class InstallerService {
     private readonly tempDir: string;
 
-    private readonly xygeniGetScannerUrl = 'https://get.xygeni.io/latest/scanner/';
+    private readonly xygeniGetScannerUrl = 'https://get.xygeni.io/latest/scanner/';    
+    private readonly xygeniScannerZipName = 'xygeni_scanner.zip';
+    private readonly xygeniScannerZipRootFolder = 'xygeni_scanner';
+    private readonly xygeniScannerChecksumUrl = 'https://raw.githubusercontent.com/xygeni/xygeni/main/checksum/latest/xygeni-release.zip.sha256';
 
     private readonly xygeniMCPLibraryUrl = 'https://get.xygeni.io/latest/mcp-server/xygeni-mcp-server.jar';
     private readonly xygeniMCPLibraryName = 'xygeni-mcp-server.jar';
@@ -76,6 +81,11 @@ export default class InstallerService {
         return this.mcpLibraryPath;
     }
 
+    public isScannerInstalled(): boolean {
+        return fs.existsSync(this.getScannerInstallationDir()) 
+            && fs.existsSync(this.getScannerInstallationDir() + '/xygeni');
+    }
+
     public isMcpLibraryInstalled(): boolean {
         return this.mcpLibraryPath !== undefined;
     }
@@ -87,81 +97,85 @@ export default class InstallerService {
         this.emitter.emitChange();
 
         this.logger.log("");
-        this.logger.log("================================");
-        this.logger.log("  Running scanner installation");
+        this.logger.log("=== Starting Xygeni Scanner Installation ===");
         this.logger.log("");
 
         try {
-
-            const scannerInstallUrl = `${this.xygeniGetScannerUrl}${this.getInstallName()}`;
-
-            if (!this.isValidUrl(scannerInstallUrl)) {
-                throw new Error('Invalid script URL provided');
-            }
-
-            this.logger.log(`  Downloading install from: ${scannerInstallUrl}  to: ${this.tempDir}`);
-
-            // Download the install script
-            const scriptPath = await this.downloadFile(scannerInstallUrl, this.tempDir, this.getInstallName());
-
-            // Make script executable (Unix-like systems)
-            if (Platform.get() !== 'win32') {
-                await this.makeExecutable(scriptPath);
-            }
-
             const installPath = this.getScannerInstallationDir();
+            this.logger.log(`    Installing Xygeni at workspace: ${installPath}`);
 
-            // remove installPath if exists, force fresh install
-            if (fs.existsSync(installPath)) {
-                this.logger.log(`  Removing existing installation at: ${installPath}`);
-                fs.rmdirSync(installPath, { recursive: true });
+            // Create a temporary directory for downloading and extracting
+            const tempDirPath = path.join(this.tempDir, `xygeni_installer_${Date.now()}`);
+            if (!fs.existsSync(tempDirPath)) {
+                fs.mkdirSync(tempDirPath, { recursive: true });
             }
 
-            const args: string[] = [];
+            const zipPath = path.join(tempDirPath, this.xygeniScannerZipName);
+            const scannerUrl = `${this.xygeniGetScannerUrl}${this.xygeniScannerZipName}`;
+            const checksumUrl = `${scannerUrl}.sha256`;
 
-            if (token) {
-                args.push(`-t ${token}`);
-            }
+            try {
+                this.logger.log("    Downloading Xygeni Scanner...");
+                await this.downloadFile(scannerUrl, tempDirPath, this.xygeniScannerZipName);
 
-            if (apiUrl) {
-                args.push(`-s '${apiUrl}'`);
-            }
+                this.logger.log("    Validating Xygeni Scanner checksum...");
+                await this.downloadFile(this.xygeniScannerChecksumUrl, tempDirPath, this.xygeniScannerZipName + '.sha256');
+                
+                const downloadedChecksum = fs.readFileSync(path.join(tempDirPath, this.xygeniScannerZipName + '.sha256'), 'utf8').trim().split(/\s+/)[0];
+                const fileChecksum = await this.calculateChecksum(zipPath);
 
-            args.push(`-d '${installPath}'`);
+                if (downloadedChecksum.toLowerCase() !== fileChecksum.toLowerCase()) {
+                    throw new Error(`Checksum validation failed. Expected: ${downloadedChecksum}, Got: ${fileChecksum}`);
+                }
+                this.logger.log("    Checksum validation successful.");
 
-            // override installation
-            if (override) {
-                args.push('-o');
-            }
+                this.logger.log("    Extracting Xygeni Scanner...");
+                await this.unzip(zipPath, tempDirPath);
 
-            this.logger.log(`  Executing install script (${scriptPath}) on ${installPath}`);
+                // Move contents from tempDir/xygeni_scanner to installPath
+                const extractedRoot = path.join(tempDirPath, this.xygeniScannerZipRootFolder);
+                if (fs.existsSync(extractedRoot) && fs.statSync(extractedRoot).isDirectory()) {
+                    this.logger.log("    Moving files to install directory...");
 
-            // Execute the script
-            return this.executeScript(scriptPath, args).then(() => {
+                    // remove installPath if exists, force fresh install
+                    if (fs.existsSync(installPath)) {
+                        this.logger.log(`    Removing existing installation at: ${installPath}`);
+                        fs.rmSync(installPath, { recursive: true, force: true });
+                    }
+                    fs.mkdirSync(installPath, { recursive: true });
 
+                    this.copyDirectoryContents(extractedRoot, installPath);
 
-                this.status = 'success';
-                this.emitter.emitChange();
-                //this.logger.log('  Xygeni Scanner installation completed successfully');
-                return Promise.resolve();
-            })
-                .catch((error) => {
-                    this.logger.error(error, '  Installation script failed');
-                    this.status = 'error';
+                    // Make binaries executable on non-windows
+                    if (Platform.get() !== 'win32') {
+                        await this.makeBinaryExecutable(installPath);
+                    }
+
+                    this.logger.log("");
+                    this.logger.log("    Xygeni Scanner installed successfully ");
+                    this.logger.log("=============================================");
+
+                    this.status = 'success';
                     this.emitter.emitChange();
-                    return Promise.reject('Installation script failed');
-                })
-                .finally(() => {
-                    // Clean up temporary script file
-                    this.cleanup(scriptPath);
-                    this.installationRunning = false;
-                });
 
-        } catch (error) {
+                } else {
+                    throw new Error(`Expected root folder ${this.xygeniScannerZipRootFolder} not found in the zip file.`);
+                }
+
+            } finally {
+                // Clean up temp directory
+                if (fs.existsSync(tempDirPath)) {
+                    fs.rmSync(tempDirPath, { recursive: true, force: true });
+                }
+                this.installationRunning = false;
+            }
+
+        } catch (error: any) {
             this.installationRunning = false;
             this.logger.error(error, '  Installation process failed');
             this.status = 'error';
-            return Promise.reject(error);
+            this.emitter.emitChange();
+            throw error;
         }
     }
 
@@ -243,17 +257,6 @@ export default class InstallerService {
 
     }
 
-    private isValidUrl(url: string): boolean {
-        try {
-            const parsedUrl = new URL(url);
-            return parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:';
-        } catch {
-            return false;
-        }
-    }
-
-
-
     private async downloadFile(scriptUrl: string, targetDir: string, installName: string): Promise<string> {
         return new Promise((resolve, reject) => {
 
@@ -319,16 +322,114 @@ export default class InstallerService {
         });
     }
 
-    private getInstallName(): string {
+    private async unzip(zipPath: string, destination: string): Promise<void> {
+        return new Promise((resolve, reject) => {
+            yauzl.open(zipPath, { lazyEntries: true }, (err, zipfile) => {
+                if (err) {
+                    return reject(err);
+                }
+                if (!zipfile) {
+                    return reject(new Error('Could not open zip file'));
+                }
+
+                zipfile.readEntry();
+                zipfile.on('entry', (entry) => {
+                    const filePath = path.join(destination, entry.fileName);
+
+                    if (/\/$/.test(entry.fileName)) {
+                        // Directory
+                        if (!fs.existsSync(filePath)) {
+                            fs.mkdirSync(filePath, { recursive: true });
+                        }
+                        zipfile.readEntry();
+                    } else {
+                        // File
+                        // Ensure parent directory exists
+                        const parentDir = path.dirname(filePath);
+                        if (!fs.existsSync(parentDir)) {
+                            fs.mkdirSync(parentDir, { recursive: true });
+                        }
+
+                        zipfile.openReadStream(entry, (err, readStream) => {
+                            if (err) {
+                                return reject(err);
+                            }
+                            if (!readStream) {
+                                return reject(new Error(`Could not read stream for entry: ${entry.fileName}`));
+                            }
+
+                            const writeStream = fs.createWriteStream(filePath);
+                            readStream.pipe(writeStream);
+
+                            writeStream.on('finish', () => {
+                                zipfile.readEntry();
+                            });
+
+                            writeStream.on('error', (err) => {
+                                reject(err);
+                            });
+                        });
+                    }
+                });
+
+                zipfile.on('end', () => {
+                    resolve();
+                });
+
+                zipfile.on('error', (err) => {
+                    reject(err);
+                });
+            });
+        });
+    }
+
+    private copyDirectoryContents(src: string, dest: string): void {
+        if (!fs.existsSync(dest)) {
+            fs.mkdirSync(dest, { recursive: true });
+        }
+        const entries = fs.readdirSync(src, { withFileTypes: true });
+
+        for (const entry of entries) {
+            const srcPath = path.join(src, entry.name);
+            const destPath = path.join(dest, entry.name);
+
+            if (entry.isDirectory()) {
+                this.copyDirectoryContents(srcPath, destPath);
+            } else {
+                fs.copyFileSync(srcPath, destPath);
+            }
+        }
+    }
+
+    private async makeBinaryExecutable(installPath: string): Promise<void> {
         const platform = Platform.get();
-        switch (platform) {
-            case 'win32':
-                return 'install.ps1';
-            case 'darwin':
-            case 'linux':
-                return 'install.sh';
-            default:
-                throw new Error(`Unsupported platform: ${platform}`);
+        if (platform === 'win32') {
+            return;
+        }
+
+        const scripts = [
+            path.join(installPath, 'xygeni'),
+            path.join(installPath, 'bin', 'xygeni'),
+        ];
+
+        for (const script of scripts) {
+            if (fs.existsSync(script)) {
+                await this.makeExecutable(script);
+            }
+        }
+
+        // Also any .sh files and binaries in bin if any
+        const binDir = path.join(installPath, 'bin');
+        if (fs.existsSync(binDir) && fs.statSync(binDir).isDirectory()) {
+            const files = fs.readdirSync(binDir);
+            for (const file of files) {
+                const filePath = path.join(binDir, file);
+                if (file.endsWith('.sh') || !file.includes('.')) {
+                    if (fs.statSync(filePath).isFile()) {
+                        await this.makeExecutable(filePath);
+                    }
+                }
+            }
         }
     }
 
@@ -344,129 +445,16 @@ export default class InstallerService {
         });
     }
 
-    private async executeScript(scriptPath: string, extraArgs: string[] = [], outputChannel?: IOutputChannel): Promise<string> {
+    private async calculateChecksum(filePath: string): Promise<string> {
         return new Promise((resolve, reject) => {
-            const platform = Platform.get();
-            let command: string;
-            let args: string[];
-
-            let installCommand = `${scriptPath} ${extraArgs.join(' ')}`;
-
-            // Determine command based on platform
-            if (platform === 'win32') {
-                command = 'powershell';
-                args = ['-ep','Bypass', installCommand];
-            } else {
-                command = 'sh';
-                args = ['-c', installCommand];
-            }
-
-            //this.logger.log(`Executing command: ${command} ${args.join(' ')}`);
-
-            const proxySettings = this.commands.getProxySettings();
-            const env: NodeJS.ProcessEnv = {
-                ...process.env,
-            };
-
-            if (proxySettings.host) {
-                let proxyUrl = `${proxySettings.protocol}://`;
-                if (proxySettings.username && proxySettings.password) {
-                    proxyUrl += `${proxySettings.username}:${proxySettings.password}@`;
-                }
-                proxyUrl += `${proxySettings.host}:${proxySettings.port}`;
-                env.XYGENI_PROXY = proxyUrl;
-            }
-
-            const installerProcess = spawn(command, args, {
-                stdio: ['pipe', 'pipe', 'pipe'],
-                shell: false,
-                env: env
-            });
-
-            let stdout = '';
-            let stderr = '';
-
-            // Capture stdout
-            installerProcess.stdout.on('data', (data) => {
-                const output = data.toString();
-                stdout += output;
-
-                // Redirect to output channel if provided, otherwise use logger
-                if (outputChannel) {
-                    outputChannel.append(this.stripAnsiEscapeSequences(output));
-                } else {
-                    this.logger.log("");
-                    this.logger.log(`[STDOUT] ${output.trim()}`);
-                    this.logger.log("");
-                }
-            });
-
-            // Captursed with 4096 bytes remae stderr
-            installerProcess.stderr.on('data', (data) => {
-                const output = data.toString();
-                stderr += output;
-
-                // Redirect to output channel if provided, otherwise use logger
-                if (outputChannel) {
-                    outputChannel.append(output);
-                } else {
-                    this.logger.log("");
-                    this.logger.log(`[STDERR] ${output.trim()}`);
-                }
-            });
-
-            // Handle process completion
-            installerProcess.on('close', (code) => {
-                if (code === 0) {
-                    //this.logger.log('  Script execution completed successfully.');
-
-                    resolve('success');
-                } else {
-                    const errorMsg = `Script execution failed with exit code ${code}`;
-                    if (stderr) {
-                        if (outputChannel) {
-                            outputChannel.appendLine(`  Error output: ${stderr}`);
-                        } else {
-                            this.logger.log(`  Error output: ${stderr}`);
-                        }
-                    }
-                    this.logger.log(errorMsg);
-                    reject('error');
-                }
-            });
-
-            // Handle process errors
-            installerProcess.on('error', (err) => {
-                this.logger.error(err, `Failed to execute script`);
-                reject('error');
-            });
-
-            // Set timeout for script execution (10 minutes)
-            const timeout = setTimeout(() => {
-                installerProcess.kill('SIGTERM');
-                this.logger.error(new Error('Script execution timeout: Process took longer than 10 minutes'), `Script execution timeout`);
-                reject('error');
-            }, 600000);
-
-            installerProcess.on('close', () => {
-                clearTimeout(timeout);
-            });
+            const hash = crypto.createHash('sha256');
+            const stream = fs.createReadStream(filePath);
+            stream.on('data', (data) => hash.update(data));
+            stream.on('end', () => resolve(hash.digest('hex')));
+            stream.on('error', (err) => reject(err));
         });
     }
 
-    private async cleanup(scriptPath: string): Promise<void> {
-        try {
-            if (fs.existsSync(scriptPath)) {
-                fs.unlinkSync(scriptPath);
-                //this.logger.log('  Temporary script file cleaned up');
-            }
-        } catch (error) {
-            this.logger.error(error, '  Warning: Failed to clean up temporary file');
-        }
-    }
 
-    private stripAnsiEscapeSequences(text: string): string {
-        return text.replace(/\u001b\[m|\u001b\[1m|\u001b\[0m|\u001b\[\d+m/g, '');
-    }
 }
 
