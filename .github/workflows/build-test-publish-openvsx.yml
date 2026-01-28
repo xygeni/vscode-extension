@@ -1,0 +1,40 @@
+name: Publish VS Code Extension to OpenVSX Marketplace
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install ovsx
+        run: npm install -g ovsx
+
+      - name: Run tests
+        run: npm run test:unit
+
+      - uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ github.TOKEN }}
+          approvers: fcarnicero,nanoalbelda,vdlr
+          minimum-approvals: 1
+          timeout-minutes: 5    
+      
+      - name: Publish to Open VSX
+        if: success()
+        run: ovsx publish
+        env:
+          OVSX_PAT: ${{ secrets.OPEN_VSX_TOKEN }}
+      
