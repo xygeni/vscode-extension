@@ -31,3 +31,4 @@
 ## [1.2.4]
 
 - Update MCP Setup to use current XYGENI_TOKEN
+- Allow download scanner CLI from non-production Xygeni API Url (e.g. on-premise environments)
