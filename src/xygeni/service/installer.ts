@@ -190,10 +190,8 @@ export default class InstallerService {
 
         // remove installPath if exists, force fresh install
         if (fs.existsSync(this.mcpLibraryPath)) {
-            this.logger.log(`  MCP Library already exist at: ${installMcpPath}`);
-            this.logger.log(`   Check Xygeni MCP Setup to configure it.`);
-            this.logger.log("============================================================");
-            return Promise.resolve();
+            this.logger.log(`  Removing existing installation at: ${this.mcpLibraryPath}`);
+            fs.rmSync(this.mcpLibraryPath, { recursive: true, force: true });
         }
         // create folder if not yet
         if (!fs.existsSync(installMcpPath)){

@@ -22,6 +22,7 @@ Xygeni Security Scanner is a powerful extension that brings comprehensive securi
 - **In-Editor Issue Highlighting:** View security findings directly in your code, making it easy to pinpoint and fix issues.
 - **Detailed Vulnerability Information:** Get rich details for each identified issue, including severity, description, and remediation guidance.
 - **Proxy Support:** Configure the extension to work with your corporate proxy.
+- **MCP Setup:** Generate ready-to-use MCP server configuration from the extension to connect Xygeni security tools to MCP-compatible AI assistants.
 
 ## Installation
 

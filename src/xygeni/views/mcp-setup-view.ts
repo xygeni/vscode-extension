@@ -1,6 +1,7 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import * as vscode from 'vscode';
-import { Commands } from "../common/interfaces";
-import path from 'path';
+import { Commands } from '../common/interfaces';
 import { Logger } from '../common/logger';
 
 export class McpSetupView {
@@ -8,7 +9,7 @@ export class McpSetupView {
 
   private static panel: vscode.WebviewPanel | undefined;
 
-  public static showMcpSetup(commands: Commands): void {
+  public static async showMcpSetup(commands: Commands): Promise<void> {
     if (this.panel) {
       this.panel.reveal(vscode.ViewColumn.Two);
     } else {
@@ -32,12 +33,49 @@ export class McpSetupView {
       };
     }
 
+    const panel = this.panel;
+    if (!panel) {
+      return;
+    }
+
     const nonce = this.getNonce();
-    const mcpLibraryPath = commands.getMcpLibraryPath();
+    const configuredMcpLibraryPath = commands.getMcpLibraryPath();
+    const fallbackMcpLibraryPath = path.join(commands.getExtensionPath(), '.xygeni-mcp', 'xygeni-mcp-server.jar');
+    const mcpLibraryPath = configuredMcpLibraryPath || (fs.existsSync(fallbackMcpLibraryPath) ? fallbackMcpLibraryPath : undefined);
     const isMcpLibraryInstalled = mcpLibraryPath !== undefined;
     const scannerInstallDirectory = commands.getScannerInstallationDir();
     const scannerInstalled = commands.isInstallReady();
     const javaHome = process.env.JAVA_HOME || '$JAVA_HOME';
+    const savedToken = await commands.getToken();
+    if (this.panel !== panel) {
+      return;
+    }
+    const xygeniToken = savedToken || '$XYGENI_TOKEN';
+
+    const serverName = 'xygeni-mcp-server';
+    const jarPath = mcpLibraryPath || '$XYGENI_MCP_SERVER_JAR';
+    const scannerPathArg = `--scannerPath=${scannerInstallDirectory}`;
+
+    const jsonConfig = JSON.stringify({
+      servers: {
+        [serverName]: {
+          timeout: 60,
+          type: 'stdio',
+          command: 'java',
+          args: [
+            '-jar',
+            jarPath,
+            scannerPathArg
+          ],
+          env: {
+            JAVA_HOME: javaHome,
+            XYGENI_TOKEN: xygeniToken
+          }
+        }
+      }
+    }, null, 2);
+
+    const tomlConfig = this.buildTomlConfig(serverName, jarPath, scannerPathArg, javaHome, xygeniToken);
 
     // Auto-import the MCP documentation
     this.loadMcpDocumentation();
@@ -48,7 +86,7 @@ export class McpSetupView {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Xygeni MCP Server Setup Guide</title>
-        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; img-src ${this.panel.webview.cspSource}; style-src 'nonce-${nonce}'; font-src https://fonts.gstatic.com;">
+        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; img-src ${panel.webview.cspSource}; style-src 'nonce-${nonce}'; font-src https://fonts.gstatic.com;">
         <style nonce="${nonce}">
             body {
                 font-family: var(--vscode-font-family);
@@ -178,31 +216,23 @@ export class McpSetupView {
                 <strong>Note:</strong> The Xygeni scanner JAR is automatically downloaded when you install the scanner.
             </div>
 
+            <div class="warning">
+                ${savedToken
+                  ? '<strong>Security note:</strong> The following examples include your current <code>XYGENI_TOKEN</code> in clear text under <code>servers.env</code>. Keep this file private.'
+                  : '<strong>Warning:</strong> No token is currently stored in Xygeni settings. Replace <code>$XYGENI_TOKEN</code> with your real token before using the config.'}
+            </div>
+
             <div class="step">
                 <div class="step-number">Step 1: Create MCP Server Configuration</div>
-                <p>Create a new MCP server configuration file. Here's an example configuration:</p>
+                <p>Create a new MCP server configuration file. Use JSON or TOML depending on your MCP client:</p>
 
-                <div class="code-block"><pre>
-{
-  "servers": {
-    "xygeni-mcp-server": {
-      "timeout": 60,
-      "type": "stdio",
-      "command": "java",
-      "args": [
-        "-jar",
-        "${mcpLibraryPath}",
-        "--scannerPath=${scannerInstallDirectory}"
-      ],
-      "env": {
-        "JAVA_HOME": "${javaHome}"
-      }
-    }
-  }
-}
-  </pre>
-                </div>
-                <button class="copy-button" onclick="copyToClipboard(this.previousElementSibling.textContent)">Copy Config</button>
+                <h3>JSON</h3>
+                <div class="code-block"><pre>${this.escapeHtml(jsonConfig)}</pre></div>
+                <button class="copy-button" onclick="copyToClipboard(this.previousElementSibling.textContent)">Copy JSON Config</button>
+
+                <h3>TOML</h3>
+                <div class="code-block"><pre>${this.escapeHtml(tomlConfig)}</pre></div>
+                <button class="copy-button" onclick="copyToClipboard(this.previousElementSibling.textContent)">Copy TOML Config</button>
             </div>
 
             <div class="step">
@@ -211,31 +241,14 @@ export class McpSetupView {
 
                 <h3>For MCP-compatible AI Assistants:</h3>
                 <ol>
-                    <li>Locate your MCP configuration file (usually <code>mcp.json</code> or <code>.mcp/config.json</code>)</li>
+                    <li>Locate your MCP configuration file (usually <code>mcp.json</code>, <code>.mcp/config.json</code>, or client-specific <code>mcp.toml</code>)</li>
                     <li>Add the Xygeni server configuration as shown above</li>
                     <li>Restart your MCP client or reload the configuration</li>
                 </ol>
             </div>
             ` : ''}
-            ${scannerInstalled ? '<h2>Available Tools</h2>' : '<h2>Next Steps</h2>'}
-            ${scannerInstalled ? `
-            <p>Once configured, the Xygeni MCP server provides the following tools:</p>
-
-            <div class="code-block"><pre>
-Available tools:
-├── xygeni_malware_scan - Executes malware analysis over the directory passed as parameter
-├── xygeni_inventory_scan - Executes inventory analysis over the directory passed as parameter
-├── xygeni_secrets_scan - Executes secrets analysis over the directory passed as parameter
-├── xygeni_iac_scan - Executes IaC analysis over the directory passed as parameter
-├── xygeni_codetamper_scan - Executes code tampering analysis over the directory passed as parameter
-├── xygeni_sca_scan - Executes SCA analysis over the directory passed as parameter
-├── xygeni_compliance_scan - Executes compliance analysis over the directory passed as parameter
-├── xygeni_sast_scan - Executes SAST analysis over the directory passed as parameter
-└── xygeni_suspectdeps_scan - Executes suspect dependencies analysis over the directory passed as parameter
-
-
-            </pre></div>
-            ` : '<p>Please install the Xygeni scanner first to access MCP server setup instructions and available tools.</p>'}
+            ${scannerInstalled ? '' : 
+                `<p>Please install the Xygeni scanner first to access MCP server setup instructions and available tools.</p>`}
 
             <h2>Get Help</h2>
             <p>For more information and support:</p>
@@ -246,17 +259,9 @@ Available tools:
         </div>
 
         <script nonce="${nonce}">
-            function copyToClipboard(command, args) {
-                let textToCopy = args || command;
-
-                // If command is a vscode command reference
-                if (command.startsWith('command:')) {
-                    textToCopy = args || command;
-                }
-
-                navigator.clipboard.writeText(textToCopy).then(() => {
-                    // Could show a toast notification here
-                    console.log('Copied to clipboard:', textToCopy);
+            function copyToClipboard(text) {
+                navigator.clipboard.writeText(text).then(() => {
+                    console.log('Copied to clipboard:', text);
                 }).catch(err => {
                     console.error('Failed to copy:', err);
                 });
@@ -268,7 +273,9 @@ Available tools:
     </body>
     </html>`;
 
-    this.panel.webview.html = html;
+    if (this.panel === panel) {
+      panel.webview.html = html;
+    }
   }
 
   private static getNonce() {
@@ -278,6 +285,45 @@ Available tools:
       text += possible.charAt(Math.floor(Math.random() * possible.length));
     }
     return text;
+  }
+
+  private static buildTomlConfig(
+    serverName: string,
+    jarPath: string,
+    scannerPathArg: string,
+    javaHome: string,
+    xygeniToken: string
+  ): string {
+    const quotedServerName = this.tomlQuote(serverName);
+    const quotedJarPath = this.tomlQuote(jarPath);
+    const quotedScannerPathArg = this.tomlQuote(scannerPathArg);
+    const quotedJavaHome = this.tomlQuote(javaHome);
+    const quotedXygeniToken = this.tomlQuote(xygeniToken);
+
+    return `[servers.${quotedServerName}]
+timeout = 60
+type = "stdio"
+command = "java"
+args = [
+  "-jar",
+  ${quotedJarPath},
+  ${quotedScannerPathArg}
+]
+
+[servers.${quotedServerName}.env]
+JAVA_HOME = ${quotedJavaHome}
+XYGENI_TOKEN = ${quotedXygeniToken}`;
+  }
+
+  private static tomlQuote(value: string): string {
+    return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+  }
+
+  private static escapeHtml(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
   }
 
   private static async loadMcpDocumentation() {

@@ -201,8 +201,11 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
       this.connectionReady();
 
       if (!override && await InstallerService.getInstance().isScannerInstalled()) {
-        Logger.log('=== Xygeni Scanner already installed ===');
+        Logger.log('=== Xygeni Scanner already installed. ===');
         this.installerOk();
+        this.setMcpLibraryInstalled();
+        Logger.log(`=== MCP Library is ready. Check Xygeni MCP Setup to configure it. ===`);
+        
         return Promise.resolve();
       }
 
@@ -413,7 +416,7 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
   }
 
   showMcpSetupView() {
-    McpSetupView.showMcpSetup(this);
+    void McpSetupView.showMcpSetup(this);
   }
 
   openDiffViewCommand(uri: string, tempFile: string): void {
