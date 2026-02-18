@@ -323,6 +323,73 @@ suite('Installer Test Suite', () => {
             assert.strictEqual(callCount, 3);
         });
 
+        test('should use API releases endpoint and bearer token for custom API URL', async () => {
+            // Arrange
+            sandbox.stub(Platform, 'get').returns('linux');
+
+            const downloadFileStub = sandbox.stub(installer as any, 'downloadFile').callsFake(
+                (url: any, targetDir: any, name: any, authToken?: any) => {
+                    const filePath = path.join(targetDir, name);
+                    fs.writeFileSync(filePath, 'matching-hash');
+                    return Promise.resolve(filePath);
+                }
+            );
+            sandbox.stub(installer as any, 'calculateChecksum').resolves('matching-hash');
+            sandbox.stub(installer as any, 'unzip').callsFake((zip: any, dest: any) => {
+                const root = path.join(dest, 'xygeni_scanner');
+                if (!fs.existsSync(root)) { fs.mkdirSync(root, { recursive: true }); }
+                return Promise.resolve();
+            });
+            sandbox.stub(installer as any, 'copyDirectoryContents').returns(undefined);
+            sandbox.stub(installer as any, 'makeBinaryExecutable').resolves();
+
+            // Act
+            await installer.install('https://onprem.xygeni.local/api', 'test-token');
+
+            // Assert
+            assert.strictEqual(downloadFileStub.callCount, 1);
+            assert.strictEqual(downloadFileStub.firstCall.args[0], 'https://onprem.xygeni.local/api/scan/releases/');
+            assert.strictEqual(downloadFileStub.firstCall.args[3], 'test-token');
+        });
+
+        test('should use public scanner URL without bearer token for default API URL', async () => {
+            // Arrange
+            sandbox.stub(Platform, 'get').returns('linux');
+
+            const downloadFileStub = sandbox.stub(installer as any, 'downloadFile').callsFake(
+                (url: any, targetDir: any, name: any, authToken?: any) => {
+                    const filePath = path.join(targetDir, name);
+                    fs.writeFileSync(filePath, 'matching-hash');
+                    return Promise.resolve(filePath);
+                }
+            );
+            sandbox.stub(installer as any, 'calculateChecksum').resolves('matching-hash');
+            sandbox.stub(installer as any, 'unzip').callsFake((zip: any, dest: any) => {
+                const root = path.join(dest, 'xygeni_scanner');
+                if (!fs.existsSync(root)) { fs.mkdirSync(root, { recursive: true }); }
+                return Promise.resolve();
+            });
+            sandbox.stub(installer as any, 'copyDirectoryContents').returns(undefined);
+            sandbox.stub(installer as any, 'makeBinaryExecutable').resolves();
+
+            // Act
+            await installer.install('https://api.xygeni.io/', 'test-token');
+
+            // Assert
+            assert.strictEqual(downloadFileStub.callCount, 2);
+            assert.strictEqual(downloadFileStub.firstCall.args[0], 'https://get.xygeni.io/latest/scanner/xygeni_scanner.zip');
+            assert.strictEqual(downloadFileStub.firstCall.args[3], undefined);
+            assert.strictEqual(downloadFileStub.secondCall.args[0], 'https://get.xygeni.io/latest/scanner/xygeni_scanner.zip.sha256');
+            assert.strictEqual(downloadFileStub.secondCall.args[3], undefined);
+        });
+
+        test('should require token for custom API URL scanner download', async () => {
+            await assert.rejects(
+                installer.install('https://onprem.xygeni.local/api'),
+                /Xygeni token is required to download scanner from custom API URL/
+            );
+        });
+
         test('should install successfully', async () => {
             // Arrange
             sandbox.stub(Platform, 'get').returns('linux');

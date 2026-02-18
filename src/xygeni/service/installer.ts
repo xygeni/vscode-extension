@@ -21,9 +21,10 @@ export default class InstallerService {
     private readonly tempDir: string;
 
     private readonly xygeniGetScannerUrl = 'https://get.xygeni.io/latest/scanner/';    
+    private readonly xygeniDefaultApiUrl = 'https://api.xygeni.io';
+    private readonly xygeniApiScannerReleasesPath = 'scan/releases';
     private readonly xygeniScannerZipName = 'xygeni_scanner.zip';
     private readonly xygeniScannerZipRootFolder = 'xygeni_scanner';
-    private readonly xygeniScannerChecksumUrl = 'https://raw.githubusercontent.com/xygeni/xygeni/main/checksum/latest/xygeni-release.zip.sha256';
 
     private readonly xygeniMCPLibraryUrl = 'https://get.xygeni.io/latest/mcp-server/xygeni-mcp-server.jar';
     private readonly xygeniMCPLibraryName = 'xygeni-mcp-server.jar';
@@ -111,23 +112,44 @@ export default class InstallerService {
             }
 
             const zipPath = path.join(tempDirPath, this.xygeniScannerZipName);
-            const scannerUrl = `${this.xygeniGetScannerUrl}${this.xygeniScannerZipName}`;
-            const checksumUrl = `${scannerUrl}.sha256`;
+            const useApiReleasesUrl = this.shouldUseApiReleasesUrl(apiUrl);
+            
+            let scannerUrl = `${this.xygeniGetScannerUrl}${this.xygeniScannerZipName}`;
+            const scannerAuthToken = useApiReleasesUrl ? token : undefined;
+            
+            if (useApiReleasesUrl) {
+                if (!token) {
+                    throw new Error('Xygeni token is required to download scanner from custom API URL');
+                }                
+                scannerUrl = this.buildUrlWithPath(apiUrl!, this.xygeniApiScannerReleasesPath);
+            }            
 
             try {
-                this.logger.log("    Downloading Xygeni Scanner...");
-                await this.downloadFile(scannerUrl, tempDirPath, this.xygeniScannerZipName);
-
-                this.logger.log("    Validating Xygeni Scanner checksum...");
-                await this.downloadFile(this.xygeniScannerChecksumUrl, tempDirPath, this.xygeniScannerZipName + '.sha256');
-                
-                const downloadedChecksum = fs.readFileSync(path.join(tempDirPath, this.xygeniScannerZipName + '.sha256'), 'utf8').trim().split(/\s+/)[0];
-                const fileChecksum = await this.calculateChecksum(zipPath);
-
-                if (downloadedChecksum.toLowerCase() !== fileChecksum.toLowerCase()) {
-                    throw new Error(`Checksum validation failed. Expected: ${downloadedChecksum}, Got: ${fileChecksum}`);
+                if (useApiReleasesUrl) {
+                    this.logger.log(`    Downloading Xygeni Scanner from API URL: ${apiUrl}`);
                 }
-                this.logger.log("    Checksum validation successful.");
+                else {
+                    this.logger.log("    Downloading Xygeni Scanner...");
+                }
+                
+                await this.downloadFile(scannerUrl, tempDirPath, this.xygeniScannerZipName, scannerAuthToken);
+
+                if (!useApiReleasesUrl) {
+                    const checksumUrl = `${scannerUrl}.sha256`;
+                    // when downloading from xygeni cloud api - validate scanner zip checksum
+                    this.logger.log("    Validating Xygeni Scanner checksum...");
+                    await this.downloadFile(checksumUrl, tempDirPath, this.xygeniScannerZipName + '.sha256', scannerAuthToken);
+
+                    const downloadedChecksum = fs.readFileSync(path.join(tempDirPath, this.xygeniScannerZipName + '.sha256'), 'utf8').trim().split(/\s+/)[0];
+                    const fileChecksum = await this.calculateChecksum(zipPath);
+
+                    if (downloadedChecksum.toLowerCase() !== fileChecksum.toLowerCase()) {
+                        throw new Error(`Checksum validation failed. Expected: ${downloadedChecksum}, Got: ${fileChecksum}`);
+                    }
+                    this.logger.log("    Checksum validation successful.");
+                }
+                
+                
 
                 this.logger.log("    Extracting Xygeni Scanner...");
                 await this.unzip(zipPath, tempDirPath);
@@ -190,10 +212,8 @@ export default class InstallerService {
 
         // remove installPath if exists, force fresh install
         if (fs.existsSync(this.mcpLibraryPath)) {
-            this.logger.log(`  MCP Library already exist at: ${installMcpPath}`);
-            this.logger.log(`   Check Xygeni MCP Setup to configure it.`);
-            this.logger.log("============================================================");
-            return Promise.resolve();
+            this.logger.log(`  Removing existing installation at: ${this.mcpLibraryPath}`);
+            fs.rmSync(this.mcpLibraryPath, { recursive: true, force: true });
         }
         // create folder if not yet
         if (!fs.existsSync(installMcpPath)){
@@ -257,7 +277,7 @@ export default class InstallerService {
 
     }
 
-    private async downloadFile(scriptUrl: string, targetDir: string, installName: string): Promise<string> {
+    private async downloadFile(scriptUrl: string, targetDir: string, installName: string, authToken?: string): Promise<string> {
         return new Promise((resolve, reject) => {
 
             // local path            
@@ -267,6 +287,9 @@ export default class InstallerService {
             //this.logger.log(`  Downloading install script from: ${scriptUrl}`);
 
             const client = this.commands.getHttpClient(scriptUrl);
+            if (authToken) {
+                client.setAuthToken(authToken);
+            }
 
             const request = client.get(scriptUrl, (response) => {
                 // Handle redirects
@@ -275,7 +298,7 @@ export default class InstallerService {
                     if (redirectUrl) {
                         file.close();
                         fs.unlinkSync(filePath);
-                        this.downloadFile(redirectUrl, targetDir, installName).then(resolve).catch(reject);
+                        this.downloadFile(redirectUrl, targetDir, installName, authToken).then(resolve).catch(reject);
                         return;
                     }
                 }
@@ -320,6 +343,21 @@ export default class InstallerService {
                 reject(new Error('Download timeout: Request took longer than 60 seconds'));
             });
         });
+    }
+
+    private shouldUseApiReleasesUrl(apiUrl?: string): boolean {
+        if (!apiUrl) {
+            return false;
+        }
+        return this.normalizeUrl(apiUrl) !== this.normalizeUrl(this.xygeniDefaultApiUrl);
+    }
+
+    private normalizeUrl(url: string): string {
+        return url.trim().replace(/\/+$/, '');
+    }
+
+    private buildUrlWithPath(baseUrl: string, pathSuffix: string): string {
+        return `${this.normalizeUrl(baseUrl)}/${pathSuffix}/`;
     }
 
     private async unzip(zipPath: string, destination: string): Promise<void> {
@@ -457,4 +495,3 @@ export default class InstallerService {
 
 
 }
-

@@ -31,7 +31,7 @@ jobs:
       - name: Upload extension artifact
         uses: actions/upload-artifact@v4
         with:
-          name: extension-vsix
+          name: xygeni-scanner-vscode
           path: "*.vsix"
 
       - uses: trstringer/manual-approval@v1
