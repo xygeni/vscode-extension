@@ -25,6 +25,8 @@ export default class InstallerService {
     private readonly xygeniApiScannerReleasesPath = 'scan/releases';
     private readonly xygeniScannerZipName = 'xygeni_scanner.zip';
     private readonly xygeniScannerZipRootFolder = 'xygeni_scanner';
+    private readonly xygeniScannerChecksumUrl = 'https://raw.githubusercontent.com/xygeni/xygeni/main/checksum/latest/xygeni-release.zip.sha256';
+
 
     private readonly xygeniMCPLibraryUrl = 'https://get.xygeni.io/latest/mcp-server/xygeni-mcp-server.jar';
     private readonly xygeniMCPLibraryName = 'xygeni-mcp-server.jar';
@@ -125,20 +127,18 @@ export default class InstallerService {
             }            
 
             try {
+                
                 if (useApiReleasesUrl) {
-                    this.logger.log(`    Downloading Xygeni Scanner from API URL: ${apiUrl}`);
+                    this.logger.log(`    Downloading Xygeni Scanner from API URL: ${apiUrl}`);                
+                    await this.downloadFile(scannerUrl, tempDirPath, this.xygeniScannerZipName, scannerAuthToken);
                 }
                 else {
                     this.logger.log("    Downloading Xygeni Scanner...");
-                }
-                
-                await this.downloadFile(scannerUrl, tempDirPath, this.xygeniScannerZipName, scannerAuthToken);
-
-                if (!useApiReleasesUrl) {
-                    const checksumUrl = `${scannerUrl}.sha256`;
+                    await this.downloadFile(scannerUrl, tempDirPath, this.xygeniScannerZipName);
+                    
                     // when downloading from xygeni cloud api - validate scanner zip checksum
                     this.logger.log("    Validating Xygeni Scanner checksum...");
-                    await this.downloadFile(checksumUrl, tempDirPath, this.xygeniScannerZipName + '.sha256', scannerAuthToken);
+                    await this.downloadFile(this.xygeniScannerChecksumUrl, tempDirPath, this.xygeniScannerZipName + '.sha256');
 
                     const downloadedChecksum = fs.readFileSync(path.join(tempDirPath, this.xygeniScannerZipName + '.sha256'), 'utf8').trim().split(/\s+/)[0];
                     const fileChecksum = await this.calculateChecksum(zipPath);
