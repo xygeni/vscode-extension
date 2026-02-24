@@ -32,3 +32,7 @@
 
 - Update MCP Setup to use current XYGENI_TOKEN
 - Allow download scanner CLI from non-production Xygeni API Url (e.g. on-premise environments)
+
+## [1.2.5]
+
+- Fix scanner CLI checksum validation (non on-premise)
