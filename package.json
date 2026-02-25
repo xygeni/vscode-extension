@@ -4,6 +4,10 @@
   "description": "Secure your codebase with Secrets, SAST, SCA, IaC & Supply Chain scanning",
   "publisher": "xygeni-security",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xygeni/vscode-extension"
+  },
   "icon": "media/images/logo_xy.png",
   "version": "1.2.5",
   "engines": {
