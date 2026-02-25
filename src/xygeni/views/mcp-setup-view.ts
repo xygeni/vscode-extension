@@ -46,10 +46,12 @@ export class McpSetupView {
     const scannerInstallDirectory = commands.getScannerInstallationDir();
     const scannerInstalled = commands.isInstallReady();
     const javaHome = process.env.JAVA_HOME || '$JAVA_HOME';
+    const savedUrl = await commands.getXygeniUrl();
     const savedToken = await commands.getToken();
     if (this.panel !== panel) {
       return;
     }
+    const xygeniUrl = savedUrl || '$XYGENI_URL';
     const xygeniToken = savedToken || '$XYGENI_TOKEN';
 
     const serverName = 'xygeni-mcp-server';
@@ -69,13 +71,14 @@ export class McpSetupView {
           ],
           env: {
             JAVA_HOME: javaHome,
+            XYGENI_URL: xygeniUrl,
             XYGENI_TOKEN: xygeniToken
           }
         }
       }
     }, null, 2);
 
-    const tomlConfig = this.buildTomlConfig(serverName, jarPath, scannerPathArg, javaHome, xygeniToken);
+    const tomlConfig = this.buildTomlConfig(serverName, jarPath, scannerPathArg, javaHome, xygeniUrl, xygeniToken);
 
     // Auto-import the MCP documentation
     this.loadMcpDocumentation();
@@ -292,12 +295,14 @@ export class McpSetupView {
     jarPath: string,
     scannerPathArg: string,
     javaHome: string,
+    xygeniUrl: string,
     xygeniToken: string
   ): string {
     const quotedServerName = this.tomlQuote(serverName);
     const quotedJarPath = this.tomlQuote(jarPath);
     const quotedScannerPathArg = this.tomlQuote(scannerPathArg);
     const quotedJavaHome = this.tomlQuote(javaHome);
+    const quotedXygeniUrl = this.tomlQuote(xygeniUrl);
     const quotedXygeniToken = this.tomlQuote(xygeniToken);
 
     return `[servers.${quotedServerName}]
@@ -312,6 +317,7 @@ args = [
 
 [servers.${quotedServerName}.env]
 JAVA_HOME = ${quotedJavaHome}
+XYGENI_URL = ${quotedXygeniUrl}
 XYGENI_TOKEN = ${quotedXygeniToken}`;
   }
 
