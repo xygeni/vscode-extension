@@ -135,6 +135,8 @@ export interface XygeniIssue extends XygeniIssueData {
   getIssueDetailsHtml(): string;
   getCodeSnippetHtml(): string;
   getCodeSnippetHtmlTab(): string;
+  getCodeFlowHtmlTab(): string;
+  getCodeFlowHtml(): string;
   getDetectorDetails(doc: any): string
 }
 

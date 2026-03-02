@@ -49,6 +49,11 @@ export class MisconfXygeniIssue extends AbstractXygeniIssue {
   getFixSnippetHtml(): string {
     return ``;
   }
-
+  getCodeFlowHtmlTab(): string{
+    return ``;
+  }
+  getCodeFlowHtml(): string{
+    return ``;
+  }
   
 }

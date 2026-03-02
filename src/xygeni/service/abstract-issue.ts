@@ -58,6 +58,9 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
   abstract getIssueDetailsHtml(): string;   // tab-content-1 implementation
   abstract getCodeSnippetHtmlTab(): string; // tab-title-2 implementation
 
+  abstract getCodeFlowHtmlTab(): string;
+  abstract getCodeFlowHtml(): string;
+
   public getSubtitleLineHtml(): string {
 
     let subtitle = this.categoryName;
@@ -121,10 +124,12 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
             <label for="tab-1">ISSUE DETAILS</label>
             ${this.getCodeSnippetHtmlTab()}
             ${this.getFixSnippetHtmlTab()}  
+            ${this.getCodeFlowHtmlTab()}  
 
             ${this.getIssueDetailsHtml()}  
             ${this.getCodeSnippetHtml()}   
             ${this.getFixSnippetHtml()}  
+            ${this.getCodeFlowHtml()}  
             <script nonce="{{nonce}}">
             window.onmessage = function(event) {
                 const message = event.data;
