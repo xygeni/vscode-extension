@@ -379,7 +379,7 @@ suite('Installer Test Suite', () => {
             assert.strictEqual(downloadFileStub.callCount, 2);
             assert.strictEqual(downloadFileStub.firstCall.args[0], 'https://get.xygeni.io/latest/scanner/xygeni_scanner.zip');
             assert.strictEqual(downloadFileStub.firstCall.args[3], undefined);
-            assert.strictEqual(downloadFileStub.secondCall.args[0], 'https://get.xygeni.io/latest/scanner/xygeni_scanner.zip.sha256');
+            assert.strictEqual(downloadFileStub.secondCall.args[0], 'https://raw.githubusercontent.com/xygeni/xygeni/main/checksum/latest/xygeni-release.zip.sha256');
             assert.strictEqual(downloadFileStub.secondCall.args[3], undefined);
         });
 
