@@ -79,9 +79,11 @@ export class SecretsXygeniIssue extends AbstractXygeniIssue {
   getFixSnippetHtml(): string {
     return ``;
   }
-
-
-  
-
+  getCodeFlowHtmlTab(): string{
+    return ``;
+  }
+  getCodeFlowHtml(): string{
+    return ``;
+  }
   
 }

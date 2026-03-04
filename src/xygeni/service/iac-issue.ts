@@ -53,6 +53,11 @@ export class IacXygeniIssue extends AbstractXygeniIssue {
   getFixSnippetHtml(): string {
     return ``;
   }
-
+  getCodeFlowHtmlTab(): string{
+    return ``;
+  }
+  getCodeFlowHtml(): string{
+    return ``;
+  }
   
 }

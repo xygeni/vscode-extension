@@ -130,8 +130,12 @@ export class VulnXygeniIssue extends AbstractXygeniIssue {
     }
     return ``;
   }
-  
-  
+  getCodeFlowHtmlTab(): string{
+    return ``;
+  }
+  getCodeFlowHtml(): string{
+    return ``;
+  } 
   
 
   public fieldReferences(references: string[] | undefined): string {

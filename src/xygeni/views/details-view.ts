@@ -15,13 +15,13 @@ export class DetailsView {
   public static readonly ID = 'xygeni.views.details';
 
   private static panel: vscode.WebviewPanel | undefined;
-  
+
 
   public static showIssueDetails(issue: XygeniIssue, commands: Commands): void {
 
-    if (this.panel) {      
+    if (this.panel) {
       this.panel.reveal(vscode.ViewColumn.Two);
-    } 
+    }
     else {
       this.panel = vscode.window.createWebviewPanel(
         'issueDetails',
@@ -36,17 +36,36 @@ export class DetailsView {
       });
       this.panel.webview.options = {
         enableScripts: true,
-        localResourceRoots: [vscode.Uri.joinPath( vscode.Uri.file(commands.getExtensionPath()), 'media')]
+        localResourceRoots: [vscode.Uri.joinPath(vscode.Uri.file(commands.getExtensionPath()), 'media')]
       };
-      
+
       // Handle messages from the webview - register only once when panel is created
       this.panel.webview.onDidReceiveMessage(async (message) => {
         const issueId = message.issueId;
         const sourceFile = message.file;
+
+        if (message.command === 'jumpToFrame') {
+          if (await commands.fileExistsInProject(sourceFile)) {
+            const fileUri = vscode.Uri.file(commands.getAbsolutePathForSourceFile(sourceFile));
+            vscode.workspace.openTextDocument(fileUri).then(document => {
+              vscode.window.showTextDocument(document, {
+                selection: new vscode.Range(
+                  Math.max(0, message.beginLine - 1),
+                  Math.max(0, message.beginColumn - 1),
+                  Math.max(0, message.endLine - 1),
+                  Math.max(0, message.endColumn - 1)
+                ),
+                viewColumn: vscode.ViewColumn.One
+              });
+            });
+          }
+          return;
+        }
+
         if (await commands.fileExistsInProject(sourceFile)) {
-            const filePath = commands.getAbsolutePathForSourceFile(sourceFile);
-            //Logger.log(`Remediation message... ${issueId} ${message.kind} ${message.file}  `);
-            this.handleRemediationView(this.panel, message, filePath, commands);
+          const filePath = commands.getAbsolutePathForSourceFile(sourceFile);
+          //Logger.log(`Remediation message... ${issueId} ${message.kind} ${message.file}  `);
+          this.handleRemediationView(this.panel, message, filePath, commands);
         }
 
       });
@@ -68,6 +87,7 @@ export class DetailsView {
       .replace('{{xygeniStyle}}', commands.getXygeniCss())
       .replaceAll('{{nonce}}', nonce);
 
+      Logger.log(html);
 
     if (issue.file) {
 
@@ -137,14 +157,14 @@ export class DetailsView {
           }
           return;
         }
-        
+
         RemediationService.getInstance().launchRemediationPreview(
           message.kind, message.issueId, fileUri,
           InstallerService.getInstance().getScannerInstallationDir(),
           commands.getScanOutputChannel())
           .then(({ tempFile, explanation }) => {
-            if (tempFile) {              
-              
+            if (tempFile) {
+
               commands.openDiffViewCommand(fileUri, tempFile);
               // Notify the webview that remediation is available
               if (panel) {
@@ -189,7 +209,7 @@ export class DetailsView {
     }
   }
 
-  
+
   private static getNonce() {
     let text = '';
     const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -200,6 +220,6 @@ export class DetailsView {
   }
 
   private static getMetaSecurityPolicy(nonce: string, cspSource: string): string {
-    return `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src ${cspSource} 'nonce-${nonce}'; img-src ${cspSource}; style-src ${cspSource} 'nonce-${nonce}'; font-src ${cspSource} https://fonts.gstatic.com;" />`;
+    return `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src ${cspSource} 'nonce-${nonce}' https://d3js.org; img-src ${cspSource}; style-src ${cspSource} 'nonce-${nonce}'; font-src ${cspSource} https://fonts.gstatic.com;" />`;
   }
 }
