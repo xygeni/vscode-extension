@@ -109,7 +109,7 @@
         },
         {
           "command": "xygeni.scan.run",
-          "when": "view == 'xygenpackages = await GetTopNuGetPackages(topNi.views.scan'",
+          "when": "view == 'xygeni.views.scan'",
           "group": "navigation"
         },
         {
