@@ -1,4 +1,4 @@
-body {  
+body {
   color: var(--vscode-foreground);
   background-color: var(--vscode-editor-background);
   font-family: "Segoe UI", sans-serif;
@@ -59,8 +59,8 @@ body {
   border: 1px solid #536DF7;
   min-height: 22px !important;
   padding-left: 2px;
-  padding-right: 2px; 
-  padding-top: 5px; 
+  padding-right: 2px;
+  padding-top: 5px;
   margin-right: 2px;
   text-wrap: nowrap;
 }
@@ -102,7 +102,8 @@ vscode-panel-view {
 
 .xy-tabs-section #tab-content-1,
 .xy-tabs-section #tab-content-2,
-.xy-tabs-section #tab-content-3 {
+.xy-tabs-section #tab-content-3,
+.xy-tabs-section #tab-content-4 {
   display: none;
   margin: 10px;
   overflow-x: auto;
@@ -110,7 +111,8 @@ vscode-panel-view {
 
 .xy-tabs-section #tab-1:checked~#tab-content-1,
 .xy-tabs-section #tab-2:checked~#tab-content-2,
-.xy-tabs-section #tab-3:checked~#tab-content-3 {
+.xy-tabs-section #tab-3:checked~#tab-content-3,
+.xy-tabs-section #tab-4:checked~#tab-content-4 {
   display: block;
 }
 
@@ -190,3 +192,205 @@ vscode-panel-view {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* CODE FLOW STYLE */
+
+.xy-view-toggle {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+  gap: 0;
+}
+
+.xy-toggle-btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.xy-toggle-btn {
+  padding: 6px 12px;
+  border: 1px solid #ccc;
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  cursor: pointer;
+  font-size: 15px;
+  transition: all 0.2s;
+}
+
+.xy-toggle-btn:first-child {
+  border-radius: 4px 0 0 4px;
+}
+
+.xy-toggle-btn:last-child {
+  border-radius: 0 4px 4px 0;
+  border-left: none;
+}
+
+.xy-toggle-btn.active {
+  background-color: #3794FF;
+  color: white;
+  border-color: #3794FF;
+}
+
+.xy-toggle-btn:hover:not(.active) {
+  background-color: rgba(55, 148, 255, 0.1);
+}
+
+.xy-code-flow-container {
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 20px;
+}
+
+.xy-flow-header {
+  border-bottom: 1px solid var(--vscode-panel-border);
+  margin-bottom: 10px;
+  padding-bottom: 5px;
+}
+
+.xy-flow-header h3 {
+  margin: 0;
+  color: #3794FF;
+}
+
+.code-flow-wrapper {
+  position: relative;
+  min-height: 550px;
+  height: auto;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.xy-text-flow-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 10px;
+}
+
+.xy-flow-step {
+  background: var(--vscode-welcomePage-tileBackground);
+  color: var(--vscode-foreground);
+  border: 1px solid rgba(128, 128, 128, 0.2);
+  border-left: 4px solid #3794FF;
+  padding: 12px 16px;
+  border-radius: 4px;
+  font-size: 17px;
+  line-height: 1.5;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: relative;
+  margin-bottom: 4px;
+}
+
+.xy-flow-step-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+
+.xy-flow-step-file {
+  font-weight: bold;
+  color: var(--vscode-badge-foreground);
+  font-size: 18px;
+}
+
+.xy-flow-step-type {
+  color: #3794FF;
+  font-weight: bold;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.xy-flow-step-path {
+  color: #888888;
+  font-size: 14px;
+  margin-bottom: 8px;
+  word-break: break-all;
+}
+
+.xy-flow-step-details {
+  font-size: 14px;
+  margin-top: 5px;
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.xy-flow-step-details span {
+  color: #888888;
+}
+
+.xy-flow-step-details b {
+  color: var(--vscode-symbolIcon-keywordForeground);
+  font-weight: 500;
+}
+
+.xy-flow-step pre {
+  /*background: rgba(128, 128, 128, 0.1);*/
+  padding: 10px;
+  border-radius: 4px;
+  margin-top: 8px;
+  font-size: 16px;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+/* --- Zoom Controls --- */
+.xy-zoom-controls {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 10;
+}
+
+.xy-zoom-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  cursor: pointer;
+  font-size: 20px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s;
+  padding: 0;
+  line-height: 1;
+}
+
+.xy-zoom-btn:hover {
+  background-color: #3794FF;
+  color: white;
+  border-color: #3794FF;
+  transform: scale(1.1);
+}
+
+.xy-zoom-btn:active {
+  transform: scale(0.95);
+}
+
+.tooltip {
+   position: absolute;
+   padding: 10px 15px;
+   background: var(--vscode-editor-background);
+   color: var(--vscode-foregronnd);
+   border: 1px solid rgba(128, 128, 128, 0.5);
+   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+   font-size: 15px;
+   line-height: 1.6;
+   border-radius: 6px;
+   pointer-events: none;
+   opacity: 0;
+   transition: opacity 0.15s;
+   white-space: normal;
+ }

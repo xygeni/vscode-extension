@@ -1,5 +1,5 @@
 import { XYGENI_SCANNER_REPORT_SUFFIX } from '../common/constants';
-import { ILogger, EventEmitter, Commands } from '../common/interfaces';
+import { ILogger, EventEmitter, Commands, Kind } from '../common/interfaces';
 import { IacXygeniIssue } from './iac-issue';
 import { MisconfXygeniIssue } from './misconf-issue';
 import { SastXygeniIssue } from './sast-issue';
@@ -370,12 +370,29 @@ export default class IssuesService {
         explanation: raw_vuln.explanation,
         url: raw_vuln.url ? raw_vuln.url : '',
         tags: raw_vuln.tags?.length > 0 ? raw_vuln.tags : undefined,
-        branch: sast_vuln.currentBranch ? sast_vuln.currentBranch : '',
+        branch: jsonRaw.currentBranch ? jsonRaw.currentBranch : '',
         cwe: raw_vuln.cwe,
         cwes: raw_vuln.cwes,
         container: raw_vuln.container,
         language: raw_vuln.language,
-        remediableLevel: 'AUTO' // all issues are candidate for IA remediation
+        remediableLevel: 'AUTO', // all issues are candidate for IA remediation        
+        codeFlows: raw_vuln.codeFlows
+          ?.filter((cf: any) => cf.frames?.length > 0)
+          .map((cf: any) => ({
+            tags: cf.tags ?? [],
+            frames: cf.frames.map((frame: any) => ({
+              kind: frame.kind,
+              filePath: frame.location?.filepath ?? '',
+              beginLine: frame.location?.beginLine ?? 0,
+              endLine: frame.location?.endLine ?? 0,
+              code: frame.location?.code ?? '',
+              beginColumn: frame.location?.beginColumn ?? 0,
+              endColumn: frame.location?.endColumn ?? 0,
+              container: frame.container ?? '',
+              injectPoint: frame.injectPoint,
+              category: frame.category
+            })),
+        })) ?? [],
       });
       this.issues.push(issue);
     });
@@ -520,7 +537,7 @@ export default class IssuesService {
 
     if (ratings && ratings.length > 0) {
       // read the last rating (most recent)
-      return ratings[ratings.length -1].vector;
+      return ratings[ratings.length - 1].vector;
     }
     return "";
   }
@@ -529,7 +546,7 @@ export default class IssuesService {
 
     if (ratings && ratings.length > 0) {
       // read the last rating (most recent)
-      return ratings[ratings.length -1].score;
+      return ratings[ratings.length - 1].score;
     }
     return 0;
   }
