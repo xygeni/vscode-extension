@@ -41,26 +41,19 @@ export class RemediationDiffContentProvider implements vscode.TextDocumentConten
       return;
     }
 
-    const startLine = 0; // Apply the remediation to whole file
-    const lines = content.split("\n");
+    const startPos = new vscode.Position(0, 0);
+    const endLine = Math.max(document.lineCount - 1, 0);
+    const endPos = new vscode.Position(endLine, document.lineAt(endLine).text.length);
+    const replacementRange = new vscode.Range(startPos, endPos);
 
-    if (lines && lines.length > 0) {
-      const startPos = new vscode.Position(startLine, 0);
-      const endLine = startLine + lines.length - 1;
-      const endPos = new vscode.Position(endLine, document.lineAt(endLine).text.length);
+    const workspaceEdit = new vscode.WorkspaceEdit();
+    workspaceEdit.replace(uri, replacementRange, content);
 
-      const replacementRange = new vscode.Range(startPos, endPos);
-      const replacementText = content;
+    // Apply the edit
+    await vscode.workspace.applyEdit(workspaceEdit);
 
-      const workspaceEdit = new vscode.WorkspaceEdit();
-      workspaceEdit.replace(uri, replacementRange, replacementText);
-
-      // Apply the edit
-      await vscode.workspace.applyEdit(workspaceEdit);
-
-      //Logger.log(`File saved: ${fileUri}`);
-      this.closeTabDiff(previewUri);      
-    }
+    //Logger.log(`File saved: ${fileUri}`);
+    this.closeTabDiff(previewUri);
     return Promise.resolve();
   }
 
