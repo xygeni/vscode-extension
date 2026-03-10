@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop, 'release/**' ]
+  pull_request:
+    branches: [ main, develop, 'release/**' ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # https://github.com/marketplace/actions/checkout
+      - name: Checkout the repo
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # https://github.com/marketplace/actions/setup-node-js-environment
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: 20
+
+      - name: Install vsce
+        run: npm install @vscode/vsce
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm run test:unit
