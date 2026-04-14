@@ -379,9 +379,9 @@ const DIAGRAM_FUNCTION_SCRIPT = `
           .attr("class", "label")
           .attr("x", d => d.x)
           .attr("y", (d, i) => d.y + (i % 2 === 0 ? 45 : 65))
-          .attr("text-anchor", "middle")  
-          .text(d => d.label );        
-          //.text(d => d.label || d.id);
+          .attr("text-anchor", "middle")
+          .attr("fill", "var(--vscode-foreground)")
+          .text(d => d.label );
 
         const badges = g.selectAll(".badge")
           .data(allNodes.filter(d => d.paths.length > 1))

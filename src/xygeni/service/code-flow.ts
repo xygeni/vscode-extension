@@ -1,5 +1,3 @@
-
-
 export interface IssueCodeFlow {
     // properties
     tags: string[];
