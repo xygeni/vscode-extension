@@ -5,10 +5,13 @@ import { XygeniIssue } from '../common/interfaces';
 import { Logger } from '../common/logger';
 import path from 'path';
 import { MarkdownParser } from '../common/markdown';
-import { ISSUE_DETAILS_REMEDIATE_FUNCTION, ISSUE_DETAILS_SAVE_FUNCTION } from '../common/constants';
+import { ISSUE_DETAILS_REMEDIATE_FUNCTION, ISSUE_DETAILS_SAVE_FUNCTION, ISSUE_DETAILS_EXPLAIN_FUNCTION } from '../common/constants';
 import { RemediationService } from '../service/remediation';
 import InstallerService from '../service/installer';
+import XygeniScannerService from '../service/scanner';
 import _ from 'lodash';
+import * as os from 'os';
+import * as fs from 'fs';
 
 
 export class DetailsView {
@@ -59,6 +62,11 @@ export class DetailsView {
               });
             });
           }
+          return;
+        }
+
+        if (message.command === ISSUE_DETAILS_EXPLAIN_FUNCTION) {
+          this.handleExplainAction(this.panel, message, commands);
           return;
         }
 
@@ -209,6 +217,58 @@ export class DetailsView {
     }
   }
 
+
+  static handleExplainAction(panel: vscode.WebviewPanel | undefined, message: any, commands: Commands): void {
+    const isXygeniInstalled = commands.isInstallReady();
+    if (!isXygeniInstalled) {
+      Logger.log('Xygeni is not installed. AI Explain not available.');
+      if (panel) {
+        panel.webview.postMessage({ status: 'explainError' });
+      }
+      return;
+    }
+
+    const vulnJson = message.vulnJson;
+    if (!vulnJson) {
+      Logger.log('No vulnerability data for AI Explain.');
+      if (panel) {
+        panel.webview.postMessage({ status: 'explainError' });
+      }
+      return;
+    }
+
+    const tempDir = path.join(os.tmpdir(), 'xygeni-explain');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+    const issueType = message.issueType || 'unknown';
+    const fileName = message.file ? path.basename(message.file) : 'unknown';
+    const safeName = `AIExplain-${issueType}-At-${fileName}-.md`.replace(/[^a-zA-Z0-9._\-]/g, '_');
+    const outputFile = path.join(tempDir, safeName);
+
+    const scanner = XygeniScannerService.getInstance();
+    scanner.runAiExplainCommand(
+      vulnJson, outputFile,
+      InstallerService.getInstance().getScannerInstallationDir(),
+      commands.getScanOutputChannel()
+    )
+    .then(() => {
+      if (fs.existsSync(outputFile)) {
+        const fileUri = vscode.Uri.file(outputFile);
+        vscode.commands.executeCommand('markdown.showPreview', fileUri);
+      }
+      if (panel) {
+        panel.webview.postMessage({ status: 'explainReady' });
+      }
+    })
+    .catch((error) => {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      Logger.log(`Error running AI Explain: ${errorMessage}`);
+      if (panel) {
+        panel.webview.postMessage({ status: 'explainError' });
+      }
+    });
+  }
 
   private static getNonce() {
     let text = '';

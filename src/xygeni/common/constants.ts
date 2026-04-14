@@ -34,6 +34,7 @@ export const COMMAND_SHOW_OUTPUT = 'xygeni.showOutput';
 export const COMMAND_SHOW_SCAN_OUTPUT = 'xygeni.showScanOutput';
 
 export const COMMAND_OPEN_PROXY_CONFIG = 'xygeni.openProxyConfig';
+export const COMMAND_TOGGLE_AUTO_SCAN = 'xygeni.scan.toggleAutoScan';
 
 // configurations
 export const CONFIG_XYGENI_API_URL = 'xygeni.api.xygeniUrl';
@@ -64,4 +65,5 @@ export const STATUS = {
 export const ISSUE_DETAILS_REMEDIATE_FUNCTION = "runRemediation";
 export const ISSUE_DETAILS_SAST_REMEDIATE_FUNCTION = "runSASTRemediation";
 export const ISSUE_DETAILS_SAVE_FUNCTION = "runSaveRemediation";
+export const ISSUE_DETAILS_EXPLAIN_FUNCTION = "explainIssue";
 

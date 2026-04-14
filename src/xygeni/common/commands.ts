@@ -362,6 +362,14 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
   }
 
   /**
+   * Toggle auto-scan on save setting
+   */
+  public async toggleAutoScan(): Promise<void> {
+    const newValue = await ConfigManager.toggleAutoScan();
+    this.refreshAllViews();
+  }
+
+  /**
    * Run Xygeni Scanner in incremental mode (triggered by auto-scan on save)
    */
   public async runIncrementalScan(): Promise<void> {
@@ -610,6 +618,7 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
 
   setMcpLibraryInstalled(): void {
     this.xygeniContext.setKey(XYGENI_CONTEXT.MCP_LIBRARY_INSTALLED, true);
+    this.refreshAllViews();
   }
 
 

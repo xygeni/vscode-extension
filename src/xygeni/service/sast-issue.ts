@@ -1,5 +1,6 @@
 
 import { XygeniIssueData } from '../common/interfaces';
+import { ISSUE_DETAILS_EXPLAIN_FUNCTION } from '../common/constants';
 import { AbstractXygeniIssue } from './abstract-issue';
 import { IssueCodeFlow, getCodeFlowDataModel } from './code-flow';
 
@@ -101,9 +102,10 @@ export class SastXygeniIssue extends AbstractXygeniIssue {
       .replace('DATA_PLACE_HOLDER_PATHS', paths);
 
     return `
-    <div id="tab-content-4">  
+    <div id="tab-content-4">
       <div class="xy-code-flow-container">
-        <div class="xy-view-toggle">                
+        <div class="xy-view-toggle">
+            <button id="btn-explain" class="xy-toggle-btn xy-explain-btn">Explanation</button>
             <button id="btn-graph" class="xy-toggle-btn active" >Graph view</button>
             <button id="btn-text" class="xy-toggle-btn">Path</button>
         </div>
@@ -111,11 +113,13 @@ export class SastXygeniIssue extends AbstractXygeniIssue {
         </div>
       </div>
 
+      <input type="hidden" id="issue-type" value="${this.type || ''}" />
+      <input type="hidden" id="issue-file" value="${this.file || ''}" />
       <script type="application/json" id="vuln-json">${JSON.stringify(this.vulnerabilityRaw)}</script>
       <script src="https://d3js.org/d3.v7.min.js" nonce="{{nonce}}"></script>
       <script nonce="{{nonce}}">
         ${DIAGRAM_FUNCTION_SCRIPT}
-        ${script}        
+        ${script}
       </script>
     </div>
     `;
@@ -165,13 +169,28 @@ const CODE_FLOW_DIAGRAM_SCRIPT = `
 
     // Initialize  code flow buttons (graph view and path)
     function initUI() {
+        // explain
+        const btnExplain = document.getElementById('btn-explain');
+        if (btnExplain) {
+            btnExplain.addEventListener('click', () => {
+                const json = document.getElementById('vuln-json').textContent;
+                vscode.postMessage({
+                    command: '${ISSUE_DETAILS_EXPLAIN_FUNCTION}',
+                    vulnJson: json,
+                    issueType: document.getElementById('issue-type').value,
+                    file: document.getElementById('issue-file').value
+                });
+                btnExplain.innerText = 'Processing...';
+                btnExplain.disabled = true;
+            });
+        }
         // graph
         const btnGraph = document.getElementById('btn-graph');
         if (btnGraph) btnGraph.addEventListener('click', () => switchView('graph'));
-        // path9
+        // path
         const btnText = document.getElementById('btn-text');
         if (btnText) btnText.addEventListener('click', () => switchView('text'));
-                
+
         // Initial render
         switchView('graph');
     }

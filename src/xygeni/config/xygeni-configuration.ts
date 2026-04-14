@@ -116,6 +116,13 @@ export class ConfigManager {
         return config.get<boolean>('autoScan', false);
     }
 
+    public static async toggleAutoScan(): Promise<boolean> {
+        const config = vscode.workspace.getConfiguration(this.SCAN_CONFIG_SECTION);
+        const current = this.getAutoScan();
+        await config.update('autoScan', !current, vscode.ConfigurationTarget.Global);
+        return !current;
+    }
+
     public static getProxySettings(): ProxySettings {
         const config = vscode.workspace.getConfiguration(this.PROXY_CONFIG_SECTION);
         return {

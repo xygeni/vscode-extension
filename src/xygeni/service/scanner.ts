@@ -202,6 +202,11 @@ class XygeniScannerService extends EventEmitter {
         return this.callScanner(xygeniInstallPath, args, output);
     }
 
+    public runAiExplainCommand(issueJson: string, outputFile: string, xygeniInstallPath: string, output: IOutputChannel): Promise<void> {
+        const args = ['util', 'ai-explain', '--issue-json', issueJson, '-f', outputFile];
+        return this.executeScannerCall(xygeniInstallPath, args, output);
+    }
+
     
 
     // call scanner executable at xygeniInstallPath from workingDir with args
@@ -295,21 +300,17 @@ class XygeniScannerService extends EventEmitter {
 
     private resolveJavaHome(): string | undefined {
         if (process.env.JAVA_HOME) {
-            this.logger.log("process javaHome " );
             return process.env.JAVA_HOME;
         }
         try {
             const shell = process.env.SHELL || '/bin/bash';
             const result = execSync(`${shell} -lc "echo \\$JAVA_HOME"`, { timeout: 5000 }).toString().trim();
             if (result) {
-                this.logger.log("resolveJavaHome result" );
                 return result;
             }
         } catch {
-            this.logger.log("resolveJavaHome shell error " );
             // ignore
         }
-        this.logger.log("resolveJavaHome undefined" );
         return undefined;
     }
 
@@ -319,7 +320,6 @@ class XygeniScannerService extends EventEmitter {
 
         const javaHome = this.resolveJavaHome();
         if (javaHome) {
-            this.logger.log("javaHome " + javaHome);
             env.JAVA_HOME = javaHome;
             env.PATH = path.join(javaHome, 'bin') + path.delimiter + (env.PATH || '');
         }
