@@ -1,4 +1,4 @@
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import EventEmitter from '../common/event-emitter';
 import { Commands, ILogger, IOutputChannel, ScanResult, WorkspaceFiles, XyContext } from "../common/interfaces";
 import { OutputChannelWrapper } from '../common/logger';
@@ -243,9 +243,36 @@ class XygeniScannerService extends EventEmitter {
         });
     }
 
+    private resolveJavaHome(): string | undefined {
+        if (process.env.JAVA_HOME) {
+            this.logger.log("process javaHome " );
+            return process.env.JAVA_HOME;
+        }
+        try {
+            const shell = process.env.SHELL || '/bin/bash';
+            const result = execSync(`${shell} -lc "echo \\$JAVA_HOME"`, { timeout: 5000 }).toString().trim();
+            if (result) {
+                this.logger.log("resolveJavaHome result" );
+                return result;
+            }
+        } catch {
+            this.logger.log("resolveJavaHome shell error " );
+            // ignore
+        }
+        this.logger.log("resolveJavaHome undefined" );
+        return undefined;
+    }
+
     async getEnvVariables(env: NodeJS.ProcessEnv): Promise<NodeJS.ProcessEnv> {
         env.XYGENI_URL = this.commands.getXygeniUrl();
         await this.commands.getToken().then(token => env.XYGENI_TOKEN = token);
+
+        const javaHome = this.resolveJavaHome();
+        if (javaHome) {
+            this.logger.log("javaHome " + javaHome);
+            env.JAVA_HOME = javaHome;
+            env.PATH = path.join(javaHome, 'bin') + path.delimiter + (env.PATH || '');
+        }
 
         const proxySettings = this.commands.getProxySettings();
 
