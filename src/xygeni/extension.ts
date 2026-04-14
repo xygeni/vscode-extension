@@ -143,6 +143,12 @@ class XygeniExtension {
         diagnosticProvider.updateDiagnostics(commands.getIssues());
       }),
 
+      vscode.workspace.onDidSaveTextDocument(() => {
+        if (ConfigManager.getAutoScan()) {
+          commands.runIncrementalScan();
+        }
+      }),
+
       issueDecorator,
       diagnosticProvider,
       licenseService,

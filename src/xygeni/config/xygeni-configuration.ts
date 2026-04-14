@@ -19,6 +19,7 @@ export class ConfigManager {
 
     private static readonly XYGENI_CONFIG_SECTION = 'xygeni.api';
     private static readonly PROXY_CONFIG_SECTION = 'xygeni.proxy';
+    private static readonly SCAN_CONFIG_SECTION = 'xygeni.scan';
     private static readonly XYGENI_DEFAULT_API_URL = 'https://api.xygeni.io';
     private static readonly XYGENI_URL_PROP_NAME = 'xygeniUrl';
     private static readonly XYGENI_TOKEN_SECRET_NAME = 'xygeniToken';
@@ -108,6 +109,11 @@ export class ConfigManager {
         }
 
         return false;
+    }
+
+    public static getAutoScan(): boolean {
+        const config = vscode.workspace.getConfiguration(this.SCAN_CONFIG_SECTION);
+        return config.get<boolean>('autoScan', false);
     }
 
     public static getProxySettings(): ProxySettings {

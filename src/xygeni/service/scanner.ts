@@ -25,7 +25,10 @@ class XygeniScannerService extends EventEmitter {
     readonly timeout = 1800000; // 30 minutes
     readonly output_suffix = '/scanner.report.json';
 
-    readonly run_analysis_args = ['scan', '--run=deps,secrets,misconf,iac,suspectdeps,sast', '-f', 'json', '-o',
+    readonly run_analysis_args = ['scan', '--run=deps,secrets,misconf,iac,suspectdeps,sast,malware', '-f', 'json', '-o',
+        XYGENI_SCANNER_REPORT_SUFFIX, '--no-upload', '--include-vulnerabilities'];
+
+    readonly run_incremental_analysis_args = ['scan', '--run=secrets,iac,sast,malware', '--incremental', '-f', 'json', '-o',
         XYGENI_SCANNER_REPORT_SUFFIX, '--no-upload', '--include-vulnerabilities'];
 
     readonly run_rectify_sca_args = ['util', 'rectify', '--sca'];    
@@ -137,8 +140,55 @@ class XygeniScannerService extends EventEmitter {
     }
 
 
-    public runAnalysisCommand(sourceFolder: string, xygeniInstallPath: string, output: IOutputChannel): Promise<void> {        
+    public runAnalysisCommand(sourceFolder: string, xygeniInstallPath: string, output: IOutputChannel): Promise<void> {
         const args = [...this.run_analysis_args, '-d', sourceFolder];
+        return this.callScanner(xygeniInstallPath, args, output);
+    }
+
+    async runIncrementalAnalysis(sourceFolder: string, xygeniScannerPath: string, output: IOutputChannel) {
+
+        this.exitCode = undefined;
+        output.clear();
+        output.show();
+
+        const timestamp = new Date();
+
+        if (this.scans.length > 5) {
+            this.scans.shift();
+        }
+
+        this.logger.log('');
+        this.logger.log('================================');
+        this.logger.log(`Running incremental scan on source folder: ${sourceFolder}`);
+
+        this.scans.push({ timestamp: timestamp, status: 'running', issuesFound: undefined, summary: 'incremental' });
+        this.emitChange();
+
+        return this.runIncrementalAnalysisCommand(sourceFolder, xygeniScannerPath, output).then(() => {
+
+            this.logger.log('  Incremental scanner finished');
+            this.scans.pop();
+            const totalTimeInSeconds = (new Date().getTime() - timestamp.getTime()) / 1000;
+            this.scans.push({ timestamp: timestamp, status: 'completed', issuesFound: undefined, summary: 'Incremental - Duration: ' + totalTimeInSeconds + 's' });
+
+            this.exitCode = 0;
+            this.emitChange();
+
+            return;
+        }).catch((error) => {
+            this.logger.error('Error running incremental scanner', error);
+
+            this.exitCode = 1;
+            this.scans.pop();
+            this.scans.push(
+                { timestamp: timestamp, status: 'failed', issuesFound: undefined, summary: 'incremental' }
+            );
+            this.emitChange();
+        });
+    }
+
+    public runIncrementalAnalysisCommand(sourceFolder: string, xygeniInstallPath: string, output: IOutputChannel): Promise<void> {
+        const args = [...this.run_incremental_analysis_args, '-d', sourceFolder];
         return this.callScanner(xygeniInstallPath, args, output);
     }
 

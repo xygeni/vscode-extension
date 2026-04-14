@@ -268,6 +268,19 @@
             "description": "A bar-separated (|) list of hostnames that should bypass the proxy."
           }
         }
+      },
+      {
+        "order": 3,
+        "id": "scan",
+        "title": "Scan Settings",
+        "properties": {
+          "xygeni.scan.autoScan": {
+            "order": 1,
+            "type": "boolean",
+            "default": false,
+            "description": "Automatically run an incremental scan when a file is saved."
+          }
+        }
       }
     ]
   },
