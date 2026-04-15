@@ -95,8 +95,6 @@ export class DetailsView {
       .replace('{{xygeniStyle}}', commands.getXygeniCss())
       .replaceAll('{{nonce}}', nonce);
 
-      Logger.log(html);
-
     if (issue.file) {
 
       const workspaceFolder = vscode.workspace.workspaceFolders?.[0];

@@ -216,7 +216,7 @@ vscode-panel-view {
   transition: all 0.2s;
 }
 
-.xy-toggle-btn:first-child {
+.xy-toggle-btn:first-child:not(.xy-explain-btn) {
   border-radius: 4px 0 0 4px;
 }
 
@@ -229,6 +229,15 @@ vscode-panel-view {
   background-color: #3794FF;
   color: white;
   border-color: #3794FF;
+}
+
+.xy-toggle-btn.xy-explain-btn {
+  margin-right: auto;
+  border-radius: 4px;
+}
+
+.xy-explain-btn + .xy-toggle-btn {
+  border-radius: 4px 0 0 4px;
 }
 
 .xy-toggle-btn:hover:not(.active) {

@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as _ from 'lodash';
 import ConfigurationView from './views/configuration-view';
 import { ScanView } from './views/scan-view';
 import { IaCIssueView, IssueView, MisconfIssueView, SastIssueView, ScaIssueView, SecretsIssueView } from './views/issue-view';
@@ -49,6 +50,12 @@ class XygeniExtension {
     const remediationDiffProvider = new RemediationDiffContentProvider(xygeniContext, commands);
 
     const licenseService = LicenseService.getInstance(context.extensionPath, Logger, commands);
+
+    const debouncedIncrementalScan = _.debounce(() => {
+      if (ConfigManager.getAutoScan()) {
+        commands.runIncrementalScan();
+      }
+    }, 1000, { leading: false, trailing: true });
 
     context.subscriptions.push(
       // Register help webview provider
@@ -146,11 +153,17 @@ class XygeniExtension {
         diagnosticProvider.updateDiagnostics(commands.getIssues());
       }),
 
-      vscode.workspace.onDidSaveTextDocument(() => {
-        if (ConfigManager.getAutoScan()) {
-          commands.runIncrementalScan();
+      vscode.workspace.onDidSaveTextDocument((document) => {
+        if (document.uri.scheme !== 'file') {
+          return;
         }
+        if (!vscode.workspace.getWorkspaceFolder(document.uri)) {
+          return;
+        }
+        debouncedIncrementalScan();
       }),
+
+      { dispose: () => debouncedIncrementalScan.cancel() },
 
       issueDecorator,
       diagnosticProvider,

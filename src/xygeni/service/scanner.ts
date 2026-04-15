@@ -35,6 +35,7 @@ class XygeniScannerService extends EventEmitter {
     readonly run_rectify_sast_args = ['util', 'rectify', '--sast'];
 
     private scannerRunning = false;
+    private cachedJavaHome: string | undefined | null = null; // null = not yet resolved
     private scannerQueue: Array<() => Promise<void>> = [];
     private maxConcurrentScanners = 3;
     private activeScannerCount = 0;
@@ -299,18 +300,32 @@ class XygeniScannerService extends EventEmitter {
     }
 
     private resolveJavaHome(): string | undefined {
-        if (process.env.JAVA_HOME) {
-            return process.env.JAVA_HOME;
+        if (this.cachedJavaHome !== null) {
+            return this.cachedJavaHome || undefined;
         }
+
+        if (process.env.JAVA_HOME) {
+            this.cachedJavaHome = process.env.JAVA_HOME;
+            return this.cachedJavaHome;
+        }
+
+        // On Windows, JAVA_HOME should be in process.env; skip shell resolution
+        if (Platform.get() === 'win32') {
+            this.cachedJavaHome = undefined;
+            return undefined;
+        }
+
         try {
             const shell = process.env.SHELL || '/bin/bash';
             const result = execSync(`${shell} -lc "echo \\$JAVA_HOME"`, { timeout: 5000 }).toString().trim();
             if (result) {
-                return result;
+                this.cachedJavaHome = result;
+                return this.cachedJavaHome;
             }
         } catch {
             // ignore
         }
+        this.cachedJavaHome = undefined;
         return undefined;
     }
 
