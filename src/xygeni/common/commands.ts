@@ -361,6 +361,39 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     }
   }
 
+  /**
+   * Toggle auto-scan on save setting
+   */
+  public async toggleAutoScan(): Promise<void> {
+    const newValue = await ConfigManager.toggleAutoScan();
+    this.refreshAllViews();
+  }
+
+  /**
+   * Run Xygeni Scanner in incremental mode (triggered by auto-scan on save)
+   */
+  public async runIncrementalScan(): Promise<void> {
+    const scanner = XygeniScannerService.getInstance();
+    if (scanner.isScannerRunning()) {
+      return;
+    }
+    if (!this.isInstallReady()) {
+      return;
+    }
+    this.initScannerRun();
+
+    const sourceFolder = this.getWorkspaceFolders()[0];
+    if (!sourceFolder) return;
+
+    try {
+      await scanner.runIncrementalAnalysis(sourceFolder, this.getXygeniInstallPath(), this.getScanOutputChannel());
+      this.readIssues();
+      this.refreshAllViews();
+    } catch (error) {
+      Logger.error(error, "Error running incremental scanner");
+    }
+  }
+
   public readIssues = _.throttle(
     () => {
       IssuesService.getInstance().readIssues();
@@ -585,6 +618,7 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
 
   setMcpLibraryInstalled(): void {
     this.xygeniContext.setKey(XYGENI_CONTEXT.MCP_LIBRARY_INSTALLED, true);
+    this.refreshAllViews();
   }
 
 

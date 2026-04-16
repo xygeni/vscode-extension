@@ -1,4 +1,4 @@
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import EventEmitter from '../common/event-emitter';
 import { Commands, ILogger, IOutputChannel, ScanResult, WorkspaceFiles, XyContext } from "../common/interfaces";
 import { OutputChannelWrapper } from '../common/logger';
@@ -25,13 +25,17 @@ class XygeniScannerService extends EventEmitter {
     readonly timeout = 1800000; // 30 minutes
     readonly output_suffix = '/scanner.report.json';
 
-    readonly run_analysis_args = ['scan', '--run=deps,secrets,misconf,iac,suspectdeps,sast', '-f', 'json', '-o',
+    readonly run_analysis_args = ['scan', '--run=deps,secrets,misconf,iac,suspectdeps,sast,malware', '-f', 'json', '-o',
+        XYGENI_SCANNER_REPORT_SUFFIX, '--no-upload', '--include-vulnerabilities'];
+
+    readonly run_incremental_analysis_args = ['scan', '--run=secrets,iac,sast,malware', '--incremental', '-f', 'json', '-o',
         XYGENI_SCANNER_REPORT_SUFFIX, '--no-upload', '--include-vulnerabilities'];
 
     readonly run_rectify_sca_args = ['util', 'rectify', '--sca'];    
     readonly run_rectify_sast_args = ['util', 'rectify', '--sast'];
 
     private scannerRunning = false;
+    private cachedJavaHome: string | undefined | null = null; // null = not yet resolved
     private scannerQueue: Array<() => Promise<void>> = [];
     private maxConcurrentScanners = 3;
     private activeScannerCount = 0;
@@ -137,8 +141,55 @@ class XygeniScannerService extends EventEmitter {
     }
 
 
-    public runAnalysisCommand(sourceFolder: string, xygeniInstallPath: string, output: IOutputChannel): Promise<void> {        
+    public runAnalysisCommand(sourceFolder: string, xygeniInstallPath: string, output: IOutputChannel): Promise<void> {
         const args = [...this.run_analysis_args, '-d', sourceFolder];
+        return this.callScanner(xygeniInstallPath, args, output);
+    }
+
+    async runIncrementalAnalysis(sourceFolder: string, xygeniScannerPath: string, output: IOutputChannel) {
+
+        this.exitCode = undefined;
+        output.clear();
+        output.show();
+
+        const timestamp = new Date();
+
+        if (this.scans.length > 5) {
+            this.scans.shift();
+        }
+
+        this.logger.log('');
+        this.logger.log('================================');
+        this.logger.log(`Running incremental scan on source folder: ${sourceFolder}`);
+
+        this.scans.push({ timestamp: timestamp, status: 'running', issuesFound: undefined, summary: 'incremental' });
+        this.emitChange();
+
+        return this.runIncrementalAnalysisCommand(sourceFolder, xygeniScannerPath, output).then(() => {
+
+            this.logger.log('  Incremental scanner finished');
+            this.scans.pop();
+            const totalTimeInSeconds = (new Date().getTime() - timestamp.getTime()) / 1000;
+            this.scans.push({ timestamp: timestamp, status: 'completed', issuesFound: undefined, summary: 'Incremental - Duration: ' + totalTimeInSeconds + 's' });
+
+            this.exitCode = 0;
+            this.emitChange();
+
+            return;
+        }).catch((error) => {
+            this.logger.error('Error running incremental scanner', error);
+
+            this.exitCode = 1;
+            this.scans.pop();
+            this.scans.push(
+                { timestamp: timestamp, status: 'failed', issuesFound: undefined, summary: 'incremental' }
+            );
+            this.emitChange();
+        });
+    }
+
+    public runIncrementalAnalysisCommand(sourceFolder: string, xygeniInstallPath: string, output: IOutputChannel): Promise<void> {
+        const args = [...this.run_incremental_analysis_args, '-d', sourceFolder];
         return this.callScanner(xygeniInstallPath, args, output);
     }
 
@@ -150,6 +201,11 @@ class XygeniScannerService extends EventEmitter {
     public runRectifySastCommand(filePath: string, detector: string, line: string, xygeniInstallPath: string, output: IOutputChannel): Promise<void> {
         const args = [...this.run_rectify_sast_args, '--file-path', filePath, '--detector', detector, '--line', line];
         return this.callScanner(xygeniInstallPath, args, output);
+    }
+
+    public runAiExplainCommand(issueJson: string, outputFile: string, xygeniInstallPath: string, output: IOutputChannel): Promise<void> {
+        const args = ['util', 'ai-explain', '--issue-json', issueJson, '-f', outputFile];
+        return this.executeScannerCall(xygeniInstallPath, args, output);
     }
 
     
@@ -243,9 +299,45 @@ class XygeniScannerService extends EventEmitter {
         });
     }
 
+    private resolveJavaHome(): string | undefined {
+        if (this.cachedJavaHome !== null) {
+            return this.cachedJavaHome || undefined;
+        }
+
+        if (process.env.JAVA_HOME) {
+            this.cachedJavaHome = process.env.JAVA_HOME;
+            return this.cachedJavaHome;
+        }
+
+        // On Windows, JAVA_HOME should be in process.env; skip shell resolution
+        if (Platform.get() === 'win32') {
+            this.cachedJavaHome = undefined;
+            return undefined;
+        }
+
+        try {
+            const shell = process.env.SHELL || '/bin/bash';
+            const result = execSync(`${shell} -lc "echo \\$JAVA_HOME"`, { timeout: 5000 }).toString().trim();
+            if (result) {
+                this.cachedJavaHome = result;
+                return this.cachedJavaHome;
+            }
+        } catch {
+            // ignore
+        }
+        this.cachedJavaHome = undefined;
+        return undefined;
+    }
+
     async getEnvVariables(env: NodeJS.ProcessEnv): Promise<NodeJS.ProcessEnv> {
         env.XYGENI_URL = this.commands.getXygeniUrl();
         await this.commands.getToken().then(token => env.XYGENI_TOKEN = token);
+
+        const javaHome = this.resolveJavaHome();
+        if (javaHome) {
+            env.JAVA_HOME = javaHome;
+            env.PATH = path.join(javaHome, 'bin') + path.delimiter + (env.PATH || '');
+        }
 
         const proxySettings = this.commands.getProxySettings();
 
