@@ -10,61 +10,70 @@ on:
 
 jobs:
   xygeni-scan:
-  
     runs-on: ubuntu-latest
   
     steps:
-    - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
+    # https://github.com/marketplace/actions/checkout
+    - name: Checkout the repo
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 0
 
-
-    - name: Xygeni-Scanner-Demo
-      uses: xygeni/xygeni-action@4e94e5ea737f5ebfedac8b1a5b75d8c60c21932d
+      # https://github.com/marketplace/actions/xygeni-scanner
+    - name: Xygeni-Scanner Demo
+      uses: xygeni/xygeni-action@13c6ed2797df7d85749864e2cbcf09c893f43b23 # v6.4.0
       id: Xygeni-Scanner
       with:
         command: scan --never-fail -o ./vscode.json -f json
         token: ${{ secrets.XYGENI_TOKEN_DEMO }}
         gh_token: ${{ secrets.GH_PAT_FOR_DOGFOODING }}
         xygeni_url: https://apidemo.xygeni.io/deps-doctor-service
+
+      # https://github.com/marketplace/actions/upload-a-build-artifact
     - name: Upload scan report result (deps)
-      uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882
+      uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v7.0.0
       with:
           name: deps.vscode.json
           path: ./deps.vscode.json
           retention-days: 1
+
     - name: Upload scan report result (suspectdeps)
-      uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882
+      uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v7.0.0
       with:
           name: suspectdeps.vscode.json
           path: ./suspectdeps.vscode.json
           retention-days: 1
+
     - name: Upload scan report result (secrets)
-      uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882
+      uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v7.0.0
       with:
           name: secrets.vscode.json
           path: ./secrets.vscode.json
           retention-days: 1
+
     - name: Upload scan report result (misconf)
-      uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882
+      uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v7.0.0
       with:
           name: misconf.vscode.json
           path: ./misconf.vscode.json
           retention-days: 1
+
     - name: Upload scan report result (iac)
-      uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882
+      uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v7.0.0
       with:
           name: iac.vscode.json
           path: ./iac.vscode.json
           retention-days: 1
+
     - name: Upload scan report result (malware)
-      uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882
+      uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v7.0.0
       with:
           name: malware.vscode.json
           path: ./malware.vscode.json
           retention-days: 1
+
     - name: Upload scan report result (sast)
-      uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882
+      uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v7.0.0
       with:
           name: sast.vscode.json
           path: ./sast.vscode.json
