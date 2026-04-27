@@ -7,6 +7,10 @@ jobs:
   publish:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+      issues: write
+
     steps:
       # https://github.com/marketplace/actions/checkout
       - name: Checkout the repo
