@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+// eslint-disable-next-line @typescript-eslint/naming-convention
 import * as _ from 'lodash';
 import ConfigurationView from './views/configuration-view';
 import { ScanView } from './views/scan-view';

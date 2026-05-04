@@ -9,7 +9,7 @@ import { ISSUE_DETAILS_REMEDIATE_FUNCTION, ISSUE_DETAILS_SAVE_FUNCTION, ISSUE_DE
 import { RemediationService } from '../service/remediation';
 import InstallerService from '../service/installer';
 import XygeniScannerService from '../service/scanner';
-import _ from 'lodash';
+
 import * as os from 'os';
 import * as fs from 'fs';
 

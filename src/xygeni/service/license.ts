@@ -170,7 +170,7 @@ export default class LicenseService {
       if (!netInterface) { continue; }
       for (const net of netInterface) {
         // Skip internal and non-IPv4
-        if (net.internal || net.family !== 'IPv4') continue;
+        if (net.internal || net.family !== 'IPv4') { continue; }
         if (net.mac && net.mac !== '00:00:00:00:00:00') {
           return net.mac;
         }

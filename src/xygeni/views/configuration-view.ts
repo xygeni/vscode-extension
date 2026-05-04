@@ -136,11 +136,11 @@ export default class ConfigurationView implements vscode.TreeDataProvider<Config
         isConfigValid: boolean, isConnecting: boolean, isConnectionValid: boolean,
         isInstalling: boolean, isXygeniInstalled: boolean
     ): string {
-        if (!isConfigValid) return 'Not configured';
-        if (isConnecting) return 'Connecting...';
-        if (!isConnectionValid) return 'Disconnected. Click to reconnect';
-        if (isInstalling) return 'Installing scanner...';
-        if (isXygeniInstalled) return 'Ready to Scan. Click to reinstall.';
+        if (!isConfigValid) { return 'Not configured'; }
+        if (isConnecting) { return 'Connecting...'; }
+        if (!isConnectionValid) { return 'Disconnected. Click to reconnect'; }
+        if (isInstalling) { return 'Installing scanner...'; }
+        if (isXygeniInstalled) { return 'Ready to Scan. Click to reinstall.'; }
         return 'Click to Install Xygeni Scanner';
     }
 
@@ -148,10 +148,10 @@ export default class ConfigurationView implements vscode.TreeDataProvider<Config
         isConfigValid: boolean, isConnecting: boolean, isConnectionValid: boolean,
         isInstalling: boolean, isXygeniInstalled: boolean
     ): string {
-        if (!isConfigValid) return 'status-error';
-        if (isConnecting || isInstalling) return 'status-loading';
-        if (isXygeniInstalled) return 'status-ok';
-        if (isConnectionValid) return 'status-unknown';
+        if (!isConfigValid) { return 'status-error'; }
+        if (isConnecting || isInstalling) { return 'status-loading'; }
+        if (isXygeniInstalled) { return 'status-ok'; }
+        if (isConnectionValid) { return 'status-unknown'; }
         return 'status-unknown';
     }
 
