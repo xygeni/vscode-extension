@@ -36,6 +36,8 @@ class XygeniScannerService extends EventEmitter {
 
     private scannerRunning = false;
     private cachedJavaHome: string | undefined | null = null; // null = not yet resolved
+    private cachedPowerShellPath: string | undefined | null = null; // null = not yet resolved
+    private cachedPowerShellProbed: string[] = [];
     private scannerQueue: Array<() => Promise<void>> = [];
     private maxConcurrentScanners = 3;
     private activeScannerCount = 0;
@@ -248,7 +250,17 @@ class XygeniScannerService extends EventEmitter {
 
             // Determine command based on platform
             if (Platform.get() === 'win32') {
-                shellCommand = 'powershell';
+                const psPath = this.resolvePowerShell();
+                if (!psPath) {
+                    reject(new Error(
+                        'PowerShell not found. Xygeni needs Windows PowerShell or PowerShell 7 ' +
+                        'to launch the scanner. Ensure %SystemRoot%\\System32\\WindowsPowerShell\\v1.0 ' +
+                        'is on PATH, or install PowerShell 7 from https://aka.ms/powershell. ' +
+                        '(Searched: ' + this.cachedPowerShellProbed.join(', ') + ')'
+                    ));
+                    return;
+                }
+                shellCommand = psPath;
                 shellArgs = ["-NoProfile","-ExecutionPolicy", "Bypass", "-File", scannerScriptPath, ...args];
             }
             else {
@@ -297,6 +309,16 @@ class XygeniScannerService extends EventEmitter {
                 }, this.timeout);
             });
         });
+    }
+
+    private resolvePowerShell(): string | undefined {
+        if (this.cachedPowerShellPath !== null) {
+            return this.cachedPowerShellPath || undefined;
+        }
+        const result = Platform.resolveWindowsShell();
+        this.cachedPowerShellPath = result.path ?? undefined;
+        this.cachedPowerShellProbed = result.probed;
+        return this.cachedPowerShellPath;
     }
 
     private resolveJavaHome(): string | undefined {
