@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ConfigManager } from '../config/xygeni-configuration';
-import { COMMAND_EDIT_XYGENI_API_URL, COMMAND_INSTALL_SCANNER, COMMAND_SHOW_MCP_SETUP, COMMAND_TEST_XYGENI_CONNECTION, STATUS, XYGENI_CONTEXT } from '../common/constants';
+import { COMMAND_EDIT_XYGENI_API_URL, COMMAND_INSTALL_SCANNER, COMMAND_SHOW_MCP_SETUP, COMMAND_TEST_XYGENI_CONNECTION, COMMAND_TOGGLE_AUTO_SCAN, STATUS, XYGENI_CONTEXT } from '../common/constants';
 import { Commands, XyContext } from '../common/interfaces';
 
 
@@ -10,8 +10,7 @@ export interface ConfigurationViewEmitter {
 
 export default class ConfigurationView implements vscode.TreeDataProvider<ConfigItem> {
 
-    private readonly CONNECTION_ITEM_LABEL = '  Connection Status => ';
-    private readonly INSTALL_ITEM_LABEL = '  Scanner Status => ';
+    private readonly CLI_STATUS_ITEM_LABEL = '  CLI Status => ';
     private readonly MCP_SETUP_ITEM_LABEL = '  MCP Setup => ';
 
     private _onDidChangeTreeData: vscode.EventEmitter<ConfigItem | undefined> = new vscode.EventEmitter<ConfigItem | undefined>();
@@ -39,11 +38,11 @@ export default class ConfigurationView implements vscode.TreeDataProvider<Config
             const xygeniToken = await ConfigManager.getXygeniToken(this.context);
             const isLicenseIdeAvailable = this.xygeniContext.getKey(XYGENI_CONTEXT.LICENSE_IDE_AVAILABLE);
             const isConfigValid = await ConfigManager.isConfigValid(this.context);
-            const isConnectionValid = this.xygeniContext.getKey(XYGENI_CONTEXT.CONNECTION_READY);
-            const isXygeniInstalled = this.xygeniContext.getKey(XYGENI_CONTEXT.INSTALL_READY);
-            const isConnecting = this.xygeniContext.getKey(XYGENI_CONTEXT.CONNECTING);
-            const isInstalling = this.xygeniContext.getKey(XYGENI_CONTEXT.INSTALLING);
-            const isMcpLibraryInstalled = this.xygeniContext.getKey(XYGENI_CONTEXT.MCP_LIBRARY_INSTALLED);
+            const isConnectionValid = !!this.xygeniContext.getKey(XYGENI_CONTEXT.CONNECTION_READY);
+            const isXygeniInstalled = !!this.xygeniContext.getKey(XYGENI_CONTEXT.INSTALL_READY);
+            const isConnecting = !!this.xygeniContext.getKey(XYGENI_CONTEXT.CONNECTING);
+            const isInstalling = !!this.xygeniContext.getKey(XYGENI_CONTEXT.INSTALLING);
+            const isMcpLibraryInstalled = !!this.xygeniContext.getKey(XYGENI_CONTEXT.MCP_LIBRARY_INSTALLED);
             const overrideInstallation = true;
 
             this.configItems = [
@@ -71,20 +70,32 @@ export default class ConfigurationView implements vscode.TreeDataProvider<Config
                         arguments: []
                     }
                 ),
-                // Connection Status
+                // CLI Status (connection + scanner installation)
                 new ConfigItem(
-                    this.CONNECTION_ITEM_LABEL,
-                    isConnecting ? 'Connecting...' : isConnectionValid ? 'Connection Ready. Click to reinstall.' : isConfigValid ? 'Disconnected. Click to reconnect' : 'Not configured',
+                    this.CLI_STATUS_ITEM_LABEL,
+                    this.getCliStatusDescription(isConfigValid, isConnecting, isConnectionValid, isInstalling, isXygeniInstalled),
                     vscode.TreeItemCollapsibleState.None,
-                    isConnecting ? 'status-loading' : isConnectionValid ? 'status-ok' : isConfigValid ? 'status-unknown' : 'status-error',
+                    this.getCliStatusIcon(isConfigValid, isConnecting, isConnectionValid, isInstalling, isXygeniInstalled),
                     {
-                        command: COMMAND_TEST_XYGENI_CONNECTION,
-                        title: 'Refresh Connection',
-                        arguments: [overrideInstallation]
+                        command: isXygeniInstalled ? COMMAND_TEST_XYGENI_CONNECTION : isConnectionValid ? COMMAND_INSTALL_SCANNER : COMMAND_TEST_XYGENI_CONNECTION,
+                        title: isConnectionValid ? 'Install Scanner' : 'Refresh Connection',
+                        arguments: isXygeniInstalled ? [overrideInstallation] : []
                     },
+                ),
+                // Auto Scan on Save toggle
+                new ConfigItem(
+                    '  Auto Scan on Save',
+                    ConfigManager.getAutoScan() ? 'Enabled' : 'Disabled. Click to Enable.',
+                    vscode.TreeItemCollapsibleState.None,
+                    ConfigManager.getAutoScan() ? 'status-ok' : 'status-unknown',
+                    {
+                        command: COMMAND_TOGGLE_AUTO_SCAN,
+                        title: 'Toggle Run Increment Scans on File Save',
+                        arguments: []
+                    }
                 )
             ];
-           
+
             if (!isLicenseIdeAvailable) {
                 this.configItems.push(
                     new ConfigItem(
@@ -92,23 +103,6 @@ export default class ConfigurationView implements vscode.TreeDataProvider<Config
                         'Max Xygeni Ide Licenses reached. Contact administrator to increase limit.',
                         vscode.TreeItemCollapsibleState.None,
                         'status-error'
-                    )
-                );
-            }
-
-            if (isConnectionValid) {
-                this.configItems.push(
-                    // Install Scanner
-                    new ConfigItem(
-                        this.INSTALL_ITEM_LABEL,
-                        isInstalling ? 'Installing...' : isXygeniInstalled ? 'Ready to Scan' : 'Click to Install Xygeni Scanner',
-                        vscode.TreeItemCollapsibleState.None,
-                        isInstalling ? 'status-loading' : isXygeniInstalled ? 'status-ok' : 'status-unknown',
-                        {
-                            command: COMMAND_INSTALL_SCANNER,
-                            title: 'Install Scan',
-                            arguments: []
-                        }
                     )
                 );
             }
@@ -138,6 +132,29 @@ export default class ConfigurationView implements vscode.TreeDataProvider<Config
 
 
 
+    private getCliStatusDescription(
+        isConfigValid: boolean, isConnecting: boolean, isConnectionValid: boolean,
+        isInstalling: boolean, isXygeniInstalled: boolean
+    ): string {
+        if (!isConfigValid) { return 'Not configured'; }
+        if (isConnecting) { return 'Connecting...'; }
+        if (!isConnectionValid) { return 'Disconnected. Click to reconnect'; }
+        if (isInstalling) { return 'Installing scanner...'; }
+        if (isXygeniInstalled) { return 'Ready to Scan. Click to reinstall.'; }
+        return 'Click to Install Xygeni Scanner';
+    }
+
+    private getCliStatusIcon(
+        isConfigValid: boolean, isConnecting: boolean, isConnectionValid: boolean,
+        isInstalling: boolean, isXygeniInstalled: boolean
+    ): string {
+        if (!isConfigValid) { return 'status-error'; }
+        if (isConnecting || isInstalling) { return 'status-loading'; }
+        if (isXygeniInstalled) { return 'status-ok'; }
+        if (isConnectionValid) { return 'status-unknown'; }
+        return 'status-unknown';
+    }
+
     private getContextValueFromStatus(status: string): string {
         switch (status) {
             case STATUS.OK:
@@ -153,11 +170,8 @@ export default class ConfigurationView implements vscode.TreeDataProvider<Config
         }
     }
 
-    getConnectionStatusItem(): ConfigItem | undefined {
-        return this.configItems.find(item => item.label === this.CONNECTION_ITEM_LABEL);
-    }
-    getInstallStatusItem(): ConfigItem | undefined {
-        return this.configItems.find(item => item.label === this.INSTALL_ITEM_LABEL);
+    getCliStatusItem(): ConfigItem | undefined {
+        return this.configItems.find(item => item.label === this.CLI_STATUS_ITEM_LABEL);
     }
 
 

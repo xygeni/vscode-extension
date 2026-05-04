@@ -3,6 +3,10 @@ name: Publish VS Code Extension to OpenVSX Marketplace
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+  issues: write        # trstringer/manual-approval creates/closes approval issues
+
 jobs:
   publish:
     runs-on: ubuntu-latest

@@ -197,13 +197,31 @@ export class McpSetupView {
             <p>MCP (Model Context Protocol) is a protocol that enables AI assistants to access external tools and data sources. Xygeni's MCP server exposes security scanning capabilities through standardized tool interfaces.</p>
 
             <h2>Features</h2>
+            <h3>Scanners</h3>
             <ul class="feature-list">
                 <li>SAST (Static Application Security Testing) analysis</li>
                 <li>SCA (Software Composition Analysis) for dependencies</li>
+                <li>Suspect dependencies analysis</li>
                 <li>Secrets detection</li>
                 <li>IaC (Infrastructure as Code) security scanning</li>
-                <li>Misconfiguration detection</li>
-                <li>Real-time security insights</li>
+                <li>CI/CD misconfiguration detection</li>
+                <li>Malware evidence analysis</li>
+                <li>Code tampering analysis</li>
+                <li>Compliance analysis</li>
+                <li>Inventory analysis</li>
+            </ul>
+            <h3>Audit guardrails</h3>
+            <p>Run the project's configured guardrails for any scan type (SAST, SCA, suspect deps, secrets, IaC, CI/CD, malware, code tampering, compliance) and get the audit verdict.</p>
+            <h3>AI-assisted remediation</h3>
+            <ul class="feature-list">
+                <li>Generate fix for SAST issues at a given file/line/detector</li>
+                <li>Generate fix for SCA issues for a given dependency</li>
+                <li>Remediation risk: assess impact of bumping a component from a version to a fixed version (changed/removed methods)</li>
+            </ul>
+            <h3>Issue management</h3>
+            <ul class="feature-list">
+                <li>Find new issues from baseline by comparing the latest scan against the project baseline</li>
+                <li>Mute issues by unique hash with a reason</li>
             </ul>
 
             <h2>Prerequisites</h2>
@@ -231,11 +249,11 @@ export class McpSetupView {
 
                 <h3>JSON</h3>
                 <div class="code-block"><pre>${this.escapeHtml(jsonConfig)}</pre></div>
-                <button class="copy-button" onclick="copyToClipboard(this.previousElementSibling.textContent)">Copy JSON Config</button>
+                <button class="copy-button" data-copy-prev>Copy JSON Config</button>
 
                 <h3>TOML</h3>
                 <div class="code-block"><pre>${this.escapeHtml(tomlConfig)}</pre></div>
-                <button class="copy-button" onclick="copyToClipboard(this.previousElementSibling.textContent)">Copy TOML Config</button>
+                <button class="copy-button" data-copy-prev>Copy TOML Config</button>
             </div>
 
             <div class="step">
@@ -264,14 +282,20 @@ export class McpSetupView {
         <script nonce="${nonce}">
             function copyToClipboard(text) {
                 navigator.clipboard.writeText(text).then(() => {
-                    console.log('Copied to clipboard:', text);
+                    console.log('Copied to clipboard');
                 }).catch(err => {
                     console.error('Failed to copy:', err);
                 });
             }
 
-            // Make copyToClipboard function globally available
-            window.copyToClipboard = copyToClipboard;
+            document.querySelectorAll('button.copy-button[data-copy-prev]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    const block = btn.previousElementSibling;
+                    if (!block) return;
+                    const pre = block.querySelector('pre') || block;
+                    copyToClipboard(pre.textContent || '');
+                });
+            });
         </script>
     </body>
     </html>`;
