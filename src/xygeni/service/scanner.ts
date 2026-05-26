@@ -5,6 +5,9 @@ import { OutputChannelWrapper } from '../common/logger';
 import GlobalContext from './global-context';
 import { Platform } from '../common/platform';
 import path from 'path';
+import fs from 'fs';
+import os from 'os';
+import crypto from 'crypto';
 import { window } from 'vscode';
 import { XYGENI_SCANNER_OUTPUT_NAME, XYGENI_SCANNER_REPORT_SUFFIX } from '../common/constants';
 import IssuesService from './issues';
@@ -205,9 +208,18 @@ class XygeniScannerService extends EventEmitter {
         return this.callScanner(xygeniInstallPath, args, output);
     }
 
-    public runAiExplainCommand(issueJson: string, outputFile: string, xygeniInstallPath: string, output: IOutputChannel): Promise<void> {
-        const args = ['util', 'ai-explain', '--issue-json', issueJson, '-f', outputFile];
-        return this.executeScannerCall(xygeniInstallPath, args, output);
+    public async runAiExplainCommand(issueJson: string, outputFile: string, xygeniInstallPath: string, output: IOutputChannel): Promise<void> {
+        // Avoid shell/CLI argument splitting by handing the JSON over via a file.
+        // Picocli's --issue-json-file is exactly for "JSON large or with characters hard to escape on the command line".
+        const tempFile = path.join(os.tmpdir(), `xygeni-issue-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.json`);
+        await fs.promises.writeFile(tempFile, issueJson, 'utf8');
+
+        const args = ['util', 'ai-explain', '--issue-json-file', tempFile, '-f', outputFile];
+        try {
+            await this.executeScannerCall(xygeniInstallPath, args, output);
+        } finally {
+            fs.promises.unlink(tempFile).catch(() => { /* best-effort cleanup */ });
+        }
     }
 
     

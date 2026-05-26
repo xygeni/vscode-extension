@@ -163,6 +163,14 @@ export class DetailsView {
           }
           return;
         }
+        if (!commands.isLicenseAvailable()) {
+          Logger.log('Xygeni IDE License is not available. Remediation not applied.');
+          vscode.window.showWarningMessage('Xygeni IDE License is not available. Please contact your administrator.');
+          if (panel) {
+            panel.webview.postMessage({ status: 'remediationError', error: 'Xygeni IDE License is not available.' });
+          }
+          return;
+        }
 
         RemediationService.getInstance().launchRemediationPreview(
           message.kind, message.issueId, fileUri,
@@ -220,6 +228,14 @@ export class DetailsView {
     const isXygeniInstalled = commands.isInstallReady();
     if (!isXygeniInstalled) {
       Logger.log('Xygeni is not installed. AI Explain not available.');
+      if (panel) {
+        panel.webview.postMessage({ status: 'explainError' });
+      }
+      return;
+    }
+    if (!commands.isLicenseAvailable()) {
+      Logger.log('Xygeni IDE License is not available. AI Explain not available.');
+      vscode.window.showWarningMessage('Xygeni IDE License is not available. Please contact your administrator.');
       if (panel) {
         panel.webview.postMessage({ status: 'explainError' });
       }

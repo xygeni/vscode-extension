@@ -72,6 +72,7 @@ export interface Commands extends WorkspaceFiles {
   getDetectorDoc(url: URL, token: string): Promise<string>
   getScanOutputChannel(): IOutputChannel
   isInstallReady(): boolean;
+  isLicenseAvailable(): boolean;
   getScannerInstallationDir(): string;
   getMcpLibraryPath(): string | undefined;
 

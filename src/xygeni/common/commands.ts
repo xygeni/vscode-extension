@@ -173,7 +173,7 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     const xygeniToken = await ConfigManager.getXygeniToken(this.context);
 
     this.resetConnectionStatus();
-    this.updateLicenseIdeAvailability(true); // consider a valid license is available by default until not checked
+    this.updateLicenseIdeAvailability(false); // fail-closed: only set to true after checkLicense() confirms a valid seat
 
     if (!xygeniUrl || !xygeniToken) {
       throw new Error('Xygeni API URL and token are required');
@@ -337,10 +337,15 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
   }
 
   /**
-   * Run Xygeni Scanner 
-   * @returns 
+   * Run Xygeni Scanner
+   * @returns
    */
   public async runScanner(): Promise<void> {
+    if (!this.isLicenseAvailable()) {
+      Logger.log('Xygeni IDE License is not available. Scan aborted.');
+      vscode.window.showWarningMessage('Xygeni IDE License is not available. Please contact your administrator.');
+      return;
+    }
     const scanner = XygeniScannerService.getInstance();
     if (scanner.isScannerRunning()) {
       vscode.window.showInformationMessage('Scanner already running...');
@@ -373,6 +378,10 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
    * Run Xygeni Scanner in incremental mode (triggered by auto-scan on save)
    */
   public async runIncrementalScan(): Promise<void> {
+    if (!this.isLicenseAvailable()) {
+      Logger.log('Xygeni IDE License is not available. Incremental scan skipped.');
+      return;
+    }
     const scanner = XygeniScannerService.getInstance();
     if (scanner.isScannerRunning()) {
       return;
@@ -448,6 +457,10 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     return false;
   }
 
+  isLicenseAvailable(): boolean {
+    return !!this.xygeniContext.getKey(XYGENI_CONTEXT.LICENSE_IDE_AVAILABLE);
+  }
+
   showMcpSetupView() {
     void McpSetupView.showMcpSetup(this);
   }
@@ -518,8 +531,8 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     // is a workspace is opened
     this.xygeniContext.setKey(XYGENI_CONTEXT.WORKSPACE_FOUND, !!this.getWorkspaceFolders().length);
 
-    // license not valid until checked
-    this.xygeniContext.setKey(XYGENI_CONTEXT.LICENSE_IDE_AVAILABLE, true); // consider a valid license is available by default until not checked
+    // license not valid until checked (fail-closed)
+    this.xygeniContext.setKey(XYGENI_CONTEXT.LICENSE_IDE_AVAILABLE, false);
 
     // is xygeni config shown
     this.xygeniContext.setKey(XYGENI_CONTEXT.SHOW_CONFIG, false);
