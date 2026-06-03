@@ -73,6 +73,8 @@ export interface Commands extends WorkspaceFiles {
   getScanOutputChannel(): IOutputChannel
   isInstallReady(): boolean;
   isLicenseAvailable(): boolean;
+  isLicenseFree(): boolean;
+  openUpgradePage(): void;
   getScannerInstallationDir(): string;
   getMcpLibraryPath(): string | undefined;
 

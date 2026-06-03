@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ConfigManager } from '../config/xygeni-configuration';
-import { COMMAND_EDIT_XYGENI_API_URL, COMMAND_INSTALL_SCANNER, COMMAND_SHOW_MCP_SETUP, COMMAND_TEST_XYGENI_CONNECTION, COMMAND_TOGGLE_AUTO_SCAN, STATUS, XYGENI_CONTEXT } from '../common/constants';
+import { COMMAND_EDIT_XYGENI_API_URL, COMMAND_INSTALL_SCANNER, COMMAND_SHOW_MCP_SETUP, COMMAND_TEST_XYGENI_CONNECTION, COMMAND_TOGGLE_AUTO_SCAN, COMMAND_UPGRADE_LICENSE, STATUS, XYGENI_CONTEXT } from '../common/constants';
 import { Commands, XyContext } from '../common/interfaces';
 
 
@@ -43,6 +43,7 @@ export default class ConfigurationView implements vscode.TreeDataProvider<Config
             const isConnecting = !!this.xygeniContext.getKey(XYGENI_CONTEXT.CONNECTING);
             const isInstalling = !!this.xygeniContext.getKey(XYGENI_CONTEXT.INSTALLING);
             const isMcpLibraryInstalled = !!this.xygeniContext.getKey(XYGENI_CONTEXT.MCP_LIBRARY_INSTALLED);
+            const isLicenseFree = !!this.xygeniContext.getKey(XYGENI_CONTEXT.LICENSE_FREE);
             const overrideInstallation = true;
 
             this.configItems = [
@@ -82,19 +83,40 @@ export default class ConfigurationView implements vscode.TreeDataProvider<Config
                         arguments: isXygeniInstalled ? [overrideInstallation] : []
                     },
                 ),
-                // Auto Scan on Save toggle
-                new ConfigItem(
-                    '  Auto Scan on Save',
-                    ConfigManager.getAutoScan() ? 'Enabled' : 'Disabled. Click to Enable.',
-                    vscode.TreeItemCollapsibleState.None,
-                    ConfigManager.getAutoScan() ? 'status-ok' : 'status-unknown',
-                    {
-                        command: COMMAND_TOGGLE_AUTO_SCAN,
-                        title: 'Toggle Run Increment Scans on File Save',
-                        arguments: []
-                    }
-                )
             ];
+
+            // Auto Scan on Save runs the scanner with `--incremental`, which the Xygeni Free
+            // edition rejects. On a Free license, show the item disabled with an upgrade prompt
+            // that opens the pricing page; otherwise show the normal enable/disable toggle.
+            if (isLicenseFree) {
+                this.configItems.push(
+                    new ConfigItem(
+                        '  Auto Scan on Save',
+                        'Disabled on Free plan. Click to Upgrade.',
+                        vscode.TreeItemCollapsibleState.None,
+                        'status-locked',
+                        {
+                            command: COMMAND_UPGRADE_LICENSE,
+                            title: 'Upgrade your Xygeni plan',
+                            arguments: []
+                        }
+                    )
+                );
+            } else {
+                this.configItems.push(
+                    new ConfigItem(
+                        '  Auto Scan on Save',
+                        ConfigManager.getAutoScan() ? 'Enabled' : 'Disabled. Click to Enable.',
+                        vscode.TreeItemCollapsibleState.None,
+                        ConfigManager.getAutoScan() ? 'status-ok' : 'status-unknown',
+                        {
+                            command: COMMAND_TOGGLE_AUTO_SCAN,
+                            title: 'Toggle Run Increment Scans on File Save',
+                            arguments: []
+                        }
+                    )
+                );
+            }
 
             if (!isLicenseIdeAvailable) {
                 this.configItems.push(
@@ -222,6 +244,9 @@ class ConfigItem extends vscode.TreeItem {
                 break;
             case 'status-unknown':
                 this.iconPath = new vscode.ThemeIcon('question');
+                break;
+            case 'status-locked':
+                this.iconPath = new vscode.ThemeIcon('lock', new vscode.ThemeColor('charts.yellow'));
                 break;
             case 'show':
                 this.iconPath = new vscode.ThemeIcon('eye');
