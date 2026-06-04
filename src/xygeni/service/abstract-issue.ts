@@ -142,8 +142,16 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
                       document.getElementById('rem-buttons').innerHTML = '<p>Fix done.</p>';
                 }  
                 
-                if (message.status === 'UPDATE_DETECTOR_DOC_FUNCTION') {             
-                  document.getElementById('xy-detector-doc').innerHTML = message.details;                
+                if (message.status === 'explainReady') {
+                  const btn = document.getElementById('btn-explain');
+                  if (btn) btn.hidden = true;
+                } else if (message.status === 'explainError') {
+                  const btn = document.getElementById('btn-explain');
+                  if (btn) { btn.innerText = 'Explanation'; btn.disabled = false; }
+                }
+
+                if (message.status === 'UPDATE_DETECTOR_DOC_FUNCTION') {
+                  document.getElementById('xy-detector-doc').innerHTML = message.details;
                 }
                 return false;
             }

@@ -393,6 +393,7 @@ export default class IssuesService {
               category: frame.category
             })),
         })) ?? [],
+        vulnerabilityRaw: raw_vuln,
       });
       this.issues.push(issue);
     });
