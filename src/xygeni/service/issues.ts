@@ -89,28 +89,31 @@ export default class IssuesService {
 
 
   public async readScannerOutput(suffix: string): Promise<void> {
+    // Read each domain report independently. A failure in one domain (a missing, partial or
+    // corrupt report — e.g. when an analyzer such as misconf timed out) must NOT prevent the
+    // remaining domains from being read and rendered. See xygeni/product-backlog#835.
+    await this.readReportSafely('secrets', `secrets.${suffix}`, f => this.readSecretsReport(f));
+    await this.readReportSafely('misconf', `misconf.${suffix}`, f => this.readMisconfReport(f));
+    await this.readReportSafely('sast', `sast.${suffix}`, f => this.readSastReport(f));
+    await this.readReportSafely('iac', `iac.${suffix}`, f => this.readIacReport(f));
+    await this.readReportSafely('deps', `deps.${suffix}`, f => this.readDepsReport(f));
+
+    // sort issues by severity
+    this.issues.sort((a, b) => {
+      return a.getSeverityLevel() - b.getSeverityLevel();
+    });
+  }
+
+  /**
+   * Reads a single domain report isolating its failures: any error is logged and swallowed so
+   * the other domains are still read. Without this, a corrupt/partial report from one analyzer
+   * (typically after a timeout) would hide the findings of every other analyzer.
+   */
+  private async readReportSafely(domain: string, filename: string, read: (filename: string) => Promise<void>): Promise<void> {
     try {
-      // read secrets
-      await this.readSecretsReport(`secrets.${suffix}`);
-
-      // read misconf
-      await this.readMisconfReport(`misconf.${suffix}`);
-
-      // read sast
-      await this.readSastReport(`sast.${suffix}`);
-
-      await this.readIacReport(`iac.${suffix}`);
-
-      await this.readDepsReport(`deps.${suffix}`);
-
-      // sort issues by severity
-      this.issues.sort((a, b) => {
-        return a.getSeverityLevel() - b.getSeverityLevel();
-      });
-
+      await read(filename);
     } catch (error) {
-      this.logger.error(error, 'Error reading scanner output:');
-      throw error;
+      this.logger.error(error, `Error reading ${domain} report (${filename}), skipping this domain`);
     }
   }
 
@@ -199,7 +202,7 @@ export default class IssuesService {
 
   async processDepsReport(jsonRaw: any): Promise<void> {
     const dependencies = Array.isArray(jsonRaw.dependencies) ? jsonRaw.dependencies : [jsonRaw.dependencies];
-    const tool = jsonRaw.metadata.reportProperties['tool.name'];
+    const tool = jsonRaw.metadata?.reportProperties?.['tool.name'];
 
     this.processVulnInDepsReport(dependencies, tool);
 
@@ -309,7 +312,7 @@ export default class IssuesService {
 
   processSecretsReport(jsonRaw: any): void {
     const secrets = Array.isArray(jsonRaw.secrets) ? jsonRaw.secrets : [jsonRaw.secrets];
-    const tool = jsonRaw.metadata.reportProperties['tool.name'];
+    const tool = jsonRaw.metadata?.reportProperties?.['tool.name'];
 
     secrets.forEach((rawSecret: any) => {
       const issue = new SecretsXygeniIssue({
@@ -348,7 +351,7 @@ export default class IssuesService {
 
   processSastReport(jsonRaw: any): void {
     const sast_vuln = Array.isArray(jsonRaw.vulnerabilities) ? jsonRaw.vulnerabilities : [jsonRaw.vulnerabilities];
-    const tool = jsonRaw.metadata.reportProperties['tool.name'];
+    const tool = jsonRaw.metadata?.reportProperties?.['tool.name'];
 
     sast_vuln.forEach((raw_vuln: any) => {
       const issue = new SastXygeniIssue({
@@ -402,7 +405,7 @@ export default class IssuesService {
   processMisconfReport(jsonRaw: any): void {
 
     const misconfigurations = Array.isArray(jsonRaw.misconfigurations) ? jsonRaw.misconfigurations : [jsonRaw.misconfigurations];
-    const tool = jsonRaw.metadata.reportProperties['tool.name'];
+    const tool = jsonRaw.metadata?.reportProperties?.['tool.name'];
 
     misconfigurations.forEach((rawMisconf: any) => {
       const issue = new MisconfXygeniIssue({
@@ -436,7 +439,7 @@ export default class IssuesService {
   processIacReport(jsonRaw: any): void {
 
     const flaws = Array.isArray(jsonRaw.flaws) ? jsonRaw.flaws : [jsonRaw.flaws];
-    const tool = jsonRaw.metadata.reportProperties['tool.name'];
+    const tool = jsonRaw.metadata?.reportProperties?.['tool.name'];
 
     flaws.forEach((flaw: any) => {
       const issue = new IacXygeniIssue({

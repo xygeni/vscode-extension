@@ -102,10 +102,22 @@ export default class LicenseService {
         .post(ideLicenseUrl, data, (res) => {
           if (res.statusCode !== 200) {
             this.logger.log(`Error response installing Xygeni IDE License: ${res.statusCode}`);
+            res.resume();
             reject(new Error(`Error response installing Xygeni IDE License`));
+            return;
           }
-          //Logger.log(`Xygeni IDE License installed successfully.`);
-          resolve(res.statusCode === 200);
+          // The endpoint returns a JSON boolean: `true` when the IDE seat is granted, `false`
+          // when it is denied (e.g. no seats available). A 200 status alone does NOT mean the
+          // seat is valid, so the response body must be read.
+          let body = '';
+          res.on('data', (chunk) => { body += chunk; });
+          res.on('end', () => {
+            const granted = body.trim().toLowerCase() === 'true';
+            if (!granted) {
+              this.logger.log('Xygeni IDE License denied: no seat available for this account.');
+            }
+            resolve(granted);
+          });
         });
 
       request.on('error', (error) => {
