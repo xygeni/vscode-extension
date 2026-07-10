@@ -51,3 +51,7 @@
 
 - Fix AI Explain CLI parsing and license gating
 - Auto Scan on Save now requires a non-Free license; on the Free plan it is shown disabled with a link to upgrade
+
+## [1.2.9]
+
+- Fix Free license handling
