@@ -13,6 +13,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as yauzl from 'yauzl';
 import * as crypto from 'crypto';
+import { buildZip } from './zip-fixture';
 
 // Mock vscode module
 class GlobalContextMock implements GlobalContext {
@@ -439,6 +440,110 @@ suite('Installer Test Suite', () => {
 
             // Assert
             assert.ok(makeExecStub.notCalled);
+        });
+    });
+
+    suite('unzip method (regression)', () => {
+        // Directories created per-test so we can clean them up afterwards.
+        const workDirs: string[] = [];
+
+        function makeWorkDir(): string {
+            const dir = path.join(os.tmpdir(), `xygeni_unzip_test_${crypto.randomBytes(6).toString('hex')}`);
+            fs.mkdirSync(dir, { recursive: true });
+            workDirs.push(dir);
+            return dir;
+        }
+
+        function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+            let timer: NodeJS.Timeout;
+            const guard = new Promise<never>((_, reject) => {
+                timer = setTimeout(() => reject(new Error(message)), ms);
+            });
+            return Promise.race([promise, guard]).finally(() => clearTimeout(timer)) as Promise<T>;
+        }
+
+        teardown(() => {
+            for (const dir of workDirs.splice(0)) {
+                fs.rmSync(dir, { recursive: true, force: true });
+            }
+        });
+
+        // Regression guard for the scanner-install hang: yauzl's streaming inflate
+        // deadlocks on large entries under some runtimes (observed on VS Code's
+        // Electron / Node 24 build), stopping a few KB short of the declared
+        // uncompressed size and never emitting 'end'. The scanner ships a ~34 MB
+        // jar, so unzip() must fully extract a large deflate entry, byte-for-byte,
+        // without hanging. A ~12 MB random (poorly compressible) entry keeps the
+        // read range well above the size that triggers the deadlock. This passes
+        // on runtimes where unzip works and fails (via the timeout below) on ones
+        // where it hangs.
+        test('extracts a large deflate entry completely without hanging', async function () {
+            this.timeout(60000);
+
+            const bigSize = 12 * 1024 * 1024;
+            const bigData = crypto.randomBytes(bigSize);
+            const bigSha = crypto.createHash('sha256').update(bigData).digest('hex');
+            const scriptData = Buffer.from('#!/bin/sh\necho xygeni\n');
+
+            const zipBuffer = buildZip([
+                { name: 'xygeni_scanner/' },
+                { name: 'xygeni_scanner/conf/' },
+                { name: 'xygeni_scanner/xygeni', data: scriptData },
+                { name: 'xygeni_scanner/lib/big.jar', data: bigData },
+            ]);
+
+            const workDir = makeWorkDir();
+            const zipPath = path.join(workDir, 'xygeni_scanner.zip');
+            const destDir = path.join(workDir, 'out');
+            fs.writeFileSync(zipPath, zipBuffer);
+            fs.mkdirSync(destDir, { recursive: true });
+
+            await withTimeout(
+                (installer as any).unzip(zipPath, destDir),
+                30000,
+                'unzip() did not finish in 30s — streaming inflate hung on the large entry'
+            );
+
+            const bigPath = path.join(destDir, 'xygeni_scanner', 'lib', 'big.jar');
+            const scriptPath = path.join(destDir, 'xygeni_scanner', 'xygeni');
+
+            assert.ok(fs.existsSync(bigPath), 'big.jar was not extracted');
+            const extracted = fs.readFileSync(bigPath);
+            assert.strictEqual(extracted.length, bigSize, 'big.jar was truncated');
+            assert.strictEqual(
+                crypto.createHash('sha256').update(extracted).digest('hex'),
+                bigSha,
+                'big.jar contents do not match the original'
+            );
+
+            assert.ok(fs.existsSync(scriptPath), 'small entry was not extracted');
+            assert.strictEqual(fs.readFileSync(scriptPath).toString(), scriptData.toString());
+            assert.ok(fs.existsSync(path.join(destDir, 'xygeni_scanner', 'conf')), 'directory entry was not created');
+        });
+
+        test('extracts small entries and directories correctly', async function () {
+            this.timeout(20000);
+
+            const zipBuffer = buildZip([
+                { name: 'xygeni_scanner/' },
+                { name: 'xygeni_scanner/conf/' },
+                { name: 'xygeni_scanner/conf/xygeni.yml', data: Buffer.from('scan: true\n') },
+                { name: 'xygeni_scanner/xygeni', data: Buffer.from('#!/bin/sh\n') },
+            ]);
+
+            const workDir = makeWorkDir();
+            const zipPath = path.join(workDir, 'xygeni_scanner.zip');
+            const destDir = path.join(workDir, 'out');
+            fs.writeFileSync(zipPath, zipBuffer);
+            fs.mkdirSync(destDir, { recursive: true });
+
+            await withTimeout((installer as any).unzip(zipPath, destDir), 10000, 'unzip() hung on small entries');
+
+            assert.strictEqual(
+                fs.readFileSync(path.join(destDir, 'xygeni_scanner', 'conf', 'xygeni.yml')).toString(),
+                'scan: true\n'
+            );
+            assert.ok(fs.existsSync(path.join(destDir, 'xygeni_scanner', 'xygeni')));
         });
     });
 
