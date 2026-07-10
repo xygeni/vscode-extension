@@ -164,4 +164,43 @@ suite('Issues Test Suite', () => {
     assert.strictEqual(firstIssue.explanation, "Generation of error message containing sensitive information");
 
   });
+
+  test('processSastReport should still parse vulnerabilities when metadata is missing', () => {
+    // A report whose metadata/reportProperties is absent (e.g. a partial report written when an
+    // analyzer timed out) must NOT throw: the findings should still be parsed. (issue #835)
+    issuesService.clear();
+
+    const malformed = {
+      // `metadata` is intentionally absent
+      vulnerabilities: [
+        { issueId: 'SAS.test.1', kind: 'test', detector: 'd', severity: 'high', location: { filepath: 'a.ts', beginLine: 1 } }
+      ]
+    };
+
+    assert.doesNotThrow(() => issuesService.processSastReport(malformed));
+
+    const parsed = issuesService.getIssues();
+    assert.strictEqual(parsed.length, 1, 'Should parse the vulnerability despite missing metadata');
+    assert.strictEqual(parsed[0].id, 'SAS.test.1');
+    assert.strictEqual(parsed[0].severity, 'high');
+  });
+
+  test('readScannerOutput should keep reading other domains when one report fails', async () => {
+    // A failure reading one domain (e.g. a corrupt misconf report after a timeout) must not
+    // prevent the remaining domains (sast, iac, deps) from being read. (issue #835)
+    issuesService.clear();
+
+    sandbox.stub(issuesService, 'readSecretsReport').resolves();
+    const misconf = sandbox.stub(issuesService, 'readMisconfReport').rejects(new Error('corrupt misconf report'));
+    const sast = sandbox.stub(issuesService, 'readSastReport').resolves();
+    const iac = sandbox.stub(issuesService, 'readIacReport').resolves();
+    const deps = sandbox.stub(issuesService, 'readDepsReport').resolves();
+
+    await issuesService.readScannerOutput('xygeni.xygeni-security');
+
+    assert.ok(misconf.calledOnce, 'misconf read should be attempted');
+    assert.ok(sast.calledOnce, 'sast should still be read after misconf failure');
+    assert.ok(iac.calledOnce, 'iac should still be read after misconf failure');
+    assert.ok(deps.calledOnce, 'deps (SCA) should still be read after misconf failure');
+  });
 });

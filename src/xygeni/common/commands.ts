@@ -4,7 +4,7 @@ import * as vscode from 'vscode';
 import * as _ from 'lodash';
 import * as os from 'os';
 import { ConfigManager, ProxySettings } from "../config/xygeni-configuration";
-import { ISSUE_DETAILS_REMEDIATE_FUNCTION, ISSUE_DETAILS_SAVE_FUNCTION, STATUS, XYGENI_CONTEXT, XYGENI_SCANNER_OUTPUT_NAME, XYGENI_SCANNER_REPORT_SUFFIX } from './constants';
+import { ISSUE_DETAILS_REMEDIATE_FUNCTION, ISSUE_DETAILS_SAVE_FUNCTION, STATUS, XYGENI_CONTEXT, XYGENI_PRICING_URL, XYGENI_SCANNER_OUTPUT_NAME, XYGENI_SCANNER_REPORT_SUFFIX } from './constants';
 import { EventEmitter } from 'vscode';
 import { Commands, XyContext, ScanResult, IHttpClient, XygeniMedia, XygeniIssue } from './interfaces';
 import InstallerService from '../service/installer';
@@ -20,6 +20,7 @@ import { ConfigurationViewEmitter } from '../views/configuration-view';
 import { DetailsView } from '../views/details-view';
 import { RemediationDiffContentProvider } from '../views/remediation-providers';
 import LicenseService from '../service/license';
+import LicenseStateService from '../service/license-state';
 import { VulnXygeniIssue } from '../service/vuln-issue';
 import { RemediationService } from '../service/remediation';
 import { McpSetupView } from '../views/mcp-setup-view';
@@ -148,18 +149,39 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
       return false;
     }
     return LicenseService.getInstance().isValidLicense(xygeniToken).then(
-      (isAvailable) => {
+      async (isAvailable) => {
         this.updateLicenseIdeAvailability(isAvailable);
-        Logger.log('==============================');
-        Logger.log('    IDE License available     ');
-        Logger.log('==============================');
-        return isAvailable; 
+        if (isAvailable) {
+          Logger.log('==============================');
+          Logger.log('    IDE License available     ');
+          Logger.log('==============================');
+          await this.refreshLicenseType(xygeniToken);
+        } else {
+          await this.updateLicenseFree(false);
+        }
+        return isAvailable;
       }
     )
-      .catch(() => {
+      .catch(async () => {
         this.updateLicenseIdeAvailability(false);
-        return false; 
+        await this.updateLicenseFree(false);
+        return false;
       });
+  }
+
+  private async refreshLicenseType(token: string): Promise<void> {
+    const stateService = LicenseStateService.getInstance(Logger, this);
+    await stateService.refresh(token);
+    const isFree = stateService.isFreeLicense();
+    if (isFree) {
+      Logger.log('Xygeni Free edition detected. Auto Scan on Save is disabled.');
+    }
+    await this.updateLicenseFree(isFree);
+  }
+
+  private async updateLicenseFree(isFree: boolean): Promise<void> {
+    await this.xygeniContext.setKey(XYGENI_CONTEXT.LICENSE_FREE, isFree);
+    this.refreshConfigView();
   }
 
   /**
@@ -173,7 +195,7 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     const xygeniToken = await ConfigManager.getXygeniToken(this.context);
 
     this.resetConnectionStatus();
-    this.updateLicenseIdeAvailability(true); // consider a valid license is available by default until not checked
+    this.updateLicenseIdeAvailability(false); // fail-closed: only set to true after checkLicense() confirms a valid seat
 
     if (!xygeniUrl || !xygeniToken) {
       throw new Error('Xygeni API URL and token are required');
@@ -225,6 +247,15 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
   public openProxySettings(): void {
     Logger.log("Opening proxy settings...");
     vscode.commands.executeCommand('workbench.action.openSettings', `@ext:${this.context.extension.id}`);
+  }
+
+  /**
+   * Open the Xygeni pricing page in the default browser so Free-edition users can upgrade
+   * their plan to unlock features such as Auto Scan on Save.
+   */
+  public openUpgradePage(): void {
+    Logger.log(`Opening Xygeni pricing page: ${XYGENI_PRICING_URL}`);
+    vscode.env.openExternal(vscode.Uri.parse(XYGENI_PRICING_URL));
   }
 
   // ============================================================================
@@ -337,10 +368,15 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
   }
 
   /**
-   * Run Xygeni Scanner 
-   * @returns 
+   * Run Xygeni Scanner
+   * @returns
    */
   public async runScanner(): Promise<void> {
+    if (!this.isLicenseAvailable()) {
+      Logger.log('Xygeni IDE License is not available. Scan aborted.');
+      vscode.window.showWarningMessage('Xygeni IDE License is not available. Please contact your administrator.');
+      return;
+    }
     const scanner = XygeniScannerService.getInstance();
     if (scanner.isScannerRunning()) {
       vscode.window.showInformationMessage('Scanner already running...');
@@ -358,6 +394,47 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     } catch (error) {
       Logger.error(error, "Error running scanner");
       this.noIssuesAvailable();
+    }
+  }
+
+  /**
+   * Toggle auto-scan on save setting
+   */
+  public async toggleAutoScan(): Promise<void> {
+    const newValue = await ConfigManager.toggleAutoScan();
+    this.refreshAllViews();
+  }
+
+  /**
+   * Run Xygeni Scanner in incremental mode (triggered by auto-scan on save)
+   */
+  public async runIncrementalScan(): Promise<void> {
+    if (!this.isLicenseAvailable()) {
+      Logger.log('Xygeni IDE License is not available. Incremental scan skipped.');
+      return;
+    }
+    if (this.isLicenseFree()) {
+      Logger.log('Auto Scan on Save is not available in the Xygeni Free edition. Incremental scan skipped.');
+      return;
+    }
+    const scanner = XygeniScannerService.getInstance();
+    if (scanner.isScannerRunning()) {
+      return;
+    }
+    if (!this.isInstallReady()) {
+      return;
+    }
+    this.initScannerRun();
+
+    const sourceFolder = this.getWorkspaceFolders()[0];
+    if (!sourceFolder) return;
+
+    try {
+      await scanner.runIncrementalAnalysis(sourceFolder, this.getXygeniInstallPath(), this.getScanOutputChannel());
+      this.readIssues();
+      this.refreshAllViews();
+    } catch (error) {
+      Logger.error(error, "Error running incremental scanner");
     }
   }
 
@@ -413,6 +490,14 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
       return true;
     }
     return false;
+  }
+
+  isLicenseAvailable(): boolean {
+    return !!this.xygeniContext.getKey(XYGENI_CONTEXT.LICENSE_IDE_AVAILABLE);
+  }
+
+  isLicenseFree(): boolean {
+    return !!this.xygeniContext.getKey(XYGENI_CONTEXT.LICENSE_FREE);
   }
 
   showMcpSetupView() {
@@ -485,8 +570,11 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     // is a workspace is opened
     this.xygeniContext.setKey(XYGENI_CONTEXT.WORKSPACE_FOUND, !!this.getWorkspaceFolders().length);
 
-    // license not valid until checked
-    this.xygeniContext.setKey(XYGENI_CONTEXT.LICENSE_IDE_AVAILABLE, true); // consider a valid license is available by default until not checked
+    // license not valid until checked (fail-closed)
+    this.xygeniContext.setKey(XYGENI_CONTEXT.LICENSE_IDE_AVAILABLE, false);
+
+    // license type unknown until /license/state responds; default to non-Free
+    this.xygeniContext.setKey(XYGENI_CONTEXT.LICENSE_FREE, false);
 
     // is xygeni config shown
     this.xygeniContext.setKey(XYGENI_CONTEXT.SHOW_CONFIG, false);
@@ -585,6 +673,7 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
 
   setMcpLibraryInstalled(): void {
     this.xygeniContext.setKey(XYGENI_CONTEXT.MCP_LIBRARY_INSTALLED, true);
+    this.refreshAllViews();
   }
 
 
