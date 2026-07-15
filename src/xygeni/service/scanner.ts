@@ -28,14 +28,15 @@ class XygeniScannerService extends EventEmitter {
     readonly timeout = 1800000; // 30 minutes
     readonly output_suffix = '/scanner.report.json';
 
-    readonly run_analysis_args = ['scan', '--run=deps,secrets,misconf,iac,suspectdeps,sast,malware', '-f', 'json', '-o',
+    readonly run_analysis_args = ['scan', '--run=deps,secrets,misconf,iac,suspectdeps,sast,malware,quality', '-f', 'json', '-o',
         XYGENI_SCANNER_REPORT_SUFFIX, '--no-upload', '--include-vulnerabilities'];
 
     readonly run_incremental_analysis_args = ['scan', '--run=secrets,iac,sast,malware', '--incremental', '-f', 'json', '-o',
         XYGENI_SCANNER_REPORT_SUFFIX, '--no-upload', '--include-vulnerabilities'];
 
-    readonly run_rectify_sca_args = ['util', 'rectify', '--sca'];    
+    readonly run_rectify_sca_args = ['util', 'rectify', '--sca'];
     readonly run_rectify_sast_args = ['util', 'rectify', '--sast'];
+    readonly run_rectify_quality_args = ['util', 'rectify', '--quality'];
 
     private scannerRunning = false;
     private cachedJavaHome: string | undefined | null = null; // null = not yet resolved
@@ -205,6 +206,11 @@ class XygeniScannerService extends EventEmitter {
 
     public runRectifySastCommand(filePath: string, detector: string, line: string, xygeniInstallPath: string, output: IOutputChannel): Promise<void> {
         const args = [...this.run_rectify_sast_args, '--file-path', filePath, '--detector', detector, '--line', line];
+        return this.callScanner(xygeniInstallPath, args, output);
+    }
+
+    public runRectifyQualityCommand(filePath: string, detector: string, line: string, xygeniInstallPath: string, output: IOutputChannel): Promise<void> {
+        const args = [...this.run_rectify_quality_args, '--file-path', filePath, '--detector', detector, '--line', line];
         return this.callScanner(xygeniInstallPath, args, output);
     }
 

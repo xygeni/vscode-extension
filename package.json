@@ -72,6 +72,11 @@
           "when": "xygeni:scannerResults && xygeni:workspaceFound"
         },
         {
+          "id": "xygeni.views.quality",
+          "name": "Code Quality",
+          "when": "xygeni:scannerResults && xygeni:workspaceFound"
+        },
+        {
           "id": "xygeni.views.help",
           "name": "Xygeni Docs & Help",
           "type": "webview"

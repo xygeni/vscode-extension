@@ -43,6 +43,8 @@ export class RemediationService {
         return this._previewDiffIacRemediation(issueId, fileUri, xygeniInstallPath, output);
       case 'code_vulnerability':
         return this._previewDiffSastRemediation(issueId, fileUri, xygeniInstallPath, output);
+      case 'quality_issue':
+        return this._previewDiffQualityRemediation(issueId, fileUri, xygeniInstallPath, output);
       case 'sca_vulnerability':
         return this._previewDiffScaRemediation(issueId, fileUri, xygeniInstallPath, output);
       default:
@@ -102,8 +104,42 @@ export class RemediationService {
     }
   }
 
+  private async _previewDiffQualityRemediation(issueId: string, fileUri: string, xygeniInstallPath: string, output: IOutputChannel): Promise<FixData> {
+    try {
+      if (!issueId) return { tempFile: undefined, explanation: undefined };
+      const qualityIssue = this.commands.getIssues().find((i) => i.category === 'quality' && i.id === issueId);
+      if (!qualityIssue) {
+        this.logger.log(`Issue not found: ${issueId}`);
+        return Promise.reject(`Issue not found: ${issueId}`);
+      }
 
-  private async _previewDiffScaRemediation(issueId: string, fileUri: string, xygeniInstallPath: string, output: IOutputChannel): Promise<FixData> {    
+      // generate temp folder and copy file
+      let tempDir = os.tmpdir() + '/' + Math.floor(Math.random() * 10000000);
+      tempDir = tempDir.replace(/\\/g, '/'); // always use linux paths style
+      return this.commands.copyFileToFolder(fileUri, tempDir)
+        .then(
+          async (tempFile) => {
+            // call rectify (Code Quality fix)
+            const scanner = XygeniScannerService.getInstance();
+            await scanner.runRectifyQualityCommand(tempFile, qualityIssue.detector, '' + qualityIssue.beginLine, xygeniInstallPath, output);
+
+            const explanation = "No explanation available";
+            return { tempFile: tempFile, explanation: explanation };
+          }
+        )
+        .catch((error) => {
+          this.logger.log(`Error applying remediation on file ${fileUri}: ${error}`);
+          throw error;
+        });
+
+    } catch (error) {
+      this.logger.log(`Error applying remediation: ${error}`);
+      throw error;
+    }
+  }
+
+
+  private async _previewDiffScaRemediation(issueId: string, fileUri: string, xygeniInstallPath: string, output: IOutputChannel): Promise<FixData> {
     try {
             
       // get Dependency
