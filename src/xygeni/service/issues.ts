@@ -421,10 +421,10 @@ export default class IssuesService {
   }
 
   processQualityReport(jsonRaw: any): void {
-    // NOTE: the exact top-level key must be confirmed against a real quality.<suffix>.json.
-    // Code Quality reuses the SAST scanner infra (QualityScanConfigLoader -> SastScanConfig),
-    // so findings are expected under `vulnerabilities`; fall back to other likely keys defensively.
-    const rawItems = jsonRaw.vulnerabilities ?? jsonRaw.qualityIssues ?? jsonRaw.issues ?? jsonRaw.findings ?? [];
+    // Top-level key CONFIRMED against a real quality.<suffix>.json (Code Quality reuses the
+    // SAST scanner infra → findings live under `vulnerabilities`). See the fixture-backed test
+    // in src/test/unit/issues.test.ts. Keep one narrow fallback for forward-compat only.
+    const rawItems = jsonRaw.vulnerabilities ?? jsonRaw.qualityIssues ?? [];
     const quality_items = Array.isArray(rawItems) ? rawItems : [rawItems];
     const tool = jsonRaw.metadata?.reportProperties?.['tool.name'];
 
@@ -440,7 +440,10 @@ export default class IssuesService {
         confidence: raw.confidence ? raw.confidence as 'highest' | 'high' | 'medium' | 'low' : 'high',
         category: 'quality',
         categoryName: 'Quality',
-        qualityCategory: raw.properties?.category ?? raw.category,
+        // Real reports carry the quality dimension in `kind` (e.g. "reliability",
+        // "maintainability", "security"); `category`/`properties.category` are only
+        // present in older/other shapes → keep them as fallbacks.
+        qualityCategory: raw.category ?? raw.properties?.category ?? raw.kind,
         file: raw.location ? raw.location.filepath ? raw.location.filepath : '' : '',
         beginLine: raw.location ? raw.location.beginLine ? raw.location.beginLine : 0 : 0,
         endLine: raw.location ? raw.location.endLine ? raw.location.endLine : 0 : 0,
