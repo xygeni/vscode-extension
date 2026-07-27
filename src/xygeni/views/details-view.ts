@@ -146,6 +146,14 @@ export class DetailsView {
             status: "UPDATE_DETECTOR_DOC_FUNCTION",
             details: details
           });
+        }).catch(() => {
+          // Detector doc not available (e.g. no doc published for this detector,
+          // typical for quality detectors) — degrade gracefully instead of leaving
+          // the panel stuck on "Loading...".
+          this.panel?.webview.postMessage({
+            status: "UPDATE_DETECTOR_DOC_FUNCTION",
+            details: ''
+          });
         });
       });
     }

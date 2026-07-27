@@ -8,11 +8,11 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
   type: string;
   detector: string;
   tool: string;
-  kind: 'secret' | 'misconfiguration' | 'iac_flaw' | 'code_vulnerability' | 'sca_vulnerability';
+  kind: 'secret' | 'misconfiguration' | 'iac_flaw' | 'code_vulnerability' | 'sca_vulnerability' | 'quality_issue';
   severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
   confidence: 'highest' | 'high' | 'medium' | 'low';
-  category: 'secrets' | 'misconf' | 'iac' | 'sast' | 'sca';
-  categoryName: 'Secret' | 'Misconfiguration' | 'IaC' | 'SAST' | 'Vulnerability';
+  category: 'secrets' | 'misconf' | 'iac' | 'sast' | 'sca' | 'quality';
+  categoryName: 'Secret' | 'Misconfiguration' | 'IaC' | 'SAST' | 'Vulnerability' | 'Quality';
   file?: string;
   beginLine: number;
   endLine: number;
@@ -269,9 +269,9 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
   }
 
   public getDetectorDetails(doc: any): string {
-    return `      
+    return `
     ${doc.descriptionDoc ? "<p> " + MarkdownParser.parse(doc.descriptionDoc) + "</p>" : ''}
-    <p><a href="${doc.linkDocumentation}" target="_blank">Link to documentation</a></p>
+    <p>${doc.linkDocumentation ? `<a href="${doc.linkDocumentation}" target="_blank">Link to documentation</a>` : 'No link available'}</p>
     `;
   }
 

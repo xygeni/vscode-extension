@@ -4,6 +4,7 @@ import { IacXygeniIssue } from './iac-issue';
 import { MisconfXygeniIssue } from './misconf-issue';
 import { SastXygeniIssue } from './sast-issue';
 import { SecretsXygeniIssue } from './secrets-issue';
+import { QualityXygeniIssue } from './quality-issue';
 import { VulnXygeniIssue } from './vuln-issue';
 import { XygeniIssue } from '../common/interfaces';
 
@@ -97,6 +98,7 @@ export default class IssuesService {
     await this.readReportSafely('sast', `sast.${suffix}`, f => this.readSastReport(f));
     await this.readReportSafely('iac', `iac.${suffix}`, f => this.readIacReport(f));
     await this.readReportSafely('deps', `deps.${suffix}`, f => this.readDepsReport(f));
+    await this.readReportSafely('quality', `quality.${suffix}`, f => this.readQualityReport(f));
 
     // sort issues by severity
     this.issues.sort((a, b) => {
@@ -397,6 +399,63 @@ export default class IssuesService {
             })),
         })) ?? [],
         vulnerabilityRaw: raw_vuln,
+      });
+      this.issues.push(issue);
+    });
+  }
+
+  public async readQualityReport(filename: string): Promise<void> {
+    if (!(await this.commands.fileExists(filename))) {
+      //this.logger.log(`Quality report file ${filename} does not exist, skipping...`);
+      return;
+    }
+
+    try {
+      const data = await this.commands.readFile(filename);
+      const rawData = JSON.parse(data);
+      this.processQualityReport(rawData);
+    } catch (error) {
+      this.logger.error(error, 'Error reading quality output:');
+      throw error;
+    }
+  }
+
+  processQualityReport(jsonRaw: any): void {
+    // Top-level key CONFIRMED against a real quality.<suffix>.json (Code Quality reuses the
+    // SAST scanner infra → findings live under `vulnerabilities`). See the fixture-backed test
+    // in src/test/unit/issues.test.ts. Keep one narrow fallback for forward-compat only.
+    const rawItems = jsonRaw.vulnerabilities ?? jsonRaw.qualityIssues ?? [];
+    const quality_items = Array.isArray(rawItems) ? rawItems : [rawItems];
+    const tool = jsonRaw.metadata?.reportProperties?.['tool.name'];
+
+    quality_items.forEach((raw: any) => {
+      if (!raw) { return; }
+      const issue = new QualityXygeniIssue({
+        id: raw.issueId,
+        type: raw.kind ?? raw.type ?? raw.ruleId,
+        detector: raw.detector,
+        tool: tool,
+        kind: 'quality_issue',
+        severity: (raw.severity ?? 'info') as 'critical' | 'high' | 'medium' | 'low' | 'info',
+        confidence: raw.confidence ? raw.confidence as 'highest' | 'high' | 'medium' | 'low' : 'high',
+        category: 'quality',
+        categoryName: 'Quality',
+        // Real reports carry the quality dimension in `kind` (e.g. "reliability",
+        // "maintainability", "security"); `category`/`properties.category` are only
+        // present in older/other shapes → keep them as fallbacks.
+        qualityCategory: raw.category ?? raw.properties?.category ?? raw.kind,
+        file: raw.location ? raw.location.filepath ? raw.location.filepath : '' : '',
+        beginLine: raw.location ? raw.location.beginLine ? raw.location.beginLine : 0 : 0,
+        endLine: raw.location ? raw.location.endLine ? raw.location.endLine : 0 : 0,
+        beginColumn: raw.location ? raw.location.beginColumn ? raw.location.beginColumn : 0 : 0,
+        endColumn: raw.location ? raw.location.endColumn ? raw.location.endColumn : 0 : 0,
+        code: raw.location ? raw.location.code ? raw.location.code : '' : '',
+        explanation: raw.explanation ?? raw.message ?? '',
+        url: raw.url ? raw.url : '',
+        tags: raw.tags?.length > 0 ? raw.tags : undefined,
+        branch: jsonRaw.currentBranch ? jsonRaw.currentBranch : '',
+        language: raw.language,
+        remediableLevel: 'AUTO' // quality AI-fix via scanner 'util rectify --quality'
       });
       this.issues.push(issue);
     });

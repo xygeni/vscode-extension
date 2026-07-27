@@ -1,0 +1,307 @@
+{
+  "metadata" : {
+    "uuid" : "ff920f09-861c-4df8-b1cb-d73722ee758e",
+    "timestamp" : "2026-07-20T13:51:50.460404Z",
+    "projectName" : "xygeni-fixture",
+    "directory" : "/Users/enriqueperezherrero/Desktop/test projects/xygeni-fixture",
+    "developerHashes" : [ ],
+    "effectiveScanMode" : "FULL",
+    "sourceType" : "REPO",
+    "scanType" : "quality",
+    "scm" : {
+      "kind" : "unknown",
+      "branch" : "unknown",
+      "visibility" : "unknown"
+    },
+    "reportProperties" : {
+      "os.release" : "Mac OS X 15.5 x86_64",
+      "tool.url" : "https://docs.xygeni.io",
+      "tool.version" : "6.14.0",
+      "tool.name" : "Xygeni"
+    },
+    "incrementalMode" : false,
+    "diffMode" : false,
+    "baseline" : false,
+    "format" : "quality-xygeni"
+  },
+  "rules" : [ ],
+  "vulnerabilities" : [ {
+    "detector" : "javascript.strict_equals",
+    "kind" : "reliability",
+    "severity" : "high",
+    "location" : {
+      "filepath" : "quality/smells.js",
+      "beginLine" : 5,
+      "endLine" : 5,
+      "code" : "value == NaN",
+      "beginColumn" : 7,
+      "endColumn" : 18
+    },
+    "remediationComplexity" : "trivial",
+    "remediationRisk" : "low",
+    "remediationEffort" : "low",
+    "language" : "javascript",
+    "confidence" : "high",
+    "cwes" : [ ],
+    "tags" : [ "best-practice", "in-app-code", "reliability" ],
+    "uniqueHash" : "xo5z7LWmw+DJjegYqcItxQ",
+    "cwe" : 0,
+    "issueId" : "SAS.reliability.javascript.strict_equals.quality/smells.js.5",
+    "explanation" : "Loose equality (== / !=) used outside the x == null idiom"
+  }, {
+    "detector" : "javascript.unused_method_parameter",
+    "kind" : "code_smell",
+    "severity" : "low",
+    "location" : {
+      "filepath" : "sast/vulns.js",
+      "beginLine" : 7,
+      "endLine" : 7,
+      "code" : "res",
+      "beginColumn" : 24,
+      "endColumn" : 26
+    },
+    "remediationComplexity" : "medium",
+    "remediationRisk" : "low",
+    "remediationEffort" : "medium",
+    "language" : "javascript",
+    "confidence" : "high",
+    "cwes" : [ ],
+    "tags" : [ "code-style", "dead-code", "in-app-code" ],
+    "uniqueHash" : "mLNkLUVxg4K0qSbbXM0I1A",
+    "cwe" : 0,
+    "issueId" : "SAS.code_smell.javascript.unused_method_parameter.sast/vulns.js.7",
+    "explanation" : "Function/method parameter is never referenced in the body"
+  }, {
+    "detector" : "javascript.unused_method_parameter",
+    "kind" : "code_smell",
+    "severity" : "low",
+    "location" : {
+      "filepath" : "sast/vulns.js",
+      "beginLine" : 10,
+      "endLine" : 10,
+      "code" : "res",
+      "beginColumn" : 24,
+      "endColumn" : 26
+    },
+    "remediationComplexity" : "medium",
+    "remediationRisk" : "low",
+    "remediationEffort" : "medium",
+    "language" : "javascript",
+    "confidence" : "high",
+    "cwes" : [ ],
+    "tags" : [ "code-style", "dead-code", "in-app-code" ],
+    "uniqueHash" : "mLNkLUVxg4K0qSbbXM0I1A",
+    "cwe" : 0,
+    "issueId" : "SAS.code_smell.javascript.unused_method_parameter.sast/vulns.js.10",
+    "explanation" : "Function/method parameter is never referenced in the body"
+  }, {
+    "detector" : "javascript.unsafe_negation",
+    "kind" : "reliability",
+    "severity" : "high",
+    "location" : {
+      "filepath" : "quality/smells.js",
+      "beginLine" : 9,
+      "endLine" : 9,
+      "code" : "!a in b",
+      "beginColumn" : 28,
+      "endColumn" : 34
+    },
+    "remediationComplexity" : "trivial",
+    "remediationRisk" : "low",
+    "remediationEffort" : "low",
+    "language" : "javascript",
+    "confidence" : "high",
+    "cwes" : [ ],
+    "tags" : [ "in-app-code", "reliability", "suspicious-comparison" ],
+    "uniqueHash" : "rpIWWZZiLfCg4npbtQXfbA",
+    "cwe" : 0,
+    "issueId" : "SAS.reliability.javascript.unsafe_negation.quality/smells.js.9",
+    "explanation" : "!a in b or !a instanceof b binds the bang too tightly"
+  }, {
+    "detector" : "javascript.prefer_const",
+    "kind" : "best_practice",
+    "severity" : "info",
+    "location" : {
+      "filepath" : "quality/smells.js",
+      "beginLine" : 3,
+      "endLine" : 3,
+      "code" : "appName = \"fixture\"",
+      "beginColumn" : 5,
+      "endColumn" : 23
+    },
+    "remediationComplexity" : "auto_fix",
+    "remediationRisk" : "low",
+    "remediationEffort" : "low",
+    "language" : "javascript",
+    "confidence" : "high",
+    "cwes" : [ ],
+    "tags" : [ "best-practice", "in-app-code", "modernization" ],
+    "uniqueHash" : "A9qHMzoEWOuCp8YMcX+mRg",
+    "cwe" : 0,
+    "issueId" : "SAS.best_practice.javascript.prefer_const.quality/smells.js.3",
+    "explanation" : "`let` binding is never reassigned — declare it `const`"
+  }, {
+    "detector" : "javascript.unused_local_variable",
+    "kind" : "code_smell",
+    "severity" : "low",
+    "location" : {
+      "filepath" : "quality/smells.js",
+      "beginLine" : 6,
+      "endLine" : 6,
+      "code" : "temp = value * 2",
+      "beginColumn" : 7,
+      "endColumn" : 22
+    },
+    "remediationComplexity" : "trivial",
+    "remediationRisk" : "low",
+    "remediationEffort" : "low",
+    "language" : "javascript",
+    "confidence" : "high",
+    "cwes" : [ ],
+    "tags" : [ "code-style", "dead-code", "in-app-code" ],
+    "uniqueHash" : "QSDFhlXD1RK/JHi7YOaMVg",
+    "cwe" : 0,
+    "issueId" : "SAS.code_smell.javascript.unused_local_variable.quality/smells.js.6",
+    "explanation" : "Local var/let/const declaration is never referenced"
+  }, {
+    "detector" : "javascript.test_nan_equality",
+    "kind" : "reliability",
+    "severity" : "high",
+    "location" : {
+      "filepath" : "quality/smells.js",
+      "beginLine" : 5,
+      "endLine" : 5,
+      "code" : "value == NaN",
+      "beginColumn" : 7,
+      "endColumn" : 18
+    },
+    "remediationComplexity" : "trivial",
+    "remediationRisk" : "low",
+    "remediationEffort" : "low",
+    "language" : "javascript",
+    "confidence" : "high",
+    "cwes" : [ ],
+    "tags" : [ "in-app-code", "reliability", "suspicious-comparison" ],
+    "uniqueHash" : "/8KZPd/Xr1bLwvJfG+4slA",
+    "cwe" : 0,
+    "issueId" : "SAS.reliability.javascript.test_nan_equality.quality/smells.js.5",
+    "explanation" : "Equality comparison against NaN"
+  }, {
+    "detector" : "javascript.no_var",
+    "kind" : "code_smell",
+    "severity" : "info",
+    "location" : {
+      "filepath" : "quality/smells.js",
+      "beginLine" : 2,
+      "endLine" : 2,
+      "code" : "var counter = 0;",
+      "beginColumn" : 1,
+      "endColumn" : 16
+    },
+    "remediationComplexity" : "trivial",
+    "remediationRisk" : "low",
+    "remediationEffort" : "low",
+    "language" : "javascript",
+    "confidence" : "high",
+    "cwes" : [ ],
+    "tags" : [ "code-smell", "in-app-code", "modern-js" ],
+    "uniqueHash" : "h71ZQsagGZ2PSBwIPNZK1g",
+    "cwe" : 0,
+    "issueId" : "SAS.code_smell.javascript.no_var.quality/smells.js.2",
+    "explanation" : "`var` declaration — use `let` or `const` instead"
+  }, {
+    "detector" : "javascript.no_var",
+    "kind" : "code_smell",
+    "severity" : "info",
+    "location" : {
+      "filepath" : "quality/smells.js",
+      "beginLine" : 6,
+      "endLine" : 6,
+      "code" : "var temp = value * 2;",
+      "beginColumn" : 3,
+      "endColumn" : 23
+    },
+    "remediationComplexity" : "trivial",
+    "remediationRisk" : "low",
+    "remediationEffort" : "low",
+    "language" : "javascript",
+    "confidence" : "high",
+    "cwes" : [ ],
+    "tags" : [ "code-smell", "in-app-code", "modern-js" ],
+    "uniqueHash" : "2F5q307X60PL5o4twqt3qQ",
+    "cwe" : 0,
+    "issueId" : "SAS.code_smell.javascript.no_var.quality/smells.js.6",
+    "explanation" : "`var` declaration — use `let` or `const` instead"
+  }, {
+    "detector" : "javascript.commented_out_code",
+    "kind" : "code_smell",
+    "severity" : "low",
+    "location" : {
+      "filepath" : "sast/vulns.js",
+      "beginLine" : 15,
+      "endLine" : 15,
+      "code" : "// [sast] Weak hashing algorithm MD5 (MEDIUM)"
+    },
+    "remediationComplexity" : "medium",
+    "remediationRisk" : "low",
+    "remediationEffort" : "medium",
+    "language" : "javascript",
+    "confidence" : "high",
+    "cwes" : [ ],
+    "tags" : [ "code-style", "in-app-code" ],
+    "uniqueHash" : "9McA6i3eUyL2uIwxP3CtVQ",
+    "cwe" : 0,
+    "issueId" : "SAS.code_smell.javascript.commented_out_code.sast/vulns.js.15",
+    "explanation" : "Block of commented-out code detected"
+  } ],
+  "statistics" : {
+    "files" : 3,
+    "vulnerabilities" : 10,
+    "filesByKind" : {
+      "javascript" : 2,
+      "python" : 1
+    },
+    "vulnerabilitiesByKind" : {
+      "code_smell" : 6,
+      "reliability" : 3,
+      "best_practice" : 1
+    },
+    "vulnerabilitiesByDetector" : {
+      "javascript.no_var" : 2,
+      "javascript.unused_method_parameter" : 2,
+      "javascript.strict_equals" : 1,
+      "javascript.test_nan_equality" : 1,
+      "javascript.commented_out_code" : 1,
+      "javascript.prefer_const" : 1,
+      "javascript.unsafe_negation" : 1,
+      "javascript.unused_local_variable" : 1
+    },
+    "vulnerabilitiesBySeverity" : {
+      "low" : 4,
+      "high" : 3,
+      "info" : 3
+    },
+    "vulnerabilitiesByRemediationComplexity" : {
+      "trivial" : 6,
+      "medium" : 3,
+      "auto_fix" : 1
+    },
+    "vulnerabilitiesByRemediationRisk" : {
+      "low" : 10
+    },
+    "vulnerabilitiesByRemediationEffort" : {
+      "low" : 7,
+      "medium" : 3
+    },
+    "elapsedTime" : 1.410143045,
+    "linesScanned" : 0,
+    "detectors" : 1309
+  },
+  "errors" : [ ],
+  "issuesAssetMapping" : {
+    "links" : { },
+    "userLinks" : { }
+  },
+  "properties" : { },
+  "currentBranch" : "unknown"
+}
