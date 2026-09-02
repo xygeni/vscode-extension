@@ -77,6 +77,24 @@
           "when": "xygeni:scannerResults && xygeni:workspaceFound"
         },
         {
+
+          "id": "xygeni.views.apisec",
+
+          "name": "API Security",
+
+          "when": "xygeni:scannerResults && xygeni:workspaceFound"
+
+        },
+        {
+
+          "id": "xygeni.views.ai",
+
+          "name": "AI Security",
+
+          "when": "xygeni:scannerResults && xygeni:workspaceFound"
+
+        },
+        {
           "id": "xygeni.views.help",
           "name": "Xygeni Docs & Help",
           "type": "webview"
