@@ -1,7 +1,7 @@
 {
   "name": "xygeni-scanner-vscode",
   "displayName": "Xygeni Security for VSCode",
-  "description": "Secure your codebase with Secrets, SAST, SCA, IaC & Supply Chain scanning",
+  "description": "Secure your codebase with Secrets, SAST, SCA, IaC, Code Quality, API Security, AI Security & Supply Chain scanning",
   "publisher": "xygeni-security",
   "license": "MIT",
   "repository": {
@@ -9,7 +9,7 @@
     "url": "https://github.com/xygeni/vscode-extension"
   },
   "icon": "media/images/logo_xy.png",
-  "version": "1.2.9",
+  "version": "1.2.10",
   "engines": {
     "vscode": "^1.99.2"
   },
@@ -75,6 +75,24 @@
           "id": "xygeni.views.quality",
           "name": "Code Quality",
           "when": "xygeni:scannerResults && xygeni:workspaceFound"
+        },
+        {
+
+          "id": "xygeni.views.apisec",
+
+          "name": "API Security",
+
+          "when": "xygeni:scannerResults && xygeni:workspaceFound"
+
+        },
+        {
+
+          "id": "xygeni.views.ai",
+
+          "name": "AI Security",
+
+          "when": "xygeni:scannerResults && xygeni:workspaceFound"
+
         },
         {
           "id": "xygeni.views.help",

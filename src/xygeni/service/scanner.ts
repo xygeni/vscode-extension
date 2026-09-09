@@ -19,7 +19,7 @@ import { ProxyConfigManager } from '../config/proxy-configuration';
      * Allow only one scanner running at a time.
      * Issues reports are persisted in workspace storage.
      * Scanner command (no report is uploaded, generate issues reports in json format at working directory):
-     *   scan --run=deps,secrets,misconf,iac,suspectdeps,sast -f json -o <reportOutputPath> -d <sourceFolder> --no-upload
+     *   scan --run=deps,secrets,misconf,iac,suspectdeps,sast,malware,quality,apisec,ai -f json -o <reportOutputPath> -d <sourceFolder> --no-upload
      */
 class XygeniScannerService extends EventEmitter {
 
@@ -28,7 +28,7 @@ class XygeniScannerService extends EventEmitter {
     readonly timeout = 1800000; // 30 minutes
     readonly output_suffix = '/scanner.report.json';
 
-    readonly run_analysis_args = ['scan', '--run=deps,secrets,misconf,iac,suspectdeps,sast,malware,quality', '-f', 'json', '-o',
+    readonly run_analysis_args = ['scan', '--run=deps,secrets,misconf,iac,suspectdeps,sast,malware,quality,apisec,ai', '-f', 'json', '-o',
         XYGENI_SCANNER_REPORT_SUFFIX, '--no-upload', '--include-vulnerabilities'];
 
     readonly run_incremental_analysis_args = ['scan', '--run=secrets,iac,sast,malware', '--incremental', '-f', 'json', '-o',
