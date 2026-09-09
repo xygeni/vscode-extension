@@ -9,7 +9,7 @@
     "url": "https://github.com/xygeni/vscode-extension"
   },
   "icon": "media/images/logo_xy.png",
-  "version": "1.2.5",
+  "version": "1.2.9",
   "engines": {
     "vscode": "^1.99.2"
   },
@@ -69,6 +69,11 @@
         {
           "id": "xygeni.views.iac",
           "name": "IaC",
+          "when": "xygeni:scannerResults && xygeni:workspaceFound"
+        },
+        {
+          "id": "xygeni.views.quality",
+          "name": "Code Quality",
           "when": "xygeni:scannerResults && xygeni:workspaceFound"
         },
         {
@@ -268,6 +273,19 @@
             "description": "A bar-separated (|) list of hostnames that should bypass the proxy."
           }
         }
+      },
+      {
+        "order": 3,
+        "id": "scan",
+        "title": "Scan Settings",
+        "properties": {
+          "xygeni.scan.autoScan": {
+            "order": 1,
+            "type": "boolean",
+            "default": false,
+            "description": "Automatically run an incremental scan when a file is saved."
+          }
+        }
       }
     ]
   },
@@ -300,18 +318,16 @@
     "@typescript-eslint/parser": "^8.31.1",
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.5.2",
-    "esbuild": "^0.25.3",
-    "eslint": "^9.25.1",
-    "mocha": "^11.7.1",
-    "npm-run-all": "^4.1.5",
-    "sinon": "^21.0.0",
-    "typescript": "^5.8.3"
+    "esbuild": "0.25.3",
+    "eslint": "9.25.1",
+    "mocha": "11.7.1",
+    "sinon": "21.0.0",
+    "typescript": "5.8.3"
   },
   "dependencies": {
-    "axios": "1.11.0",
     "https-proxy-agent": "7.0.6",
-    "lodash": "4.17.21",
+    "lodash": "4.18.0",
     "marked": "16.2.1",
-    "yauzl": "^3.2.0"
+    "yauzl": "3.2.1"
   }
 }

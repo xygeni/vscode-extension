@@ -34,6 +34,11 @@ export const COMMAND_SHOW_OUTPUT = 'xygeni.showOutput';
 export const COMMAND_SHOW_SCAN_OUTPUT = 'xygeni.showScanOutput';
 
 export const COMMAND_OPEN_PROXY_CONFIG = 'xygeni.openProxyConfig';
+export const COMMAND_TOGGLE_AUTO_SCAN = 'xygeni.scan.toggleAutoScan';
+export const COMMAND_UPGRADE_LICENSE = 'xygeni.license.upgrade';
+
+// external links
+export const XYGENI_PRICING_URL = 'https://xygeni.io/pricing/';
 
 // configurations
 export const CONFIG_XYGENI_API_URL = 'xygeni.api.xygeniUrl';
@@ -43,6 +48,7 @@ export const XYGENI_CONTEXT = {
     API_ERROR: 'apiError',
     WORKSPACE_FOUND: 'workspaceFound',
     LICENSE_IDE_AVAILABLE: 'licenseIdeAvailable',
+    LICENSE_FREE: 'licenseFree',
     SHOW_CONFIG: 'showConfig',
     CONNECTION_READY: 'connectionReady',
     CONNECTING: 'connecting',
@@ -64,4 +70,5 @@ export const STATUS = {
 export const ISSUE_DETAILS_REMEDIATE_FUNCTION = "runRemediation";
 export const ISSUE_DETAILS_SAST_REMEDIATE_FUNCTION = "runSASTRemediation";
 export const ISSUE_DETAILS_SAVE_FUNCTION = "runSaveRemediation";
+export const ISSUE_DETAILS_EXPLAIN_FUNCTION = "explainIssue";
 

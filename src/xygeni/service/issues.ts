@@ -4,6 +4,7 @@ import { IacXygeniIssue } from './iac-issue';
 import { MisconfXygeniIssue } from './misconf-issue';
 import { SastXygeniIssue } from './sast-issue';
 import { SecretsXygeniIssue } from './secrets-issue';
+import { QualityXygeniIssue } from './quality-issue';
 import { VulnXygeniIssue } from './vuln-issue';
 import { XygeniIssue } from '../common/interfaces';
 
@@ -89,28 +90,32 @@ export default class IssuesService {
 
 
   public async readScannerOutput(suffix: string): Promise<void> {
+    // Read each domain report independently. A failure in one domain (a missing, partial or
+    // corrupt report — e.g. when an analyzer such as misconf timed out) must NOT prevent the
+    // remaining domains from being read and rendered. See xygeni/product-backlog#835.
+    await this.readReportSafely('secrets', `secrets.${suffix}`, f => this.readSecretsReport(f));
+    await this.readReportSafely('misconf', `misconf.${suffix}`, f => this.readMisconfReport(f));
+    await this.readReportSafely('sast', `sast.${suffix}`, f => this.readSastReport(f));
+    await this.readReportSafely('iac', `iac.${suffix}`, f => this.readIacReport(f));
+    await this.readReportSafely('deps', `deps.${suffix}`, f => this.readDepsReport(f));
+    await this.readReportSafely('quality', `quality.${suffix}`, f => this.readQualityReport(f));
+
+    // sort issues by severity
+    this.issues.sort((a, b) => {
+      return a.getSeverityLevel() - b.getSeverityLevel();
+    });
+  }
+
+  /**
+   * Reads a single domain report isolating its failures: any error is logged and swallowed so
+   * the other domains are still read. Without this, a corrupt/partial report from one analyzer
+   * (typically after a timeout) would hide the findings of every other analyzer.
+   */
+  private async readReportSafely(domain: string, filename: string, read: (filename: string) => Promise<void>): Promise<void> {
     try {
-      // read secrets
-      await this.readSecretsReport(`secrets.${suffix}`);
-
-      // read misconf
-      await this.readMisconfReport(`misconf.${suffix}`);
-
-      // read sast
-      await this.readSastReport(`sast.${suffix}`);
-
-      await this.readIacReport(`iac.${suffix}`);
-
-      await this.readDepsReport(`deps.${suffix}`);
-
-      // sort issues by severity
-      this.issues.sort((a, b) => {
-        return a.getSeverityLevel() - b.getSeverityLevel();
-      });
-
+      await read(filename);
     } catch (error) {
-      this.logger.error(error, 'Error reading scanner output:');
-      throw error;
+      this.logger.error(error, `Error reading ${domain} report (${filename}), skipping this domain`);
     }
   }
 
@@ -199,7 +204,7 @@ export default class IssuesService {
 
   async processDepsReport(jsonRaw: any): Promise<void> {
     const dependencies = Array.isArray(jsonRaw.dependencies) ? jsonRaw.dependencies : [jsonRaw.dependencies];
-    const tool = jsonRaw.metadata.reportProperties['tool.name'];
+    const tool = jsonRaw.metadata?.reportProperties?.['tool.name'];
 
     this.processVulnInDepsReport(dependencies, tool);
 
@@ -309,7 +314,7 @@ export default class IssuesService {
 
   processSecretsReport(jsonRaw: any): void {
     const secrets = Array.isArray(jsonRaw.secrets) ? jsonRaw.secrets : [jsonRaw.secrets];
-    const tool = jsonRaw.metadata.reportProperties['tool.name'];
+    const tool = jsonRaw.metadata?.reportProperties?.['tool.name'];
 
     secrets.forEach((rawSecret: any) => {
       const issue = new SecretsXygeniIssue({
@@ -348,7 +353,7 @@ export default class IssuesService {
 
   processSastReport(jsonRaw: any): void {
     const sast_vuln = Array.isArray(jsonRaw.vulnerabilities) ? jsonRaw.vulnerabilities : [jsonRaw.vulnerabilities];
-    const tool = jsonRaw.metadata.reportProperties['tool.name'];
+    const tool = jsonRaw.metadata?.reportProperties?.['tool.name'];
 
     sast_vuln.forEach((raw_vuln: any) => {
       const issue = new SastXygeniIssue({
@@ -393,6 +398,64 @@ export default class IssuesService {
               category: frame.category
             })),
         })) ?? [],
+        vulnerabilityRaw: raw_vuln,
+      });
+      this.issues.push(issue);
+    });
+  }
+
+  public async readQualityReport(filename: string): Promise<void> {
+    if (!(await this.commands.fileExists(filename))) {
+      //this.logger.log(`Quality report file ${filename} does not exist, skipping...`);
+      return;
+    }
+
+    try {
+      const data = await this.commands.readFile(filename);
+      const rawData = JSON.parse(data);
+      this.processQualityReport(rawData);
+    } catch (error) {
+      this.logger.error(error, 'Error reading quality output:');
+      throw error;
+    }
+  }
+
+  processQualityReport(jsonRaw: any): void {
+    // Top-level key CONFIRMED against a real quality.<suffix>.json (Code Quality reuses the
+    // SAST scanner infra → findings live under `vulnerabilities`). See the fixture-backed test
+    // in src/test/unit/issues.test.ts. Keep one narrow fallback for forward-compat only.
+    const rawItems = jsonRaw.vulnerabilities ?? jsonRaw.qualityIssues ?? [];
+    const quality_items = Array.isArray(rawItems) ? rawItems : [rawItems];
+    const tool = jsonRaw.metadata?.reportProperties?.['tool.name'];
+
+    quality_items.forEach((raw: any) => {
+      if (!raw) { return; }
+      const issue = new QualityXygeniIssue({
+        id: raw.issueId,
+        type: raw.kind ?? raw.type ?? raw.ruleId,
+        detector: raw.detector,
+        tool: tool,
+        kind: 'quality_issue',
+        severity: (raw.severity ?? 'info') as 'critical' | 'high' | 'medium' | 'low' | 'info',
+        confidence: raw.confidence ? raw.confidence as 'highest' | 'high' | 'medium' | 'low' : 'high',
+        category: 'quality',
+        categoryName: 'Quality',
+        // Real reports carry the quality dimension in `kind` (e.g. "reliability",
+        // "maintainability", "security"); `category`/`properties.category` are only
+        // present in older/other shapes → keep them as fallbacks.
+        qualityCategory: raw.category ?? raw.properties?.category ?? raw.kind,
+        file: raw.location ? raw.location.filepath ? raw.location.filepath : '' : '',
+        beginLine: raw.location ? raw.location.beginLine ? raw.location.beginLine : 0 : 0,
+        endLine: raw.location ? raw.location.endLine ? raw.location.endLine : 0 : 0,
+        beginColumn: raw.location ? raw.location.beginColumn ? raw.location.beginColumn : 0 : 0,
+        endColumn: raw.location ? raw.location.endColumn ? raw.location.endColumn : 0 : 0,
+        code: raw.location ? raw.location.code ? raw.location.code : '' : '',
+        explanation: raw.explanation ?? raw.message ?? '',
+        url: raw.url ? raw.url : '',
+        tags: raw.tags?.length > 0 ? raw.tags : undefined,
+        branch: jsonRaw.currentBranch ? jsonRaw.currentBranch : '',
+        language: raw.language,
+        remediableLevel: 'AUTO' // quality AI-fix via scanner 'util rectify --quality'
       });
       this.issues.push(issue);
     });
@@ -401,7 +464,7 @@ export default class IssuesService {
   processMisconfReport(jsonRaw: any): void {
 
     const misconfigurations = Array.isArray(jsonRaw.misconfigurations) ? jsonRaw.misconfigurations : [jsonRaw.misconfigurations];
-    const tool = jsonRaw.metadata.reportProperties['tool.name'];
+    const tool = jsonRaw.metadata?.reportProperties?.['tool.name'];
 
     misconfigurations.forEach((rawMisconf: any) => {
       const issue = new MisconfXygeniIssue({
@@ -435,7 +498,7 @@ export default class IssuesService {
   processIacReport(jsonRaw: any): void {
 
     const flaws = Array.isArray(jsonRaw.flaws) ? jsonRaw.flaws : [jsonRaw.flaws];
-    const tool = jsonRaw.metadata.reportProperties['tool.name'];
+    const tool = jsonRaw.metadata?.reportProperties?.['tool.name'];
 
     flaws.forEach((flaw: any) => {
       const issue = new IacXygeniIssue({

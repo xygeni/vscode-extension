@@ -40,7 +40,7 @@ export abstract class IssueView implements vscode.TreeDataProvider<XygeniTreeIte
 
     private getCategoryNodes(): XygeniCategoryItem[] {
         const allIssues = this.getIssues();
-        const categories: ('iac' | 'sast' | 'sca' | 'secrets' | 'misconf')[] = [this.getCategory()];
+        const categories: ('iac' | 'sast' | 'sca' | 'secrets' | 'misconf' | 'quality')[] = [this.getCategory()];
 
         //Logger.log(`Issues by category ${this.getCategory()}: ${allIssues.length}}`);
         return categories.map(category => {
@@ -101,7 +101,7 @@ export type XygeniTreeItem = XygeniCategoryItem | XygeniIssueItem;
 
 export class XygeniCategoryItem extends vscode.TreeItem {
     constructor(
-        public readonly category: 'secrets' | 'misconf' | 'iac' | 'sast' | 'sca',
+        public readonly category: 'secrets' | 'misconf' | 'iac' | 'sast' | 'sca' | 'quality',
         public readonly issueCount: number,
         private commands: IssueViewEmitter
     ) {
@@ -110,7 +110,8 @@ export class XygeniCategoryItem extends vscode.TreeItem {
             'misconf': 'Misconfigurations',
             'iac': 'Infrastructure as Code',
             'sast': 'Static Analysis',
-            'sca': 'Dependency Analysis'
+            'sca': 'Dependency Analysis',
+            'quality': 'Code Quality'
         };
 
         super(categoryNames[category], vscode.TreeItemCollapsibleState.Expanded);
@@ -124,7 +125,8 @@ export class XygeniCategoryItem extends vscode.TreeItem {
             'misconf': 'misconf.svg',
             'iac': 'iacNew.svg',
             'sast': 'code-sec-new.svg',
-            'sca': 'open-source.svg'
+            'sca': 'open-source.svg',
+            'quality': 'code-quality.svg'
         };
 
         this.iconPath = new vscode.ThemeIcon(categoryIcons[category]);
@@ -200,6 +202,22 @@ export class SecretsIssueView extends IssueView {
 
 export class IaCIssueView extends IssueView {
     private category = 'iac';
+
+    constructor(commands: IssueViewEmitter) {
+        super(commands);
+    }
+
+    getIssues(): XygeniIssue[] {
+        return this.commands.getIssuesByCategory(this.category);
+    }
+
+    getCategory(): string {
+        return this.category;
+    }
+}
+
+export class QualityIssueView extends IssueView {
+    private category = 'quality';
 
     constructor(commands: IssueViewEmitter) {
         super(commands);

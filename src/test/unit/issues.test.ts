@@ -7,6 +7,7 @@ import { readFile } from 'fs';
 
 import { IacXygeniIssue } from '../../xygeni/service/iac-issue';
 import { SastXygeniIssue } from '../../xygeni/service/sast-issue';
+import { QualityXygeniIssue } from '../../xygeni/service/quality-issue';
 
 // Mock Logger class
 class LoggerMock implements ILogger {
@@ -163,5 +164,98 @@ suite('Issues Test Suite', () => {
     assert.strictEqual(firstIssue.beginLine, 25);
     assert.strictEqual(firstIssue.explanation, "Generation of error message containing sensitive information");
 
+  });
+
+  test('processSastReport should still parse vulnerabilities when metadata is missing', () => {
+    // A report whose metadata/reportProperties is absent (e.g. a partial report written when an
+    // analyzer timed out) must NOT throw: the findings should still be parsed. (issue #835)
+    issuesService.clear();
+
+    const malformed = {
+      // `metadata` is intentionally absent
+      vulnerabilities: [
+        { issueId: 'SAS.test.1', kind: 'test', detector: 'd', severity: 'high', location: { filepath: 'a.ts', beginLine: 1 } }
+      ]
+    };
+
+    assert.doesNotThrow(() => issuesService.processSastReport(malformed));
+
+    const parsed = issuesService.getIssues();
+    assert.strictEqual(parsed.length, 1, 'Should parse the vulnerability despite missing metadata');
+    assert.strictEqual(parsed[0].id, 'SAS.test.1');
+    assert.strictEqual(parsed[0].severity, 'high');
+  });
+
+  test('readScannerOutput should keep reading other domains when one report fails', async () => {
+    // A failure reading one domain (e.g. a corrupt misconf report after a timeout) must not
+    // prevent the remaining domains (sast, iac, deps) from being read. (issue #835)
+    issuesService.clear();
+
+    sandbox.stub(issuesService, 'readSecretsReport').resolves();
+    const misconf = sandbox.stub(issuesService, 'readMisconfReport').rejects(new Error('corrupt misconf report'));
+    const sast = sandbox.stub(issuesService, 'readSastReport').resolves();
+    const iac = sandbox.stub(issuesService, 'readIacReport').resolves();
+    const deps = sandbox.stub(issuesService, 'readDepsReport').resolves();
+
+    await issuesService.readScannerOutput('xygeni.xygeni-security');
+
+    assert.ok(misconf.calledOnce, 'misconf read should be attempted');
+    assert.ok(sast.calledOnce, 'sast should still be read after misconf failure');
+    assert.ok(iac.calledOnce, 'iac should still be read after misconf failure');
+    assert.ok(deps.calledOnce, 'deps (SCA) should still be read after misconf failure');
+  });
+
+  test('readQualityReport should parse quality issues from a real report', async () => {
+    const testDataPath = path.join(__dirname, 'issues.test.data', 'quality.output.report.json');
+
+    // reset issues
+    issuesService.clear();
+
+    await issuesService.readQualityReport(testDataPath);
+
+    const parsedIssues = issuesService.getIssuesByCategory('quality');
+
+    // The real report keeps findings under `vulnerabilities` (10 items) — the
+    // primary key must resolve, NOT the fallback (else this would be 0).
+    assert.strictEqual(parsedIssues.length, 10, 'Should parse 10 quality issues from `vulnerabilities`');
+
+    const first = parsedIssues[0] as QualityXygeniIssue;
+    assert.strictEqual(first.id, 'SAS.reliability.javascript.strict_equals.quality/smells.js.5');
+    assert.strictEqual(first.category, 'quality');
+    assert.strictEqual(first.kind, 'quality_issue');
+    assert.strictEqual(first.type, 'reliability');
+    assert.strictEqual(first.qualityCategory, 'reliability');
+    assert.strictEqual(first.detector, 'javascript.strict_equals');
+    assert.strictEqual(first.severity, 'high');
+    assert.strictEqual(first.file, 'quality/smells.js');
+    // Lines are exposed 0-based for VS Code (AbstractXygeniIssue applies `raw - 1`),
+    // so the report's beginLine/endLine=5 surface as 4 — this also proves the raw
+    // field was read (not defaulted to 0).
+    assert.strictEqual(first.beginLine, 4);
+    assert.strictEqual(first.endLine, 4);
+    assert.ok(
+      first.explanation && first.explanation.startsWith('Loose equality'),
+      'explanation must be mapped from the real field, not defaulted to ""',
+    );
+    // Guard against silent defaulting of the mapped fields.
+    assert.notStrictEqual(first.file, '', 'file must not default to ""');
+    assert.notStrictEqual(first.beginLine, 0, 'beginLine must not default to 0');
+  });
+
+  test('readQualityReport should yield zero issues (no throw) when the findings key does not match', async () => {
+    // reset issues
+    issuesService.clear();
+
+    // A report whose top-level findings key is none of the known ones must not
+    // throw and must produce zero quality issues (silent-empty is acceptable here,
+    // a crash is not).
+    assert.doesNotThrow(() =>
+      issuesService.processQualityReport({ metadata: {}, somethingElse: [{ issueId: 'x' }] }),
+    );
+    assert.strictEqual(
+      issuesService.getIssuesByCategory('quality').length,
+      0,
+      'unknown findings key → zero quality issues',
+    );
   });
 });

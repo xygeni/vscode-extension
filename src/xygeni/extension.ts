@@ -1,9 +1,11 @@
 import * as vscode from 'vscode';
+// eslint-disable-next-line @typescript-eslint/naming-convention
+import * as _ from 'lodash';
 import ConfigurationView from './views/configuration-view';
 import { ScanView } from './views/scan-view';
-import { IaCIssueView, IssueView, MisconfIssueView, SastIssueView, ScaIssueView, SecretsIssueView } from './views/issue-view';
+import { IaCIssueView, IssueView, MisconfIssueView, QualityIssueView, SastIssueView, ScaIssueView, SecretsIssueView } from './views/issue-view';
 import { HelpView } from './views/help-view';
-import { XYGENI_SHOW_CONFIG_COMMAND, XYGENI_CONTEXT, COMMAND_EDIT_XYGENI_API_URL, COMMAND_EDIT_XYGENI_TOKEN, COMMAND_TEST_XYGENI_CONNECTION, COMMAND_INSTALL_SCANNER, XYGENI_CLOSE_CONFIG_COMMAND, COMMAND_RUN_SCANNER, COMMAND_SHOW_OUTPUT, COMMAND_OPEN_PROXY_CONFIG, COMMAND_SHOW_SCAN_OUTPUT, COMMAND_SHOW_MCP_SETUP } from './common/constants';
+import { XYGENI_SHOW_CONFIG_COMMAND, XYGENI_CONTEXT, COMMAND_EDIT_XYGENI_API_URL, COMMAND_EDIT_XYGENI_TOKEN, COMMAND_TEST_XYGENI_CONNECTION, COMMAND_INSTALL_SCANNER, XYGENI_CLOSE_CONFIG_COMMAND, COMMAND_RUN_SCANNER, COMMAND_SHOW_OUTPUT, COMMAND_OPEN_PROXY_CONFIG, COMMAND_SHOW_SCAN_OUTPUT, COMMAND_SHOW_MCP_SETUP, COMMAND_TOGGLE_AUTO_SCAN, COMMAND_UPGRADE_LICENSE } from './common/constants';
 import { XyContextImpl } from './common/context';
 import InstallerService from './service/installer';
 import { Logger } from './common/logger';
@@ -43,12 +45,19 @@ class XygeniExtension {
     const misconfViewProvider = new MisconfIssueView(commands);
     const secretsViewProvider = new SecretsIssueView(commands);
     const iacViewProvider = new IaCIssueView(commands);
+    const qualityViewProvider = new QualityIssueView(commands);
 
     const issueDecorator = new IssueDecorator();
     const diagnosticProvider = new DiagnosticProvider();
     const remediationDiffProvider = new RemediationDiffContentProvider(xygeniContext, commands);
 
     const licenseService = LicenseService.getInstance(context.extensionPath, Logger, commands);
+
+    const debouncedIncrementalScan = _.debounce(() => {
+      if (ConfigManager.getAutoScan() && !commands.isLicenseFree()) {
+        commands.runIncrementalScan();
+      }
+    }, 1000, { leading: false, trailing: true });
 
     context.subscriptions.push(
       // Register help webview provider
@@ -80,6 +89,9 @@ class XygeniExtension {
       }),
       vscode.window.createTreeView('xygeni.views.iac', {
         treeDataProvider: iacViewProvider
+      }),
+      vscode.window.createTreeView('xygeni.views.quality', {
+        treeDataProvider: qualityViewProvider
       }),
 
       // Commands
@@ -123,6 +135,13 @@ class XygeniExtension {
       vscode.commands.registerCommand(COMMAND_RUN_SCANNER, async () => {
         await commands.runScanner();
       }),
+      vscode.commands.registerCommand(COMMAND_TOGGLE_AUTO_SCAN, async () => {
+        await commands.toggleAutoScan();
+      }),
+
+      vscode.commands.registerCommand(COMMAND_UPGRADE_LICENSE, () => {
+        commands.openUpgradePage();
+      }),
 
       vscode.commands.registerCommand(COMMAND_SHOW_MCP_SETUP, (issue) => {
         commands.showMcpSetupView();
@@ -142,6 +161,18 @@ class XygeniExtension {
       vscode.workspace.onDidOpenTextDocument(() => {
         diagnosticProvider.updateDiagnostics(commands.getIssues());
       }),
+
+      vscode.workspace.onDidSaveTextDocument((document) => {
+        if (document.uri.scheme !== 'file') {
+          return;
+        }
+        if (!vscode.workspace.getWorkspaceFolder(document.uri)) {
+          return;
+        }
+        debouncedIncrementalScan();
+      }),
+
+      { dispose: () => debouncedIncrementalScan.cancel() },
 
       issueDecorator,
       diagnosticProvider,

@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as yauzl from 'yauzl';
 import * as crypto from 'crypto';
+import * as zlib from 'zlib';
 import { spawn } from 'child_process';
 import { ILogger, IOutputChannel, EventEmitter, Commands } from '../common/interfaces';
 import { Platform } from '../common/platform';
@@ -388,7 +389,12 @@ export default class InstallerService {
                             fs.mkdirSync(parentDir, { recursive: true });
                         }
 
-                        zipfile.openReadStream(entry, (err, readStream) => {
+                        // Read the raw (still-compressed) entry with decompress:false and inflate
+                        // it ourselves in memory. yauzl's streaming inflate deadlocks under
+                        // backpressure on large entries on Node >= 24.16 / Electron 42.5+, so we
+                        // must consume the read stream without backpressure (never pausing it)
+                        // and decompress synchronously. See xygeni/product-backlog#4455.
+                        zipfile.openReadStream(entry, { decompress: false, decrypt: null, start: null, end: null }, (err, readStream) => {
                             if (err) {
                                 return reject(err);
                             }
@@ -396,15 +402,19 @@ export default class InstallerService {
                                 return reject(new Error(`Could not read stream for entry: ${entry.fileName}`));
                             }
 
-                            const writeStream = fs.createWriteStream(filePath);
-                            readStream.pipe(writeStream);
-
-                            writeStream.on('finish', () => {
-                                zipfile.readEntry();
-                            });
-
-                            writeStream.on('error', (err) => {
-                                reject(err);
+                            const chunks: Buffer[] = [];
+                            readStream.on('data', (chunk: Buffer) => chunks.push(chunk));
+                            readStream.on('error', (err) => reject(err));
+                            readStream.on('end', () => {
+                                try {
+                                    const raw = Buffer.concat(chunks);
+                                    // compressionMethod 8 = deflate, 0 = stored
+                                    const data = entry.compressionMethod === 8 ? zlib.inflateRawSync(raw) : raw;
+                                    fs.writeFileSync(filePath, data);
+                                    zipfile.readEntry();
+                                } catch (inflateErr) {
+                                    reject(inflateErr);
+                                }
                             });
                         });
                     }
