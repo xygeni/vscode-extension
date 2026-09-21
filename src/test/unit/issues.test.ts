@@ -8,6 +8,8 @@ import { readFile } from 'fs';
 import { IacXygeniIssue } from '../../xygeni/service/iac-issue';
 import { SastXygeniIssue } from '../../xygeni/service/sast-issue';
 import { QualityXygeniIssue } from '../../xygeni/service/quality-issue';
+import { ApisecXygeniIssue } from '../../xygeni/service/apisec-issue';
+import { AiXygeniIssue } from '../../xygeni/service/ai-issue';
 
 // Mock Logger class
 class LoggerMock implements ILogger {
@@ -256,6 +258,143 @@ suite('Issues Test Suite', () => {
       issuesService.getIssuesByCategory('quality').length,
       0,
       'unknown findings key → zero quality issues',
+    );
+  });
+
+  test('readApisecReport should parse API flaws from a real report', async () => {
+    const testDataPath = path.join(__dirname, 'issues.test.data', 'apisec.output.report.json');
+
+    // reset issues
+    issuesService.clear();
+
+    await issuesService.readApisecReport(testDataPath);
+
+    const parsedIssues = issuesService.getIssuesByCategory('apisec');
+
+    // The real report keeps findings under `flaws` (7 items) — NOT `vulnerabilities`,
+    // which is what the SAST-family reports use. Reading the wrong key yields 0.
+    assert.strictEqual(parsedIssues.length, 7, 'Should parse 7 API flaws from `flaws`');
+
+    const first = parsedIssues[0] as ApisecXygeniIssue;
+    assert.strictEqual(first.id, 'API-excessive_data_exposure_python-POST /users/v1/login');
+    assert.strictEqual(first.category, 'apisec');
+    assert.strictEqual(first.kind, 'api_flaw');
+    assert.strictEqual(first.detector, 'excessive_data_exposure_python');
+    assert.strictEqual(first.severity, 'high');
+    // `title` is the human label and wins over the machine `flawType`.
+    assert.ok(
+      first.type && first.type.startsWith('Response DTO returns sensitive fields'),
+      'type must map to the flaw title, not default',
+    );
+    assert.strictEqual(first.endpointMethod, 'POST');
+    assert.strictEqual(first.endpointPath, '/users/v1/login');
+    assert.strictEqual(first.endpoint, 'POST /users/v1/login');
+    assert.deepStrictEqual(first.owaspApiTop10, ['API3:2023']);
+    assert.deepStrictEqual(first.cwes, ['CWE-213', 'CWE-200']);
+    assert.strictEqual(first.branch, 'origin/master');
+    assert.ok(
+      first.explanation && first.explanation.length > 0,
+      'explanation must be mapped from the real field, not defaulted to ""',
+    );
+    assert.ok(first.remediation && first.remediation.length > 0, 'remediation must be mapped');
+  });
+
+  test('readApisecReport tolerates flaws without a location', async () => {
+    const testDataPath = path.join(__dirname, 'issues.test.data', 'apisec.output.report.json');
+
+    // reset issues
+    issuesService.clear();
+
+    await issuesService.readApisecReport(testDataPath);
+
+    // API flaws are endpoint-, module- or service-scoped and carry no `location` in the real
+    // report. That must produce well-formed issues with an empty file (inline diagnostics skip
+    // them by design) rather than crashing or dropping the finding.
+    const parsedIssues = issuesService.getIssuesByCategory('apisec') as ApisecXygeniIssue[];
+    assert.ok(parsedIssues.every((issue) => issue.file === ''), 'no location → empty file');
+    assert.ok(parsedIssues.every((issue) => issue.beginLine === 0), 'no location → line 0');
+    // A module-scoped flaw (no endpoint) must still be listed.
+    assert.ok(
+      parsedIssues.some((issue) => !issue.endpointPath),
+      'module-/service-scoped flaws must not be dropped',
+    );
+  });
+
+  test('readApisecReport should yield zero issues (no throw) when the findings key does not match', () => {
+    // reset issues
+    issuesService.clear();
+
+    assert.doesNotThrow(() =>
+      issuesService.processApisecReport({ metadata: {}, services: [{ name: 'x' }] }),
+    );
+    assert.strictEqual(
+      issuesService.getIssuesByCategory('apisec').length,
+      0,
+      'the API inventory (services/dataObjects) is not a findings stream → zero issues',
+    );
+  });
+
+  test('processAiReport maps the AI report field names, which differ from the SAST ones', () => {
+    // reset issues
+    issuesService.clear();
+
+    // Field names taken from the serializer contract of `AIVulnerability`: its getSeverity() /
+    // getIssueId() / getDetector() / getExplanation() are all @JsonIgnore, so the JSON carries
+    // `severityFloor`, `id`, `detectorId` and `description`. This payload is model-derived, not
+    // captured from a scan — the live-report check is the ticket's own verification step.
+    issuesService.processAiReport({
+      metadata: { reportProperties: { 'tool.name': 'xygeni' } },
+      currentBranch: 'origin/main',
+      vulnerabilities: [
+        {
+          id: 'AI.prompt-pinned-to-mutable-label.app/agent.py.12',
+          detectorId: 'prompt-pinned-to-mutable-label',
+          severityFloor: 'high',
+          confidence: 'medium',
+          description: 'The prompt template is pinned to a mutable label.',
+          assetKind: 'ai_prompt',
+          standards: [{ standard: 'owasp-llm-top10', version: '2025', controlId: 'LLM01' }],
+          redTeamVectors: ['PromptInjection'],
+          remediationHint: 'Pin the prompt to an immutable digest.',
+          tags: ['ai'],
+          location: { filepath: 'app/agent.py', beginLine: 12, endLine: 12, beginColumn: 1, endColumn: 40 },
+        },
+      ],
+    });
+
+    const parsedIssues = issuesService.getIssuesByCategory('ai');
+    assert.strictEqual(parsedIssues.length, 1);
+
+    const first = parsedIssues[0] as AiXygeniIssue;
+    assert.strictEqual(first.category, 'ai');
+    assert.strictEqual(first.kind, 'ia_vulnerability');
+    // The three names that would silently default if `severity`/`issueId`/`explanation` were read.
+    assert.strictEqual(first.severity, 'high', 'severity must come from `severityFloor`');
+    assert.strictEqual(first.id, 'AI.prompt-pinned-to-mutable-label.app/agent.py.12', 'id must come from `id`');
+    assert.strictEqual(first.detector, 'prompt-pinned-to-mutable-label', 'detector must come from `detectorId`');
+    assert.strictEqual(
+      first.explanation,
+      'The prompt template is pinned to a mutable label.',
+      'explanation must come from `description`',
+    );
+    assert.strictEqual(first.type, 'prompt-pinned-to-mutable-label', 'the AI report has no kind/type field');
+    assert.strictEqual(first.assetKind, 'ai_prompt');
+    assert.deepStrictEqual(first.standards, ['LLM01']);
+    assert.deepStrictEqual(first.redTeamVectors, ['PromptInjection']);
+    assert.strictEqual(first.file, 'app/agent.py');
+    assert.strictEqual(first.beginLine, 11, 'lines are exposed 0-based');
+    assert.strictEqual(first.branch, 'origin/main');
+  });
+
+  test('processAiReport should yield zero issues (no throw) when the findings key does not match', () => {
+    // reset issues
+    issuesService.clear();
+
+    assert.doesNotThrow(() => issuesService.processAiReport({ metadata: {}, somethingElse: [{ id: 'x' }] }));
+    assert.strictEqual(
+      issuesService.getIssuesByCategory('ai').length,
+      0,
+      'unknown findings key → zero AI issues',
     );
   });
 });

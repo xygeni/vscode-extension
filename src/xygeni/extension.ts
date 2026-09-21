@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import * as _ from 'lodash';
 import ConfigurationView from './views/configuration-view';
 import { ScanView } from './views/scan-view';
-import { IaCIssueView, IssueView, MisconfIssueView, QualityIssueView, SastIssueView, ScaIssueView, SecretsIssueView } from './views/issue-view';
+import { AiIssueView, ApisecIssueView, IaCIssueView, IssueView, MisconfIssueView, QualityIssueView, SastIssueView, ScaIssueView, SecretsIssueView } from './views/issue-view';
 import { HelpView } from './views/help-view';
 import { XYGENI_SHOW_CONFIG_COMMAND, XYGENI_CONTEXT, COMMAND_EDIT_XYGENI_API_URL, COMMAND_EDIT_XYGENI_TOKEN, COMMAND_TEST_XYGENI_CONNECTION, COMMAND_INSTALL_SCANNER, XYGENI_CLOSE_CONFIG_COMMAND, COMMAND_RUN_SCANNER, COMMAND_SHOW_OUTPUT, COMMAND_OPEN_PROXY_CONFIG, COMMAND_SHOW_SCAN_OUTPUT, COMMAND_SHOW_MCP_SETUP, COMMAND_TOGGLE_AUTO_SCAN, COMMAND_UPGRADE_LICENSE } from './common/constants';
 import { XyContextImpl } from './common/context';
@@ -46,6 +46,8 @@ class XygeniExtension {
     const secretsViewProvider = new SecretsIssueView(commands);
     const iacViewProvider = new IaCIssueView(commands);
     const qualityViewProvider = new QualityIssueView(commands);
+    const apisecViewProvider = new ApisecIssueView(commands);
+    const aiViewProvider = new AiIssueView(commands);
 
     const issueDecorator = new IssueDecorator();
     const diagnosticProvider = new DiagnosticProvider();
@@ -92,6 +94,12 @@ class XygeniExtension {
       }),
       vscode.window.createTreeView('xygeni.views.quality', {
         treeDataProvider: qualityViewProvider
+      }),
+      vscode.window.createTreeView('xygeni.views.apisec', {
+        treeDataProvider: apisecViewProvider
+      }),
+      vscode.window.createTreeView('xygeni.views.ai', {
+        treeDataProvider: aiViewProvider
       }),
 
       // Commands

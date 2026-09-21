@@ -55,3 +55,9 @@
 ## [1.2.9]
 
 - Fix Free license handling
+- Add Code Quality scan (xygeni/xygeni-product-backlog#56)
+
+## [1.2.10]
+
+- Add API Security scan (xygeni/xygeni-product-backlog#1691)
+- Add AI Security scan (xygeni/xygeni-product-backlog#1692)

@@ -5,6 +5,8 @@ import { MisconfXygeniIssue } from './misconf-issue';
 import { SastXygeniIssue } from './sast-issue';
 import { SecretsXygeniIssue } from './secrets-issue';
 import { QualityXygeniIssue } from './quality-issue';
+import { ApisecXygeniIssue } from './apisec-issue';
+import { AiXygeniIssue } from './ai-issue';
 import { VulnXygeniIssue } from './vuln-issue';
 import { XygeniIssue } from '../common/interfaces';
 
@@ -99,6 +101,8 @@ export default class IssuesService {
     await this.readReportSafely('iac', `iac.${suffix}`, f => this.readIacReport(f));
     await this.readReportSafely('deps', `deps.${suffix}`, f => this.readDepsReport(f));
     await this.readReportSafely('quality', `quality.${suffix}`, f => this.readQualityReport(f));
+    await this.readReportSafely('apisec', `apisec.${suffix}`, f => this.readApisecReport(f));
+    await this.readReportSafely('ai', `ai.${suffix}`, f => this.readAiReport(f));
 
     // sort issues by severity
     this.issues.sort((a, b) => {
@@ -456,6 +460,134 @@ export default class IssuesService {
         branch: jsonRaw.currentBranch ? jsonRaw.currentBranch : '',
         language: raw.language,
         remediableLevel: 'AUTO' // quality AI-fix via scanner 'util rectify --quality'
+      });
+      this.issues.push(issue);
+    });
+  }
+
+  public async readApisecReport(filename: string): Promise<void> {
+    if (!(await this.commands.fileExists(filename))) {
+      return;
+    }
+
+    try {
+      const data = await this.commands.readFile(filename);
+      const rawData = JSON.parse(data);
+      this.processApisecReport(rawData);
+    } catch (error) {
+      this.logger.error(error, 'Error reading apisec output:');
+      throw error;
+    }
+  }
+
+  /**
+   * Maps the `apisec.<suffix>` report. Findings live under `flaws` — the sibling `services` /
+   * `dataObjects` arrays are the discovered API inventory, not findings, and are deliberately
+   * not surfaced as issues (verified on `ApiSecurityReport`, whose `getIssues()` returns the
+   * flaws only).
+   */
+  processApisecReport(jsonRaw: any): void {
+    const rawFlaws = jsonRaw.flaws ?? [];
+    const flaws = Array.isArray(rawFlaws) ? rawFlaws : [rawFlaws];
+    const tool = jsonRaw.metadata?.reportProperties?.['tool.name'];
+
+    flaws.forEach((rawFlaw: any) => {
+      if (!rawFlaw) { return; }
+      const issue = new ApisecXygeniIssue({
+        id: rawFlaw.issueId,
+        // `flawType` is the machine type (missing_authentication, bola, bfla...); `title` is the
+        // human label. Prefer the label, fall back to the type so the tree node is never blank.
+        type: rawFlaw.title ?? rawFlaw.flawType,
+        detector: rawFlaw.detector,
+        tool: tool,
+        kind: 'api_flaw',
+        severity: (rawFlaw.severity ?? 'info') as 'critical' | 'high' | 'medium' | 'low' | 'info',
+        confidence: rawFlaw.confidence ? rawFlaw.confidence as 'highest' | 'high' | 'medium' | 'low' : 'high',
+        category: 'apisec',
+        categoryName: 'API Security',
+        // Module-/service-scoped flaws carry no location at all: keep every positional field at
+        // its zero default so the tree renders them and inline diagnostics skip them.
+        file: rawFlaw.location?.filepath ?? '',
+        beginLine: rawFlaw.location?.beginLine ?? 0,
+        endLine: rawFlaw.location?.endLine ?? 0,
+        beginColumn: rawFlaw.location?.beginColumn ?? 0,
+        endColumn: rawFlaw.location?.endColumn ?? 0,
+        code: rawFlaw.location?.code ?? '',
+        explanation: rawFlaw.explanation ?? '',
+        url: rawFlaw.url ? rawFlaw.url : '',
+        tags: rawFlaw.tags?.length > 0 ? rawFlaw.tags : undefined,
+        branch: jsonRaw.currentBranch ? jsonRaw.currentBranch : '',
+        endpointMethod: rawFlaw.endpointMethod,
+        endpointPath: rawFlaw.endpointPath,
+        moduleName: rawFlaw.moduleName,
+        serviceName: rawFlaw.serviceName,
+        owaspApiTop10: rawFlaw.owaspApiTop10,
+        cwes: rawFlaw.cwes,
+        remediation: rawFlaw.remediation,
+        remediableLevel: 'none' // no `util rectify --apisec` in the scanner
+      });
+      this.issues.push(issue);
+    });
+  }
+
+  public async readAiReport(filename: string): Promise<void> {
+    if (!(await this.commands.fileExists(filename))) {
+      return;
+    }
+
+    try {
+      const data = await this.commands.readFile(filename);
+      const rawData = JSON.parse(data);
+      this.processAiReport(rawData);
+    } catch (error) {
+      this.logger.error(error, 'Error reading ai output:');
+      throw error;
+    }
+  }
+
+  /**
+   * Maps the `ai.<suffix>` report. `AIVulnerability` does NOT reuse the SAST field names: its
+   * `getSeverity()` / `getIssueId()` / `getDetector()` / `getExplanation()` are all @JsonIgnore,
+   * so the serialized keys are `severityFloor`, `id`, `detectorId` and `description`. Reading
+   * `severity` / `issueId` / `detector` / `explanation` here would silently yield undefined.
+   */
+  processAiReport(jsonRaw: any): void {
+    const rawVulnerabilities = jsonRaw.vulnerabilities ?? [];
+    const vulnerabilities = Array.isArray(rawVulnerabilities) ? rawVulnerabilities : [rawVulnerabilities];
+    const tool = jsonRaw.metadata?.reportProperties?.['tool.name'];
+
+    vulnerabilities.forEach((rawVulnerability: any) => {
+      if (!rawVulnerability) { return; }
+      const issue = new AiXygeniIssue({
+        id: rawVulnerability.id,
+        // The AI report carries no `kind`/`type`: the detector id is the finding's label.
+        type: rawVulnerability.detectorId,
+        detector: rawVulnerability.detectorId,
+        tool: tool,
+        kind: 'ia_vulnerability',
+        severity: (rawVulnerability.severityFloor ?? 'info') as 'critical' | 'high' | 'medium' | 'low' | 'info',
+        confidence: rawVulnerability.confidence ? rawVulnerability.confidence as 'highest' | 'high' | 'medium' | 'low' : 'high',
+        category: 'ai',
+        categoryName: 'AI Security',
+        file: rawVulnerability.location?.filepath ?? '',
+        beginLine: rawVulnerability.location?.beginLine ?? 0,
+        endLine: rawVulnerability.location?.endLine ?? 0,
+        beginColumn: rawVulnerability.location?.beginColumn ?? 0,
+        endColumn: rawVulnerability.location?.endColumn ?? 0,
+        code: rawVulnerability.location?.code ?? '',
+        explanation: rawVulnerability.description ?? '',
+        url: rawVulnerability.url ? rawVulnerability.url : '',
+        tags: rawVulnerability.tags?.length > 0 ? rawVulnerability.tags : undefined,
+        branch: jsonRaw.currentBranch ? jsonRaw.currentBranch : '',
+        assetKind: rawVulnerability.assetKind,
+        // `standards` is a list of {standard, version, controlId} refs; the canonical tag the
+        // scanner materializes from each one is what reads well in the panel.
+        standards: rawVulnerability.standards
+          ?.map((standard: any) => standard?.controlId ?? standard?.standard)
+          .filter((controlId: string | undefined) => !!controlId),
+        redTeamVectors: rawVulnerability.redTeamVectors,
+        remediationHint: rawVulnerability.remediationHint,
+        remediableLevel: 'none' // no `util rectify --ai` in the scanner
       });
       this.issues.push(issue);
     });
