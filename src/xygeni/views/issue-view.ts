@@ -133,9 +133,6 @@ export class XygeniCategoryItem extends vscode.TreeItem {
             'ai': 'ai-security.svg'
         };
 
-        this.iconPath = new vscode.ThemeIcon(categoryIcons[category]);
-
-        // Color the count based on whether there are issues
         this.iconPath = this.commands.getIconPath(categoryIcons[category]);
     }
 }

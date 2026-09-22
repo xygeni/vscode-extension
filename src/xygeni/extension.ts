@@ -160,7 +160,8 @@ class XygeniExtension {
       }),
 
       vscode.commands.registerCommand('xygeni.showIssueDetailsFromDiagnostic', (issueId) => {
-        const issue = commands.getIssues().find(i => i.id === issueId);
+        if (!issueId) { return; }
+        const issue = commands.getIssues().find((candidate) => candidate.id === issueId);
         if (issue) {
           commands.showIssueDetails(issue);
         }

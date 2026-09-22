@@ -32,7 +32,7 @@ export class RemediationService {
 
 
   public async launchRemediationPreview(kind: string, issueId: string, fileUri: string, xygeniInstallPath: string, output: IOutputChannel): Promise<FixData> {
-    // 'secret' | 'misconfiguration' | 'iac_flaw' | 'code_vulnerability' | 'sca_vulnerability'
+    // 'secret' | 'misconfiguration' | 'iac_flaw' | 'code_vulnerability' | 'quality_issue' | 'ia_vulnerability' | 'sca_vulnerability'
     this.logger.log(`run remediation for kind ${kind}`);
     switch (kind) {
       case 'secret':
@@ -45,6 +45,8 @@ export class RemediationService {
         return this._previewDiffSastRemediation(issueId, fileUri, xygeniInstallPath, output);
       case 'quality_issue':
         return this._previewDiffQualityRemediation(issueId, fileUri, xygeniInstallPath, output);
+      case 'ia_vulnerability':
+        return this._previewDiffAiRemediation(issueId, fileUri, xygeniInstallPath, output);
       case 'sca_vulnerability':
         return this._previewDiffScaRemediation(issueId, fileUri, xygeniInstallPath, output);
       default:
@@ -122,6 +124,41 @@ export class RemediationService {
             // call rectify (Code Quality fix)
             const scanner = XygeniScannerService.getInstance();
             await scanner.runRectifyQualityCommand(tempFile, qualityIssue.detector, '' + qualityIssue.beginLine, xygeniInstallPath, output);
+
+            const explanation = "No explanation available";
+            return { tempFile: tempFile, explanation: explanation };
+          }
+        )
+        .catch((error) => {
+          this.logger.log(`Error applying remediation on file ${fileUri}: ${error}`);
+          throw error;
+        });
+
+    } catch (error) {
+      this.logger.log(`Error applying remediation: ${error}`);
+      throw error;
+    }
+  }
+
+
+  private async _previewDiffAiRemediation(issueId: string, fileUri: string, xygeniInstallPath: string, output: IOutputChannel): Promise<FixData> {
+    try {
+      if (!issueId) return { tempFile: undefined, explanation: undefined };
+      const aiIssue = this.commands.getIssues().find((i) => i.category === 'ai' && i.id === issueId);
+      if (!aiIssue) {
+        this.logger.log(`Issue not found: ${issueId}`);
+        return Promise.reject(`Issue not found: ${issueId}`);
+      }
+
+      // generate temp folder and copy file
+      let tempDir = os.tmpdir() + '/' + Math.floor(Math.random() * 10000000);
+      tempDir = tempDir.replace(/\\/g, '/'); // always use linux paths style
+      return this.commands.copyFileToFolder(fileUri, tempDir)
+        .then(
+          async (tempFile) => {
+            // call rectify (AI Security fix)
+            const scanner = XygeniScannerService.getInstance();
+            await scanner.runRectifyAiCommand(tempFile, aiIssue.detector, '' + aiIssue.beginLine, xygeniInstallPath, output);
 
             const explanation = "No explanation available";
             return { tempFile: tempFile, explanation: explanation };

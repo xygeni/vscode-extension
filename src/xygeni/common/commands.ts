@@ -431,16 +431,17 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
 
     try {
       await scanner.runIncrementalAnalysis(sourceFolder, this.getXygeniInstallPath(), this.getScanOutputChannel());
-      this.readIssues();
+      this.readIssues(scanner.getIncrementalScanTypes());
       this.refreshAllViews();
     } catch (error) {
       Logger.error(error, "Error running incremental scanner");
     }
   }
 
+  /** With `scanTypes` only those reports are re-read (incremental scan); without, all of them. */
   public readIssues = _.throttle(
-    () => {
-      IssuesService.getInstance().readIssues();
+    (scanTypes?: string[]) => {
+      IssuesService.getInstance().readIssues(scanTypes);
     },
     2000,
     { leading: false, trailing: true }

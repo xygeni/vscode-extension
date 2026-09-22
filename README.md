@@ -2,7 +2,7 @@
 
 [![Version](https://img.shields.io/visual-studio-marketplace/v/xygeni-security.xygeni-scanner-vscode)](https://marketplace.visualstudio.com/items?itemName=xygeni-security.xygeni-scanner-vscode)
 
-**Secure your codebase with Secrets, SAST, SCA, IaC & Supply Chain scanning directly within your VS Code environment.**
+**Secure your codebase with Secrets, SAST, SCA, IaC, Code Quality, API Security, AI Security & Supply Chain scanning directly within your VS Code environment.**
 
 Xygeni Security Scanner is a powerful extension that brings comprehensive security scanning to your fingertips. It integrates seamlessly with your development workflow, allowing you to identify and remediate security vulnerabilities early in the process.
 
@@ -16,7 +16,10 @@ Xygeni Security Scanner is a powerful extension that brings comprehensive securi
   - **SCA (Software Composition Analysis):** Identify vulnerabilities in your open-source dependencies.
   - **IaC (Infrastructure as Code):** Scan your IaC files (e.g., Terraform, CloudFormation) for misconfigurations.
   - **Misconfigurations:** Detect security misconfigurations in your application and services.
-- **Remediation actions for SCA and SAST Issues:** Automatically detect and provide remediation guidance for vulnerabilities found in your source code and dependencies, enabling quick fixes directly within VS Code.
+  - **Code Quality:** Find maintainability and reliability issues in your source code.
+  - **API Security:** Discover your API endpoints and detect flaws such as missing authentication, excessive data exposure or PII leaks (OWASP API Top 10).
+  - **AI Security:** Detect insecure prompts, agents and AI integrations (OWASP LLM Top 10 / Agentic ASI).
+- **Remediation actions for SCA, SAST and Code Quality Issues:** Automatically detect and provide remediation guidance for vulnerabilities found in your source code and dependencies, enabling quick fixes directly within VS Code.
 - **Seamless Integration:** The extension adds a dedicated Xygeni view to your activity bar for easy access.
 - **Guided Setup:** A simple configuration process to connect to the Xygeni service.
 - **In-Editor Issue Highlighting:** View security findings directly in your code, making it easy to pinpoint and fix issues.
