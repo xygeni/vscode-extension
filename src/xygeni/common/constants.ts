@@ -34,7 +34,9 @@ export const COMMAND_SHOW_OUTPUT = 'xygeni.showOutput';
 export const COMMAND_SHOW_SCAN_OUTPUT = 'xygeni.showScanOutput';
 
 export const COMMAND_OPEN_PROXY_CONFIG = 'xygeni.openProxyConfig';
+export const COMMAND_OPEN_SETTINGS = 'xygeni.openSettings';
 export const COMMAND_TOGGLE_AUTO_SCAN = 'xygeni.scan.toggleAutoScan';
+export const COMMAND_TOGGLE_GLOBAL_OPTION = 'xygeni.scan.toggleGlobalOption';
 export const COMMAND_UPGRADE_LICENSE = 'xygeni.license.upgrade';
 
 // external links

@@ -8,11 +8,13 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import crypto from 'crypto';
-import { window } from 'vscode';
-import { XYGENI_SCANNER_OUTPUT_NAME, XYGENI_SCANNER_REPORT_SUFFIX } from '../common/constants';
+import { commands as vscodeCommands, window } from 'vscode';
+import { COMMAND_TOGGLE_GLOBAL_OPTION, XYGENI_SCANNER_OUTPUT_NAME, XYGENI_SCANNER_REPORT_SUFFIX } from '../common/constants';
 import IssuesService from './issues';
 import { ProxyConfigManager } from '../config/proxy-configuration';
 import { LICENSE_ERROR_EXIT_CODE, hasReportWrittenSince, isCompletedRun, reportFreshnessStartTime } from './scan-exit-code';
+import { ConfigManager } from '../config/xygeni-configuration';
+import { GLOBAL_OPTION_TOGGLES, SKIP_SSL_VERIFY_OPTION, blockedOptionsIn, buildGlobalOptions, isCertificateError } from './scanner-options';
 
 
     /**
@@ -53,6 +55,7 @@ class XygeniScannerService extends EventEmitter {
     private activeScannerCount = 0;
 
     private exitCode: number | undefined;
+    private skipSslVerifySuggested = false;
 
 
     private scans: ScanResult[] = [];
@@ -291,6 +294,19 @@ class XygeniScannerService extends EventEmitter {
                 ...process.env,
             };
             
+            // Global options go before the command (`xygeni <global> scan ...`); `args` keeps the command
+            // first, so the isScanCommand check below still sees it.
+            const enabledOptions = GLOBAL_OPTION_TOGGLES
+                .filter((toggle) => ConfigManager.getScanFlag(toggle.setting))
+                .map((toggle) => toggle.option);
+            const additionalGlobalOptions = ConfigManager.getAdditionalGlobalOptions();
+            const globalOptions = buildGlobalOptions(enabledOptions, additionalGlobalOptions);
+            const blockedOptions = blockedOptionsIn(additionalGlobalOptions);
+            if (blockedOptions.length) {
+                this.logger.log(`  Ignoring scanner options ${blockedOptions.join(' ')}: -q/--quiet hide the scanner output the extension reads; the API token comes from the Xygeni configuration.`);
+            }
+            const commandArgs = [...globalOptions, ...args];
+
             let shellCommand;
             let shellArgs = [];
 
@@ -307,11 +323,11 @@ class XygeniScannerService extends EventEmitter {
                     return;
                 }
                 shellCommand = psPath;
-                shellArgs = ["-NoProfile","-ExecutionPolicy", "Bypass", "-File", scannerScriptPath, ...args];
+                shellArgs = ["-NoProfile","-ExecutionPolicy", "Bypass", "-File", scannerScriptPath, ...commandArgs];
             }
             else {
                 shellCommand = scannerScriptPath;
-                shellArgs = [...args];
+                shellArgs = [...commandArgs];
 
             }
 
@@ -324,6 +340,8 @@ class XygeniScannerService extends EventEmitter {
                 // that the licensed scan types ran when the exit code is 127.
                 const isScanCommand = args[0] === 'scan';
                 const startTime = reportFreshnessStartTime();
+                let sawCertificateError = false;
+                let previousTail = ''; // a marker may be split across two output chunks
 
                 const scannerProcess = spawn(shellCommand, shellArgs, {
                     stdio: ['pipe', 'pipe', 'pipe'],
@@ -332,13 +350,14 @@ class XygeniScannerService extends EventEmitter {
                     env: env
                 });
 
-                scannerProcess.stdout.on('data', (data) => {
-                    output.append(this.stripAnsiEscapeSequences(data.toString()));
-                });
-
-                scannerProcess.stderr.on('data', (data) => {
-                    output.append(this.stripAnsiEscapeSequences(data.toString()));
-                });
+                const onOutput = (data: Buffer) => {
+                    const text = this.stripAnsiEscapeSequences(data.toString());
+                    sawCertificateError = sawCertificateError || isCertificateError(previousTail + text);
+                    previousTail = text.slice(-100);
+                    output.append(text);
+                };
+                scannerProcess.stdout.on('data', onOutput);
+                scannerProcess.stderr.on('data', onOutput);
 
                 scannerProcess.on('close', (code) => {
                     clearTimeout(timeout);
@@ -348,6 +367,9 @@ class XygeniScannerService extends EventEmitter {
                     } else {
                         if (isScanCommand && code === LICENSE_ERROR_EXIT_CODE) {
                             output.appendLine('Scan finished with exit code 127 and no report was written: the license is missing, expired or locked, or no scan type is licensed.');
+                        }
+                        if (sawCertificateError && !globalOptions.includes(SKIP_SSL_VERIFY_OPTION)) {
+                            this.suggestSkipSslVerify(output);
                         }
                         reject(new Error(`Scanner process failed with exit code ${code}`));
                     }
@@ -363,6 +385,22 @@ class XygeniScannerService extends EventEmitter {
                     reject(new Error('Scanner process timeout'));
                 }, this.timeout);
             });
+        });
+    }
+
+    // A TLS-intercepting proxy makes every scanner call fail on the certificate; the user cannot be expected
+    // to know the CLI option, so point them at the setting. (xygeni/tech-support#378)
+    private suggestSkipSslVerify(output: IOutputChannel): void {
+        if (this.skipSslVerifySuggested) { return; } // concurrent scans would repeat it
+        this.skipSslVerifySuggested = true;
+        const message = 'The Xygeni scanner could not validate the server SSL certificate. If you are behind a corporate proxy '
+            + 'that inspects TLS traffic, enable "Skip SSL Verification" in the Xygeni Configuration.';
+        output.appendLine(message);
+        const enable = 'Enable Skip SSL Verification';
+        window.showWarningMessage(message, enable).then((choice) => {
+            if (choice === enable) {
+                vscodeCommands.executeCommand(COMMAND_TOGGLE_GLOBAL_OPTION, 'skipSslVerify');
+            }
         });
     }
 

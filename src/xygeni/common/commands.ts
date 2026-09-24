@@ -406,6 +406,29 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
   }
 
   /**
+   * Toggle one of the scanner global option checkboxes (GLOBAL_OPTION_TOGGLES). Turning on
+   * --skip-ssl-verify weakens transport security, so it asks for confirmation first. (xygeni/tech-support#378)
+   */
+  public async toggleGlobalOption(setting: string): Promise<void> {
+    const enabled = ConfigManager.getScanFlag(setting);
+    if (!enabled && setting === 'skipSslVerify') {
+      const enable = 'Enable';
+      const choice = await vscode.window.showWarningMessage(
+        'Skip SSL certificate validation in the Xygeni scanner?',
+        {
+          modal: true,
+          detail: 'Use it only when a corporate proxy inspects TLS traffic and re-signs it with an internal CA, '
+            + 'so the scan fails with certificate errors. This reduces transport security: use it only in trusted networks.'
+        },
+        enable
+      );
+      if (choice !== enable) { return; }
+    }
+    await ConfigManager.setScanFlag(setting, !enabled);
+    this.refreshAllViews();
+  }
+
+  /**
    * Run Xygeni Scanner in incremental mode (triggered by auto-scan on save)
    */
   public async runIncrementalScan(): Promise<void> {

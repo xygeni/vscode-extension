@@ -54,7 +54,13 @@ This extension contributes the following settings (accessible via `File > Prefer
 -   `xygeni.api.xygeniUrl`: The URL of the Xygeni API server.
 -   `xygeni.api.xygeniToken`: Your Xygeni API token. It is recommended to store this securely.
 -   `xygeni.proxy.*`: A full set of options to configure a proxy.
+-   `xygeni.scan.autoScan`: Run an incremental scan when a file is saved.
+-   `xygeni.scan.skipSslVerify`: Disable SSL certificate validation in the scanner (`--skip-ssl-verify`), for corporate proxies that inspect TLS traffic. Use it only in trusted networks. Also available in the Configuration view.
+-   `xygeni.scan.skipUpdate`: Do not update the scanner before running it (`--skip-update`).
+-   `xygeni.scan.verbose`: Verbose scanner output (`--verbose`), for troubleshooting.
+-   `xygeni.scan.additionalGlobalOptions`: Advanced. Extra global scanner options placed before the command (e.g. `-cop key=value`).
 
+The gear icon in the Configuration view opens all the Xygeni settings.
 
 ## Support
 

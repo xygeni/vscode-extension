@@ -67,3 +67,5 @@
 - Auto Scan on Save no longer discards the findings of the scan types it does not run (Dependency Analysis, Misconfigurations, Code Quality, API Security, AI Security) (xygeni/eclipse-plugin#22, xygeni/visual-studio-extension#15)
 - Escape scanner-provided text (titles, endpoint paths, module names, explanations) in the issue details panel (xygeni/eclipse-plugin#22, xygeni/visual-studio-extension#15)
 - A scan that only skipped an unlicensed scan type (or that found issues) is now reported as completed instead of failed (xygeni/eclipse-plugin#22, xygeni/visual-studio-extension#15)
+- Scanner global options (xygeni/tech-support#378): Skip SSL Verification (`--skip-ssl-verify`, for corporate proxies that inspect TLS traffic), Skip Scanner Update and Verbose Scanner Output checkboxes plus an Additional Global Options field in the Scan Settings. Skip SSL Verification can be toggled from the Configuration view, where the other options also show while they are on; a scan that fails on the SSL certificate offers to enable it
+- Gear icon in the Configuration view to open the Xygeni settings

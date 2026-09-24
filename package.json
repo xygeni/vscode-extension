@@ -128,6 +128,11 @@
           "group": "navigation"
         },
         {
+          "command": "xygeni.openSettings",
+          "when": "view == 'xygeni.views.configuration'",
+          "group": "navigation"
+        },
+        {
           "command": "xygeni.showOutput",
           "when": "view == 'xygeni.views.configuration'",
           "group": "navigation"
@@ -149,6 +154,11 @@
         "command": "xygeni.openProxyConfig",
         "title": "Xygeni: Open Proxy Configuration",
         "icon": "$(debug-configure)"
+      },
+      {
+        "command": "xygeni.openSettings",
+        "title": "Xygeni: Open Settings",
+        "icon": "$(settings-gear)"
       },
       {
         "command": "xygeni.closeConfig",
@@ -294,6 +304,34 @@
             "type": "boolean",
             "default": false,
             "description": "Automatically run an incremental scan when a file is saved."
+          },
+          "xygeni.scan.skipSslVerify": {
+            "scope": "machine",
+            "order": 2,
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Disable SSL certificate validation in the Xygeni scanner (`--skip-ssl-verify`). Enable it only when the scan fails with certificate errors because a corporate proxy inspects TLS traffic and re-signs it with an internal CA. **This reduces transport security: use it only in trusted networks.**"
+          },
+          "xygeni.scan.skipUpdate": {
+            "scope": "machine",
+            "order": 3,
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Do not update the Xygeni scanner before running it (`--skip-update`). Useful when the update download is blocked or slow. **You may run an outdated scanner version.**"
+          },
+          "xygeni.scan.verbose": {
+            "scope": "machine",
+            "order": 4,
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Verbose scanner output in the Xygeni Scanner output channel (`--verbose`), for troubleshooting."
+          },
+          "xygeni.scan.additionalGlobalOptions": {
+            "scope": "machine",
+            "order": 5,
+            "type": "string",
+            "default": "",
+            "markdownDescription": "Advanced: extra global options for the Xygeni scanner, placed before the command (`xygeni <options> scan ...`). Separate them with spaces. Example: `-cop key=value`. Leave empty unless Xygeni support asks for it. `-q`/`--quiet` (the extension reads the scanner output) and `--api-key` (the token comes from the Xygeni configuration) are ignored."
           }
         }
       }
@@ -307,7 +345,7 @@
     "watch:esbuild": "node esbuild.js --watch",
     "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
     "package": "npm run check-types && npm run lint && node esbuild.js --production",
-    "package:vsix": "vsce package --allow-missing-repository",
+    "package:vsix": "npx --yes @vscode/vsce package --allow-missing-repository",
     "compile-tests": "tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",
     "pretest": "npm run cleanup && npm run compile-tests && npm run compile",
