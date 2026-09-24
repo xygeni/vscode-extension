@@ -119,9 +119,10 @@ export default class IssuesService {
     // Read each domain report independently. A failure in one domain (a missing, partial or
     // corrupt report — e.g. when an analyzer such as misconf timed out) must NOT prevent the
     // remaining domains from being read and rendered. See xygeni/product-backlog#835.
-    for (const reader of readers) {
-      await this.readReportSafely(reader.scanType, `${reader.scanType}.${suffix}`, reader.read);
-    }
+    // The reports are independent files and the readers only push into `this.issues`, so they are
+    // read concurrently; the severity sort below is the only join point.
+    await Promise.all(readers.map((reader) =>
+      this.readReportSafely(reader.scanType, `${reader.scanType}.${suffix}`, reader.read)));
 
     // sort issues by severity
     this.issues.sort((a, b) => {
