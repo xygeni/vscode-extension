@@ -281,10 +281,11 @@ suite('Issues Test Suite', () => {
     assert.strictEqual(first.kind, 'api_flaw');
     assert.strictEqual(first.detector, 'excessive_data_exposure_python');
     assert.strictEqual(first.severity, 'high');
-    // `title` is the human label and wins over the machine `flawType`.
+    // The tree label is the machine `flawType`; the human `title` is kept for the details panel.
+    assert.strictEqual(first.type, 'excessive_data_exposure', 'type must map to flawType');
     assert.ok(
-      first.type && first.type.startsWith('Response DTO returns sensitive fields'),
-      'type must map to the flaw title, not default',
+      first.title && first.title.startsWith('Response DTO returns sensitive fields'),
+      'title must be mapped for the details panel',
     );
     assert.strictEqual(first.endpointMethod, 'POST');
     assert.strictEqual(first.endpointPath, '/users/v1/login');
@@ -299,7 +300,7 @@ suite('Issues Test Suite', () => {
     assert.ok(first.remediation && first.remediation.length > 0, 'remediation must be mapped');
   });
 
-  test('readApisecReport tolerates flaws without a location', async () => {
+  test('readApisecReport resolves the file of location-less flaws from the API inventory', async () => {
     const testDataPath = path.join(__dirname, 'issues.test.data', 'apisec.output.report.json');
 
     // reset issues
@@ -307,17 +308,101 @@ suite('Issues Test Suite', () => {
 
     await issuesService.readApisecReport(testDataPath);
 
-    // API flaws are endpoint-, module- or service-scoped and carry no `location` in the real
-    // report. That must produce well-formed issues with an empty file (inline diagnostics skip
-    // them by design) rather than crashing or dropping the finding.
+    // No flaw in the real report carries a `location`. Six are endpoint-scoped and resolve through
+    // `services[].modules[].endpoints[]` (endpointId is "<METHOD> <path>") to the handler file and
+    // line; the service-scoped one has no endpoint and resolves through `properties.handler_file`.
     const parsedIssues = issuesService.getIssuesByCategory('apisec') as ApisecXygeniIssue[];
-    assert.ok(parsedIssues.every((issue) => issue.file === ''), 'no location → empty file');
-    assert.ok(parsedIssues.every((issue) => issue.beginLine === 0), 'no location → line 0');
-    // A module-scoped flaw (no endpoint) must still be listed.
-    assert.ok(
-      parsedIssues.some((issue) => !issue.endpointPath),
-      'module-/service-scoped flaws must not be dropped',
-    );
+    const issuesById = new Map(parsedIssues.map((issue) => [issue.id, issue]));
+
+    const login = issuesById.get('API-excessive_data_exposure_python-POST /users/v1/login')!;
+    assert.strictEqual(login.file, 'api_views/users.py');
+    assert.strictEqual(login.beginLine, 84, 'handler line 85, exposed 0-based');
+
+    const deleteUser = issuesById.get('API-broken_function_level_authorization-DELETE /users/v1/{username}')!;
+    assert.strictEqual(deleteUser.file, 'api_views/users.py');
+    assert.strictEqual(deleteUser.beginLine, 205);
+
+    const bookByTitle = issuesById.get('API-excessive_data_exposure_python-GET /books/v1/{book_title}')!;
+    assert.strictEqual(bookByTitle.file, 'api_views/books.py');
+    assert.strictEqual(bookByTitle.beginLine, 44);
+
+    const rateLimit = issuesById.get('API-rate_limit_absence-service:VAmPI')!;
+    assert.strictEqual(rateLimit.endpointPath, undefined, 'service-scoped: no endpoint');
+    assert.strictEqual(rateLimit.file, 'api_views/users.py', 'falls back to properties.handler_file');
+    assert.strictEqual(rateLimit.beginLine, 0, 'handler_file carries no line');
+
+    assert.ok(parsedIssues.every((issue) => issue.file !== ''), 'every flaw of the real report resolves a file');
+    assert.ok(parsedIssues.every((issue) => issue.code === ''), 'the inventory has no source excerpt');
+  });
+
+  test('processApisecReport falls back to the module spec file, and keeps flaws it cannot locate', () => {
+    // reset issues
+    issuesService.clear();
+
+    issuesService.processApisecReport({
+      metadata: {},
+      currentBranch: 'main',
+      services: [{ name: 'svc', modules: [{ name: 'mod', location: { file: 'openapi/spec.yml' }, endpoints: [] }] }],
+      flaws: [
+        { issueId: 'API-in-known-module', detector: 'd', title: 't', severity: 'low', moduleName: 'mod' },
+        { issueId: 'API-in-unknown-module', detector: 'd', title: 't', severity: 'low', moduleName: 'other' },
+      ],
+    });
+
+    const [viaSpecFile, unresolved] = issuesService.getIssuesByCategory('apisec') as ApisecXygeniIssue[];
+    assert.strictEqual(viaSpecFile.file, 'openapi/spec.yml', 'module-scoped: the module spec file');
+    assert.strictEqual(viaSpecFile.beginLine, 0);
+    assert.strictEqual(unresolved.file, '', 'nothing to resolve → empty file, finding kept');
+    assert.strictEqual(unresolved.getCodeSnippetHtmlTab(), '', 'no snippet tab without a location');
+  });
+
+  test('apisec details escape scanner strings before interpolating them into the webview', () => {
+    issuesService.clear();
+
+    issuesService.processApisecReport({
+      metadata: {},
+      flaws: [{
+        issueId: 'API-x', detector: 'd', severity: 'low',
+        title: 'Title <script>alert(1)</script>',
+        endpointMethod: 'GET', endpointPath: '/users/<img src=x onerror=alert(1)>',
+        moduleName: '"mod"', serviceName: "svc'",
+      }],
+    });
+
+    const [issue] = issuesService.getIssuesByCategory('apisec') as ApisecXygeniIssue[];
+    const html = issue.getIssueDetailsHtml() + issue.getSubtitleLineHtml();
+    assert.ok(!html.includes('<script>'), 'title must not inject a tag');
+    assert.ok(!html.includes('<img'), 'endpoint path must not inject a tag');
+    assert.ok(html.includes('&lt;script&gt;alert(1)&lt;/script&gt;'), 'the title text is still shown');
+    assert.ok(html.includes('&quot;mod&quot;') && html.includes('svc&#39;'), 'quotes are escaped');
+  });
+
+  test('readScannerOutput with the incremental scan types re-reads only their reports and keeps the rest', async () => {
+    issuesService.clear();
+
+    // A finding from a report the incremental scan does NOT rewrite: it must survive the re-read.
+    issuesService.processApisecReport({ metadata: {}, flaws: [{ issueId: 'API-kept', detector: 'd', title: 't', severity: 'low' }] });
+
+    const secrets = sandbox.stub(issuesService, 'readSecretsReport').resolves();
+    const iac = sandbox.stub(issuesService, 'readIacReport').resolves();
+    const sast = sandbox.stub(issuesService, 'readSastReport').resolves();
+    const misconf = sandbox.stub(issuesService, 'readMisconfReport').resolves();
+    const deps = sandbox.stub(issuesService, 'readDepsReport').resolves();
+    const quality = sandbox.stub(issuesService, 'readQualityReport').resolves();
+    const apisec = sandbox.stub(issuesService, 'readApisecReport').resolves();
+    const ai = sandbox.stub(issuesService, 'readAiReport').resolves();
+
+    await issuesService.readScannerOutput('xygeni.xygeni-security', ['secrets', 'iac', 'sast', 'malware']);
+
+    assert.ok(secrets.calledOnce && iac.calledOnce && sast.calledOnce, 'the scan types that ran are re-read');
+    assert.ok(misconf.notCalled && deps.notCalled && quality.notCalled && apisec.notCalled && ai.notCalled,
+      'reports of scan types that did not run are stale and must not be re-read');
+    assert.strictEqual(issuesService.getIssuesByCategory('apisec').length, 1, 'their current findings are kept');
+
+    // A full read replaces every category.
+    await issuesService.readScannerOutput('xygeni.xygeni-security');
+    assert.ok(apisec.calledOnce, 'full read reads every report');
+    assert.strictEqual(issuesService.getIssuesByCategory('apisec').length, 0, 'full read replaces every category');
   });
 
   test('readApisecReport should yield zero issues (no throw) when the findings key does not match', () => {
@@ -334,56 +419,55 @@ suite('Issues Test Suite', () => {
     );
   });
 
-  test('processAiReport maps the AI report field names, which differ from the SAST ones', () => {
+  test('readAiReport should parse AI vulnerabilities from a real report', async () => {
+    const testDataPath = path.join(__dirname, 'issues.test.data', 'ai.output.report.json');
+
     // reset issues
     issuesService.clear();
 
-    // Field names taken from the serializer contract of `AIVulnerability`: its getSeverity() /
-    // getIssueId() / getDetector() / getExplanation() are all @JsonIgnore, so the JSON carries
-    // `severityFloor`, `id`, `detectorId` and `description`. This payload is model-derived, not
-    // captured from a scan — the live-report check is the ticket's own verification step.
-    issuesService.processAiReport({
-      metadata: { reportProperties: { 'tool.name': 'xygeni' } },
-      currentBranch: 'origin/main',
-      vulnerabilities: [
-        {
-          id: 'AI.prompt-pinned-to-mutable-label.app/agent.py.12',
-          detectorId: 'prompt-pinned-to-mutable-label',
-          severityFloor: 'high',
-          confidence: 'medium',
-          description: 'The prompt template is pinned to a mutable label.',
-          assetKind: 'ai_prompt',
-          standards: [{ standard: 'owasp-llm-top10', version: '2025', controlId: 'LLM01' }],
-          redTeamVectors: ['PromptInjection'],
-          remediationHint: 'Pin the prompt to an immutable digest.',
-          tags: ['ai'],
-          location: { filepath: 'app/agent.py', beginLine: 12, endLine: 12, beginColumn: 1, endColumn: 40 },
-        },
-      ],
-    });
+    await issuesService.readAiReport(testDataPath);
 
     const parsedIssues = issuesService.getIssuesByCategory('ai');
-    assert.strictEqual(parsedIssues.length, 1);
+    assert.strictEqual(parsedIssues.length, 9, 'Should parse 9 AI vulnerabilities from `vulnerabilities`');
 
+    // `AIVulnerability` does not reuse the SAST names: getSeverity() / getIssueId() / getDetector() /
+    // getExplanation() are @JsonIgnore, so the wire keys are `severityFloor`, `id`, `detectorId`
+    // and `description`. Reading the SAST names here would silently default every field.
     const first = parsedIssues[0] as AiXygeniIssue;
     assert.strictEqual(first.category, 'ai');
     assert.strictEqual(first.kind, 'ia_vulnerability');
-    // The three names that would silently default if `severity`/`issueId`/`explanation` were read.
     assert.strictEqual(first.severity, 'high', 'severity must come from `severityFloor`');
-    assert.strictEqual(first.id, 'AI.prompt-pinned-to-mutable-label.app/agent.py.12', 'id must come from `id`');
+    assert.strictEqual(first.id, 'prompt-pinned-to-mutable-label:ai/prompt_registry.py:31', 'id must come from `id`');
     assert.strictEqual(first.detector, 'prompt-pinned-to-mutable-label', 'detector must come from `detectorId`');
-    assert.strictEqual(
-      first.explanation,
-      'The prompt template is pinned to a mutable label.',
+    assert.strictEqual(first.type, 'prompt-pinned-to-mutable-label', 'the AI report has no kind/type field');
+    assert.ok(
+      first.explanation && first.explanation.startsWith('Registry prompt is referenced by a floating / mutable label'),
       'explanation must come from `description`',
     );
-    assert.strictEqual(first.type, 'prompt-pinned-to-mutable-label', 'the AI report has no kind/type field');
     assert.strictEqual(first.assetKind, 'ai_prompt');
-    assert.deepStrictEqual(first.standards, ['LLM01']);
-    assert.deepStrictEqual(first.redTeamVectors, ['PromptInjection']);
-    assert.strictEqual(first.file, 'app/agent.py');
-    assert.strictEqual(first.beginLine, 11, 'lines are exposed 0-based');
-    assert.strictEqual(first.branch, 'origin/main');
+    // `standards[]` entries serialize the standard name as `std`, never `standard`.
+    assert.deepStrictEqual(first.standards, ['LLM01', 'ASI06']);
+    assert.deepStrictEqual(first.redTeamVectors, ['PromptInjection', 'RAGPoisoning']);
+    assert.ok(first.remediationHint && first.remediationHint.startsWith('Pin the prompt to an immutable version'));
+    assert.strictEqual(first.file, 'ai/prompt_registry.py');
+    assert.strictEqual(first.beginLine, 30, 'lines are exposed 0-based');
+    assert.strictEqual(first.code, 'return langfuse.get_prompt("support/summarizer")');
+    assert.strictEqual(first.branch, 'unknown');
+    // `util rectify --ai` exists (RectifyCommand.java), so the FIX IT tab must be offered.
+    assert.strictEqual(first.remediableLevel, 'AUTO');
+  });
+
+  test('processAiReport keeps the standard name when a standards entry has no controlId', () => {
+    // reset issues
+    issuesService.clear();
+
+    issuesService.processAiReport({
+      metadata: {},
+      vulnerabilities: [{ id: 'x', detectorId: 'd', severityFloor: 'low', standards: [{ std: 'owasp-llm-top10', version: '2025' }] }],
+    });
+
+    const first = issuesService.getIssuesByCategory('ai')[0] as AiXygeniIssue;
+    assert.deepStrictEqual(first.standards, ['owasp-llm-top10']);
   });
 
   test('processAiReport should yield zero issues (no throw) when the findings key does not match', () => {

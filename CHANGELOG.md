@@ -55,9 +55,17 @@
 ## [1.2.9]
 
 - Fix Free license handling
-- Add Code Quality scan (xygeni/xygeni-product-backlog#56)
 
 ## [1.2.10]
 
+- Add Code Quality scan (xygeni/xygeni-product-backlog#56)
 - Add API Security scan (xygeni/xygeni-product-backlog#1691)
 - Add AI Security scan (xygeni/xygeni-product-backlog#1692)
+- AI Security findings can be fixed with the Xygeni Agent (FIX IT tab, scanner `util rectify --ai`) (xygeni/xygeni-product-backlog#1692)
+- API Security findings are listed by flaw type, like the other categories; the full title is shown in the details panel (xygeni/xygeni-product-backlog#1691)
+- API Security findings now point to the endpoint handler file and line (or the module's OpenAPI spec), so they open in the editor and appear in Problems (xygeni/eclipse-plugin#22, xygeni/visual-studio-extension#15)
+- Auto Scan on Save no longer discards the findings of the scan types it does not run (Dependency Analysis, Misconfigurations, Code Quality, API Security, AI Security) (xygeni/eclipse-plugin#22, xygeni/visual-studio-extension#15)
+- Escape scanner-provided text (titles, endpoint paths, module names, explanations) in the issue details panel (xygeni/eclipse-plugin#22, xygeni/visual-studio-extension#15)
+- A scan that only skipped an unlicensed scan type (or that found issues) is now reported as completed instead of failed (xygeni/eclipse-plugin#22, xygeni/visual-studio-extension#15)
+- Scanner global options (xygeni/tech-support#378): Skip SSL Verification (`--skip-ssl-verify`, for corporate proxies that inspect TLS traffic), Skip Scanner Update and Verbose Scanner Output checkboxes plus an Additional Global Options field in the Scan Settings. Skip SSL Verification can be toggled from the Configuration view, where the other options also show while they are on; a scan that fails on the SSL certificate offers to enable it
+- Gear icon in the Configuration view to open the Xygeni settings

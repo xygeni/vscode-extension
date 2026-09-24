@@ -116,6 +116,22 @@ export class ConfigManager {
         return config.get<boolean>('autoScan', false);
     }
 
+    /** A boolean Scan Setting, such as the global option checkboxes (GLOBAL_OPTION_TOGGLES). */
+    public static getScanFlag(setting: string): boolean {
+        const config = vscode.workspace.getConfiguration(this.SCAN_CONFIG_SECTION);
+        return config.get<boolean>(setting, false);
+    }
+
+    public static async setScanFlag(setting: string, value: boolean): Promise<void> {
+        const config = vscode.workspace.getConfiguration(this.SCAN_CONFIG_SECTION);
+        await config.update(setting, value, vscode.ConfigurationTarget.Global);
+    }
+
+    public static getAdditionalGlobalOptions(): string {
+        const config = vscode.workspace.getConfiguration(this.SCAN_CONFIG_SECTION);
+        return config.get<string>('additionalGlobalOptions', '');
+    }
+
     public static async toggleAutoScan(): Promise<boolean> {
         const config = vscode.workspace.getConfiguration(this.SCAN_CONFIG_SECTION);
         const current = this.getAutoScan();

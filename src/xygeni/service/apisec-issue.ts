@@ -1,5 +1,4 @@
-import { XygeniIssueData } from '../common/interfaces';
-import { AbstractXygeniIssue } from './abstract-issue';
+import { SingleLocationXygeniIssue, SingleLocationXygeniIssueData } from './single-location-issue';
 
 /**
  * API Security flaw (missing authentication, BOLA, BFLA, data exposure, JWT/CORS
@@ -8,13 +7,18 @@ import { AbstractXygeniIssue } from './abstract-issue';
  * Two shape differences with the SAST-family reports drive this class:
  *  - the findings live under `flaws`, not `vulnerabilities` — the rest of the report is the
  *    discovered API inventory (services / dataObjects), which is NOT a finding stream;
- *  - a flaw may be scoped to a module or a service instead of an endpoint, and in that case it
- *    has no `location` — so it has no file, and inline diagnostics skip it by design.
+ *  - a flaw carries no `location`: IssuesService resolves its file from the API inventory
+ *    (endpoint handler, `handler_file` property or the module spec). When none applies the
+ *    flaw has no file, and the editor-bound consumers (snippet tab, diagnostics) skip it.
+ *
+ * The tree label (`type`) is the machine `flawType`, like every other category; the human
+ * `title` (which embeds the endpoint) is shown in the details panel.
  *
  * See ticket xygeni/xygeni-product-backlog#1691.
  */
-export interface ApisecXygeniIssueData extends XygeniIssueData {
-  branch: string;
+export interface ApisecXygeniIssueData extends SingleLocationXygeniIssueData {
+  /** Human-readable label of the flaw, e.g. "Endpoint reachable without authentication: GET /users". */
+  title?: string;
   /** HTTP method of the affected endpoint, when the flaw is endpoint-scoped. */
   endpointMethod?: string;
   /** Path of the affected endpoint, when the flaw is endpoint-scoped. */
@@ -31,9 +35,9 @@ export interface ApisecXygeniIssueData extends XygeniIssueData {
   remediation?: string;
 }
 
-export class ApisecXygeniIssue extends AbstractXygeniIssue {
+export class ApisecXygeniIssue extends SingleLocationXygeniIssue {
 
-  branch: string;
+  title?: string;
   endpointMethod?: string;
   endpointPath?: string;
   moduleName?: string;
@@ -44,7 +48,7 @@ export class ApisecXygeniIssue extends AbstractXygeniIssue {
 
   constructor(issue: ApisecXygeniIssueData) {
     super(issue);
-    this.branch = issue.branch;
+    this.title = issue.title;
     this.endpointMethod = issue.endpointMethod;
     this.endpointPath = issue.endpointPath;
     this.moduleName = issue.moduleName;
@@ -60,56 +64,17 @@ export class ApisecXygeniIssue extends AbstractXygeniIssue {
     return this.endpointMethod ? `${this.endpointMethod} ${this.endpointPath}` : this.endpointPath;
   }
 
-  override getSubtitleLineHtml(): string {
-    let subtitle = this.categoryName;
-
-    if (this.url) {
-      subtitle += ` &nbsp;&nbsp; <a href="${this.url}" target="_blank">${this.type}</a>`;
-    } else {
-      subtitle += ` ${this.type}`;
-    }
-    return subtitle;
-  }
-
-  getIssueDetailsHtml(): string {
+  protected getDetailRowsHtml(): string {
     return `
-      <div id="tab-content-1">
-      <table>
-          ${this.field(this.explanation, 'Explanation')}
-          ${this.field(this.type, 'Type')}
-          ${this.field(this.endpoint, 'Endpoint')}
-          ${this.field(this.moduleName, 'Module')}
-          ${this.field(this.serviceName, 'Service')}
-          ${this.field(this.owaspApiTop10?.join(', '), 'OWASP API Top 10')}
-          ${this.field(this.cwes?.join(', '), 'CWE')}
-          ${this.field(this.where(this.branch, undefined, undefined), 'Where')}
-          ${this.field(this.file, 'Location')}
-          ${this.field(this.detector, 'Found By')}
-          ${this.field(this.remediation, 'Remediation')}
-
-          ${this.fieldTags(this.tags)}
-
-      </table>
-
-        <p><span id="xy-detector-doc">Loading...</span></p>
-      </div>`;
+          ${this.fieldText(this.title, 'Title')}
+          ${this.fieldText(this.endpoint, 'Endpoint')}
+          ${this.fieldText(this.moduleName, 'Module')}
+          ${this.fieldText(this.serviceName, 'Service')}
+          ${this.fieldText(this.owaspApiTop10?.join(', '), 'OWASP API Top 10')}
+          ${this.fieldText(this.cwes?.join(', '), 'CWE')}`;
   }
 
-  getCodeSnippetHtmlTab(): string {
-    // Module-/service-scoped flaws have no location, so there is no snippet to show.
-    return this.file
-      ? `
-    <input type="radio" name="tabs" id="tab-2">
-    <label for="tab-2">CODE SNIPPET</label>`
-      : ``;
-  }
-
-  // API flaws are single-location: no taint/code-flow tab.
-  getCodeFlowHtmlTab(): string {
-    return ``;
-  }
-
-  getCodeFlowHtml(): string {
-    return ``;
+  protected getTrailingRowsHtml(): string {
+    return this.fieldMarkdown(this.remediation, 'Remediation');
   }
 }

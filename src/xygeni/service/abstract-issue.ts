@@ -1,6 +1,7 @@
 import { ISSUE_DETAILS_SAVE_FUNCTION, ISSUE_DETAILS_REMEDIATE_FUNCTION } from '../common/constants';
 import { Commands, XygeniIssue, XygeniIssueData } from '../common/interfaces';
 import { MarkdownParser } from '../common/markdown';
+import { escapeHtml } from '../common/html';
 
 
 export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssue {
@@ -66,10 +67,10 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
     let subtitle = this.categoryName;
 
     if (this.url) {
-      subtitle += ` &nbsp;&nbsp; <a href="${this.url}" target="_blank">${this.type}</a>`;
+      subtitle += ` &nbsp;&nbsp; <a href="${escapeHtml(this.url)}" target="_blank">${escapeHtml(this.type)}</a>`;
     }
     else {
-      subtitle += ` ${this.type}`;
+      subtitle += ` ${escapeHtml(this.type)}`;
     }
     return subtitle;
   }
@@ -90,7 +91,7 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
 
     return `
       <div id="tab-content-2">
-        <p class="file">${this.file ? this.file : ''}</p>
+        <p class="file">${escapeHtml(this.file)}</p>
         <table class="code-snippet-table">
           <tbody>
             ${codeSnippet}
@@ -117,7 +118,7 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
       </head>
       <body>
             <h1>Xygeni ${this.categoryName} Issue</h1>
-            <p>${this.severity ? `<span class="xy-slide-${this.severity}">${this.severity}</span>` : ''}</span> ${this.explanation ? this.explanation.length > 50 ? this.explanation.substring(0, 50) + '...' : this.explanation : this.type}</p>
+            <p>${this.severity ? `<span class="xy-slide-${this.severity}">${this.severity}</span>` : ''}</span> ${escapeHtml(this.explanation ? this.explanation.length > 50 ? this.explanation.substring(0, 50) + '...' : this.explanation : this.type)}</p>
             <p> ${this.getSubtitleLineHtml()} </p>
             <section class="xy-tabs-section">
             <input type="radio" name="tabs" id="tab-1" checked>
@@ -236,10 +237,20 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
       : '';
   }
 
+  /** Like `field`, for a plain-text value that comes from the scanner and must not render as HTML. */
+  public fieldText(value: string | undefined, title: string): string {
+    return this.field(escapeHtml(value), title);
+  }
+
+  /** Like `field`, for scanner text written in markdown (numbered steps, code spans); raw HTML in it is escaped by the parser. */
+  public fieldMarkdown(value: string | undefined, title: string): string {
+    return value && value.length > 0 ? this.field(MarkdownParser.parse(value), title) : '';
+  }
+
   public fieldTags(tags: string[] | undefined): string {
     return tags ?
       '<tr><th>Tags</th>' +
-      '<td><div class="xy-container-chip">' + tags.map(tag => `<div class="xy-blue-chip">${this.tagNames(tag)}</div>`).join(' ') + '</div></td></tr>'
+      '<td><div class="xy-container-chip">' + tags.map(tag => `<div class="xy-blue-chip">${escapeHtml(this.tagNames(tag))}</div>`).join(' ') + '</div></td></tr>'
       : '';
   }
 
@@ -278,13 +289,13 @@ export abstract class AbstractXygeniIssue implements XygeniIssueData, XygeniIssu
   public where(branch: string, commitHash: string | undefined, user: string | undefined): string {
     let where = '';
     if (branch) {
-      where += '<img src="{{iconsPath}}/branch.svg" alt="Branch"></img> ' + branch + ' &nbsp;&nbsp; ';
+      where += '<img src="{{iconsPath}}/branch.svg" alt="Branch"></img> ' + escapeHtml(branch) + ' &nbsp;&nbsp; ';
     }
     if (commitHash) {
-      where += '<img src="{{iconsPath}}/branch.svg" alt="Commit"></i> ' + commitHash + ' &nbsp;&nbsp; ';
+      where += '<img src="{{iconsPath}}/branch.svg" alt="Commit"></i> ' + escapeHtml(commitHash) + ' &nbsp;&nbsp; ';
     }
     if (user) {
-      where += '<img src="{{iconsPath}}/account.svg" alt="User"></img> ' + user;
+      where += '<img src="{{iconsPath}}/account.svg" alt="User"></img> ' + escapeHtml(user);
     }
     return where;
   }
