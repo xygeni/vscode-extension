@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
 import { ConfigManager } from '../config/xygeni-configuration';
-import { COMMAND_EDIT_XYGENI_API_URL, COMMAND_INSTALL_SCANNER, COMMAND_SHOW_MCP_SETUP, COMMAND_TEST_XYGENI_CONNECTION, COMMAND_TOGGLE_AUTO_SCAN, COMMAND_UPGRADE_LICENSE, STATUS, XYGENI_CONTEXT } from '../common/constants';
+import { COMMAND_EDIT_XYGENI_API_URL, COMMAND_INSTALL_SCANNER, COMMAND_SHOW_MCP_SETUP, COMMAND_TEST_XYGENI_CONNECTION, COMMAND_TOGGLE_AUTO_SCAN, COMMAND_TOGGLE_GLOBAL_OPTION, COMMAND_UPGRADE_LICENSE, STATUS, XYGENI_CONTEXT } from '../common/constants';
 import { Commands, XyContext } from '../common/interfaces';
+import { GLOBAL_OPTION_TOGGLES } from '../service/scanner-options';
 
 
 export interface ConfigurationViewEmitter {
@@ -22,6 +23,10 @@ export default class ConfigurationView implements vscode.TreeDataProvider<Config
         private commands: ConfigurationViewEmitter
     ) {
         this.commands.refreshConfigEventEmitter(() => this._onDidChangeTreeData.fire(undefined));
+        // Scan Settings can also be changed from the Settings editor.
+        context.subscriptions.push(vscode.workspace.onDidChangeConfiguration((event) => {
+            if (event.affectsConfiguration('xygeni.scan')) { this._onDidChangeTreeData.fire(undefined); }
+        }));
     }
 
     configItems: ConfigItem[] = [];
@@ -116,6 +121,27 @@ export default class ConfigurationView implements vscode.TreeDataProvider<Config
                         }
                     )
                 );
+            }
+
+            // Scanner global options: Skip SSL Verification is always offered (the corporate TLS proxy case);
+            // the others show up only while they are on, so what changes the scanner is visible and one
+            // click away from being turned off. All of them are checkboxes in the Settings (gear icon).
+            for (const toggle of GLOBAL_OPTION_TOGGLES) {
+                const enabled = ConfigManager.getScanFlag(toggle.setting);
+                if (!enabled && !toggle.alwaysVisible) { continue; }
+                const item = new ConfigItem(
+                    `  ${toggle.label}`,
+                    enabled ? `Enabled (${toggle.option}). Click to Disable.` : 'Disabled. Click to Enable.',
+                    vscode.TreeItemCollapsibleState.None,
+                    enabled ? 'option-on' : 'option-off',
+                    {
+                        command: COMMAND_TOGGLE_GLOBAL_OPTION,
+                        title: `Toggle ${toggle.option}`,
+                        arguments: [toggle.setting]
+                    }
+                );
+                item.tooltip = `Runs the scanner with ${toggle.option}. More scanner options in the Settings (gear icon).`;
+                this.configItems.push(item);
             }
 
             if (!isLicenseIdeAvailable) {
@@ -247,6 +273,12 @@ class ConfigItem extends vscode.TreeItem {
                 break;
             case 'status-locked':
                 this.iconPath = new vscode.ThemeIcon('lock', new vscode.ThemeColor('charts.yellow'));
+                break;
+            case 'option-off':
+                this.iconPath = new vscode.ThemeIcon('shield');
+                break;
+            case 'option-on':
+                this.iconPath = new vscode.ThemeIcon('warning', new vscode.ThemeColor('charts.yellow'));
                 break;
             case 'show':
                 this.iconPath = new vscode.ThemeIcon('eye');

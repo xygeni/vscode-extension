@@ -8,10 +8,13 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import crypto from 'crypto';
-import { window } from 'vscode';
-import { XYGENI_SCANNER_OUTPUT_NAME, XYGENI_SCANNER_REPORT_SUFFIX } from '../common/constants';
+import { commands as vscodeCommands, window } from 'vscode';
+import { COMMAND_TOGGLE_GLOBAL_OPTION, XYGENI_SCANNER_OUTPUT_NAME, XYGENI_SCANNER_REPORT_SUFFIX } from '../common/constants';
 import IssuesService from './issues';
 import { ProxyConfigManager } from '../config/proxy-configuration';
+import { LICENSE_ERROR_EXIT_CODE, hasReportWrittenSince, isCompletedRun, reportFreshnessStartTime } from './scan-exit-code';
+import { ConfigManager } from '../config/xygeni-configuration';
+import { GLOBAL_OPTION_TOGGLES, SKIP_SSL_VERIFY_OPTION, blockedOptionsIn, buildGlobalOptions, isCertificateError } from './scanner-options';
 
 
     /**
@@ -28,15 +31,20 @@ class XygeniScannerService extends EventEmitter {
     readonly timeout = 1800000; // 30 minutes
     readonly output_suffix = '/scanner.report.json';
 
-    readonly run_analysis_args = ['scan', '--run=deps,secrets,misconf,iac,suspectdeps,sast,malware,quality,apisec,ai', '-f', 'json', '-o',
+    readonly full_scan_types = ['deps', 'secrets', 'misconf', 'iac', 'suspectdeps', 'sast', 'malware', 'quality', 'apisec', 'ai'];
+    readonly incremental_scan_types = ['secrets', 'iac', 'sast', 'malware'];
+
+    readonly run_analysis_args = ['scan', `--run=${this.full_scan_types.join(',')}`, '-f', 'json', '-o',
         XYGENI_SCANNER_REPORT_SUFFIX, '--no-upload', '--include-vulnerabilities'];
 
-    readonly run_incremental_analysis_args = ['scan', '--run=secrets,iac,sast,malware', '--incremental', '-f', 'json', '-o',
+    readonly run_incremental_analysis_args = ['scan', `--run=${this.incremental_scan_types.join(',')}`, '--incremental', '-f', 'json', '-o',
         XYGENI_SCANNER_REPORT_SUFFIX, '--no-upload', '--include-vulnerabilities'];
 
     readonly run_rectify_sca_args = ['util', 'rectify', '--sca'];
     readonly run_rectify_sast_args = ['util', 'rectify', '--sast'];
     readonly run_rectify_quality_args = ['util', 'rectify', '--quality'];
+    // RectifyCommand.java `--ai` → runAiRectify(file, detector, line): same parameters as SAST/quality.
+    readonly run_rectify_ai_args = ['util', 'rectify', '--ai'];
 
     private scannerRunning = false;
     private cachedJavaHome: string | undefined | null = null; // null = not yet resolved
@@ -47,6 +55,7 @@ class XygeniScannerService extends EventEmitter {
     private activeScannerCount = 0;
 
     private exitCode: number | undefined;
+    private skipSslVerifySuggested = false;
 
 
     private scans: ScanResult[] = [];
@@ -89,15 +98,15 @@ class XygeniScannerService extends EventEmitter {
         this.scans.push({ timestamp: timestamp, status: 'running', issuesFound: undefined, summary: '' });
         this.emitChange();
 
-        return this.runAnalysisCommand(sourceFolder, xygeniScannerPath, output).then(() => {
+        return this.runAnalysisCommand(sourceFolder, xygeniScannerPath, output).then((exitCode) => {
 
             this.logger.log('  Scanner finished');
             this.scans.pop();
             const totalTimeInSeconds = (new Date().getTime() - timestamp.getTime()) / 1000;
-            this.scans.push({ timestamp: timestamp, status: 'completed', issuesFound: undefined, summary: 'Duration: ' + totalTimeInSeconds + 's' });
+            this.scans.push({ timestamp: timestamp, status: 'completed', issuesFound: undefined, summary: 'Duration: ' + totalTimeInSeconds + 's' + this.licenseNote(exitCode) });
+            this.reportLicenseSkips(exitCode, output);
 
-            
-            this.exitCode = 0;
+            this.exitCode = exitCode;
 
             this.emitChange();
 
@@ -146,8 +155,13 @@ class XygeniScannerService extends EventEmitter {
         return this.scans;
     }
 
+    /** The `--run=` scan types of the on-save incremental scan; only their reports are refreshed by it. */
+    public getIncrementalScanTypes(): string[] {
+        return [...this.incremental_scan_types];
+    }
 
-    public runAnalysisCommand(sourceFolder: string, xygeniInstallPath: string, output: IOutputChannel): Promise<void> {
+
+    public runAnalysisCommand(sourceFolder: string, xygeniInstallPath: string, output: IOutputChannel): Promise<number> {
         const args = [...this.run_analysis_args, '-d', sourceFolder];
         return this.callScanner(xygeniInstallPath, args, output);
     }
@@ -171,14 +185,15 @@ class XygeniScannerService extends EventEmitter {
         this.scans.push({ timestamp: timestamp, status: 'running', issuesFound: undefined, summary: 'incremental' });
         this.emitChange();
 
-        return this.runIncrementalAnalysisCommand(sourceFolder, xygeniScannerPath, output).then(() => {
+        return this.runIncrementalAnalysisCommand(sourceFolder, xygeniScannerPath, output).then((exitCode) => {
 
             this.logger.log('  Incremental scanner finished');
             this.scans.pop();
             const totalTimeInSeconds = (new Date().getTime() - timestamp.getTime()) / 1000;
-            this.scans.push({ timestamp: timestamp, status: 'completed', issuesFound: undefined, summary: 'Incremental - Duration: ' + totalTimeInSeconds + 's' });
+            this.scans.push({ timestamp: timestamp, status: 'completed', issuesFound: undefined, summary: 'Incremental - Duration: ' + totalTimeInSeconds + 's' + this.licenseNote(exitCode) });
+            this.reportLicenseSkips(exitCode, output);
 
-            this.exitCode = 0;
+            this.exitCode = exitCode;
             this.emitChange();
 
             return;
@@ -194,23 +209,28 @@ class XygeniScannerService extends EventEmitter {
         });
     }
 
-    public runIncrementalAnalysisCommand(sourceFolder: string, xygeniInstallPath: string, output: IOutputChannel): Promise<void> {
+    public runIncrementalAnalysisCommand(sourceFolder: string, xygeniInstallPath: string, output: IOutputChannel): Promise<number> {
         const args = [...this.run_incremental_analysis_args, '-d', sourceFolder];
         return this.callScanner(xygeniInstallPath, args, output);
     }
 
-    public runRectifyScaCommand(filePath: string, dependency: string, xygeniInstallPath: string, output: IOutputChannel): Promise<void> {
+    public runRectifyScaCommand(filePath: string, dependency: string, xygeniInstallPath: string, output: IOutputChannel): Promise<number> {
         const args = [...this.run_rectify_sca_args, '--file-path', filePath, '--dependency', dependency];
         return this.callScanner(xygeniInstallPath, args, output);
     }
 
-    public runRectifySastCommand(filePath: string, detector: string, line: string, xygeniInstallPath: string, output: IOutputChannel): Promise<void> {
+    public runRectifySastCommand(filePath: string, detector: string, line: string, xygeniInstallPath: string, output: IOutputChannel): Promise<number> {
         const args = [...this.run_rectify_sast_args, '--file-path', filePath, '--detector', detector, '--line', line];
         return this.callScanner(xygeniInstallPath, args, output);
     }
 
-    public runRectifyQualityCommand(filePath: string, detector: string, line: string, xygeniInstallPath: string, output: IOutputChannel): Promise<void> {
+    public runRectifyQualityCommand(filePath: string, detector: string, line: string, xygeniInstallPath: string, output: IOutputChannel): Promise<number> {
         const args = [...this.run_rectify_quality_args, '--file-path', filePath, '--detector', detector, '--line', line];
+        return this.callScanner(xygeniInstallPath, args, output);
+    }
+
+    public runRectifyAiCommand(filePath: string, detector: string, line: string, xygeniInstallPath: string, output: IOutputChannel): Promise<number> {
+        const args = [...this.run_rectify_ai_args, '--file-path', filePath, '--detector', detector, '--line', line];
         return this.callScanner(xygeniInstallPath, args, output);
     }
 
@@ -231,8 +251,8 @@ class XygeniScannerService extends EventEmitter {
     
 
     // call scanner executable at xygeniInstallPath from workingDir with args
-    private callScanner(xygeniInstallPath: string, args: string[], output: IOutputChannel): Promise<void> {
-        
+    private callScanner(xygeniInstallPath: string, args: string[], output: IOutputChannel): Promise<number> {
+
         if (this.scannerRunning) {
             return Promise.reject('Scanner is already running');
         }
@@ -242,12 +262,23 @@ class XygeniScannerService extends EventEmitter {
             .finally(() => {
                 this.scannerRunning = false;
             });
-               
-        
+
+
     }
 
-    // execute the actual scanner process
-    private executeScannerCall(xygeniInstallPath: string, args: string[], output: IOutputChannel): Promise<void> {
+    private licenseNote(exitCode: number): string {
+        return exitCode === LICENSE_ERROR_EXIT_CODE ? ' - some scan types are not licensed and were skipped' : '';
+    }
+
+    // The scan list only shows the note on hover, so repeat it where the scanner output is read.
+    private reportLicenseSkips(exitCode: number, output: IOutputChannel): void {
+        if (exitCode === LICENSE_ERROR_EXIT_CODE) {
+            output.appendLine('Some scan types are not licensed and were skipped; the licensed ones completed (see the LICENSE ERROR lines above).');
+        }
+    }
+
+    // execute the actual scanner process; resolves with the scanner exit code
+    private executeScannerCall(xygeniInstallPath: string, args: string[], output: IOutputChannel): Promise<number> {
         return new Promise((resolve, reject) => {
             
             if (!xygeniInstallPath) {
@@ -263,6 +294,19 @@ class XygeniScannerService extends EventEmitter {
                 ...process.env,
             };
             
+            // Global options go before the command (`xygeni <global> scan ...`); `args` keeps the command
+            // first, so the isScanCommand check below still sees it.
+            const enabledOptions = GLOBAL_OPTION_TOGGLES
+                .filter((toggle) => ConfigManager.getScanFlag(toggle.setting))
+                .map((toggle) => toggle.option);
+            const additionalGlobalOptions = ConfigManager.getAdditionalGlobalOptions();
+            const globalOptions = buildGlobalOptions(enabledOptions, additionalGlobalOptions);
+            const blockedOptions = blockedOptionsIn(additionalGlobalOptions);
+            if (blockedOptions.length) {
+                this.logger.log(`  Ignoring scanner options ${blockedOptions.join(' ')}: -q/--quiet hide the scanner output the extension reads; the API token comes from the Xygeni configuration.`);
+            }
+            const commandArgs = [...globalOptions, ...args];
+
             let shellCommand;
             let shellArgs = [];
 
@@ -279,11 +323,11 @@ class XygeniScannerService extends EventEmitter {
                     return;
                 }
                 shellCommand = psPath;
-                shellArgs = ["-NoProfile","-ExecutionPolicy", "Bypass", "-File", scannerScriptPath, ...args];
+                shellArgs = ["-NoProfile","-ExecutionPolicy", "Bypass", "-File", scannerScriptPath, ...commandArgs];
             }
             else {
                 shellCommand = scannerScriptPath;
-                shellArgs = [...args];
+                shellArgs = [...commandArgs];
 
             }
 
@@ -291,7 +335,14 @@ class XygeniScannerService extends EventEmitter {
             this.logger.log('  Running scanner command: ' + shellCommand + ' ' + shellArgs.join(' '));
 
             this.getEnvVariables(env).then((env) => {
-                    
+
+                // Reports land in workingDir as `<type>.<suffix>`; one dated after this start proves
+                // that the licensed scan types ran when the exit code is 127.
+                const isScanCommand = args[0] === 'scan';
+                const startTime = reportFreshnessStartTime();
+                let sawCertificateError = false;
+                let previousTail = ''; // a marker may be split across two output chunks
+
                 const scannerProcess = spawn(shellCommand, shellArgs, {
                     stdio: ['pipe', 'pipe', 'pipe'],
                     shell: false, // Disable shell for cross-platform compatibility and security
@@ -299,19 +350,27 @@ class XygeniScannerService extends EventEmitter {
                     env: env
                 });
 
-                scannerProcess.stdout.on('data', (data) => {
-                    output.append(this.stripAnsiEscapeSequences(data.toString()));
-                });
-
-                scannerProcess.stderr.on('data', (data) => {
-                    output.append(this.stripAnsiEscapeSequences(data.toString()));
-                });
+                const onOutput = (data: Buffer) => {
+                    const text = this.stripAnsiEscapeSequences(data.toString());
+                    sawCertificateError = sawCertificateError || isCertificateError(previousTail + text);
+                    previousTail = text.slice(-100);
+                    output.append(text);
+                };
+                scannerProcess.stdout.on('data', onOutput);
+                scannerProcess.stderr.on('data', onOutput);
 
                 scannerProcess.on('close', (code) => {
                     clearTimeout(timeout);
-                    if (code !== null && (code === 0 || code > 128)) {
-                        resolve(); // Scanner process completed successfully
+                    const wroteReportThisRun = isScanCommand && hasReportWrittenSince(workingDir, XYGENI_SCANNER_REPORT_SUFFIX, startTime);
+                    if (isCompletedRun(code, isScanCommand, wroteReportThisRun)) {
+                        resolve(code as number);
                     } else {
+                        if (isScanCommand && code === LICENSE_ERROR_EXIT_CODE) {
+                            output.appendLine('Scan finished with exit code 127 and no report was written: the license is missing, expired or locked, or no scan type is licensed.');
+                        }
+                        if (sawCertificateError && !globalOptions.includes(SKIP_SSL_VERIFY_OPTION)) {
+                            this.suggestSkipSslVerify(output);
+                        }
                         reject(new Error(`Scanner process failed with exit code ${code}`));
                     }
                 });
@@ -326,6 +385,22 @@ class XygeniScannerService extends EventEmitter {
                     reject(new Error('Scanner process timeout'));
                 }, this.timeout);
             });
+        });
+    }
+
+    // A TLS-intercepting proxy makes every scanner call fail on the certificate; the user cannot be expected
+    // to know the CLI option, so point them at the setting. (xygeni/tech-support#378)
+    private suggestSkipSslVerify(output: IOutputChannel): void {
+        if (this.skipSslVerifySuggested) { return; } // concurrent scans would repeat it
+        this.skipSslVerifySuggested = true;
+        const message = 'The Xygeni scanner could not validate the server SSL certificate. If you are behind a corporate proxy '
+            + 'that inspects TLS traffic, enable "Skip SSL Verification" in the Xygeni Configuration.';
+        output.appendLine(message);
+        const enable = 'Enable Skip SSL Verification';
+        window.showWarningMessage(message, enable).then((choice) => {
+            if (choice === enable) {
+                vscodeCommands.executeCommand(COMMAND_TOGGLE_GLOBAL_OPTION, 'skipSslVerify');
+            }
         });
     }
 

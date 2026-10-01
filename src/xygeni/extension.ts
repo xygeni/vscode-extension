@@ -5,7 +5,7 @@ import ConfigurationView from './views/configuration-view';
 import { ScanView } from './views/scan-view';
 import { AiIssueView, ApisecIssueView, IaCIssueView, IssueView, MisconfIssueView, QualityIssueView, SastIssueView, ScaIssueView, SecretsIssueView } from './views/issue-view';
 import { HelpView } from './views/help-view';
-import { XYGENI_SHOW_CONFIG_COMMAND, XYGENI_CONTEXT, COMMAND_EDIT_XYGENI_API_URL, COMMAND_EDIT_XYGENI_TOKEN, COMMAND_TEST_XYGENI_CONNECTION, COMMAND_INSTALL_SCANNER, XYGENI_CLOSE_CONFIG_COMMAND, COMMAND_RUN_SCANNER, COMMAND_SHOW_OUTPUT, COMMAND_OPEN_PROXY_CONFIG, COMMAND_SHOW_SCAN_OUTPUT, COMMAND_SHOW_MCP_SETUP, COMMAND_TOGGLE_AUTO_SCAN, COMMAND_UPGRADE_LICENSE } from './common/constants';
+import { XYGENI_SHOW_CONFIG_COMMAND, XYGENI_CONTEXT, COMMAND_EDIT_XYGENI_API_URL, COMMAND_EDIT_XYGENI_TOKEN, COMMAND_TEST_XYGENI_CONNECTION, COMMAND_INSTALL_SCANNER, XYGENI_CLOSE_CONFIG_COMMAND, COMMAND_RUN_SCANNER, COMMAND_SHOW_OUTPUT, COMMAND_OPEN_PROXY_CONFIG, COMMAND_OPEN_SETTINGS, COMMAND_SHOW_SCAN_OUTPUT, COMMAND_SHOW_MCP_SETUP, COMMAND_TOGGLE_AUTO_SCAN, COMMAND_TOGGLE_GLOBAL_OPTION, COMMAND_UPGRADE_LICENSE } from './common/constants';
 import { XyContextImpl } from './common/context';
 import InstallerService from './service/installer';
 import { Logger } from './common/logger';
@@ -114,6 +114,10 @@ class XygeniExtension {
       vscode.commands.registerCommand(COMMAND_OPEN_PROXY_CONFIG, () => {
         commands.openProxySettings();
       }),
+      // Every Xygeni setting (connection, proxy, scan options) filtered in the Settings editor.
+      vscode.commands.registerCommand(COMMAND_OPEN_SETTINGS, () => {
+        commands.openProxySettings();
+      }),
 
       vscode.commands.registerCommand(COMMAND_SHOW_OUTPUT, () => {
         Logger.showOutput();
@@ -146,6 +150,9 @@ class XygeniExtension {
       vscode.commands.registerCommand(COMMAND_TOGGLE_AUTO_SCAN, async () => {
         await commands.toggleAutoScan();
       }),
+      vscode.commands.registerCommand(COMMAND_TOGGLE_GLOBAL_OPTION, async (setting: string) => {
+        await commands.toggleGlobalOption(setting);
+      }),
 
       vscode.commands.registerCommand(COMMAND_UPGRADE_LICENSE, () => {
         commands.openUpgradePage();
@@ -160,7 +167,8 @@ class XygeniExtension {
       }),
 
       vscode.commands.registerCommand('xygeni.showIssueDetailsFromDiagnostic', (issueId) => {
-        const issue = commands.getIssues().find(i => i.id === issueId);
+        if (!issueId) { return; }
+        const issue = commands.getIssues().find((candidate) => candidate.id === issueId);
         if (issue) {
           commands.showIssueDetails(issue);
         }
