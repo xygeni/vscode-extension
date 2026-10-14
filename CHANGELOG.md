@@ -55,3 +55,7 @@
 ## [1.2.9]
 
 - Fix Free license handling
+
+## [1.2.10]
+
+- Fix extension versioning so the release can be published to the Marketplace
