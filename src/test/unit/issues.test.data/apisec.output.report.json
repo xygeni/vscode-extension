@@ -1,0 +1,1204 @@
+{
+  "metadata": {
+    "uuid": "00000000-0000-0000-0000-000000000000",
+    "timestamp": "2026-01-01T00:00:00.000000000Z",
+    "projectName": "erev0s/VAmPI",
+    "directory": "/work/apisec/benchmark/vampi",
+    "developerHashes": [],
+    "sourceType": "REPO",
+    "scanType": "apisec",
+    "scm": {
+      "kind": "github",
+      "url": "https://github.com/erev0s/VAmPI.git",
+      "fullName": "erev0s/VAmPI",
+      "branch": "origin/master",
+      "defaultBranch": "origin/master",
+      "visibility": "public"
+    },
+    "reportProperties": {
+      "tool.url": "https://docs.xygeni.io",
+      "tool.version": "6.12.0",
+      "tool.name": "Xygeni"
+    },
+    "format": "apisec-xygeni"
+  },
+  "services": [
+    {
+      "name": "VAmPI",
+      "version": "0.1",
+      "description": "OpenAPI v3 specs for VAmPI",
+      "baseUrls": [
+        "http://localhost:5000"
+      ],
+      "modules": [
+        {
+          "name": "VAmPI",
+          "basePath": "",
+          "location": {
+            "file": "openapi_specs/openapi3.yml"
+          },
+          "endpoints": [
+            {
+              "method": "GET",
+              "path": "/createdb",
+              "operationId": "api_views.main.populate_db",
+              "summary": "Creates and populates the database with dummy data",
+              "description": "Creates and populates the database with dummy data",
+              "responseType": "api_views.main.populate_db_response_200",
+              "qualifiedResponseType": "api_views.main.populate_db_response_200",
+              "tags": [
+                "db-init"
+              ],
+              "handler": {
+                "file": "api_views/main.py",
+                "line": 6,
+                "className": "api_views.main",
+                "methodName": "populate_db"
+              },
+              "produces": [
+                "application/json"
+              ],
+              "fullPath": "http://localhost:5000/createdb"
+            },
+            {
+              "method": "GET",
+              "path": "/",
+              "operationId": "api_views.main.basic",
+              "summary": "VAmPI home",
+              "description": "VAmPI is a vulnerable on purpose API. It was created in order to evaluate the efficiency of third party tools in identifying vulnerabilities in APIs but it can also be used in learning/teaching purposes.",
+              "responseType": "api_views.main.basic_response_200",
+              "qualifiedResponseType": "api_views.main.basic_response_200",
+              "tags": [
+                "home"
+              ],
+              "handler": {
+                "file": "api_views/main.py",
+                "line": 14,
+                "className": "api_views.main",
+                "methodName": "basic"
+              },
+              "produces": [
+                "application/json"
+              ],
+              "fullPath": "http://localhost:5000/"
+            },
+            {
+              "method": "GET",
+              "path": "/users/v1",
+              "operationId": "api_views.users.get_all_users",
+              "summary": "Retrieves all users",
+              "description": "Displays all users with basic information",
+              "responseType": "api_views.users.get_all_users_response_200",
+              "qualifiedResponseType": "api_views.users.get_all_users_response_200",
+              "tags": [
+                "users"
+              ],
+              "handler": {
+                "file": "api_views/users.py",
+                "line": 19,
+                "className": "api_views.users",
+                "methodName": "get_all_users"
+              },
+              "produces": [
+                "application/json"
+              ],
+              "fullPath": "http://localhost:5000/users/v1"
+            },
+            {
+              "method": "GET",
+              "path": "/users/v1/_debug",
+              "operationId": "api_views.users.debug",
+              "summary": "Retrieves all details for all users",
+              "description": "Displays all details for all users",
+              "responseType": "api_views.users.debug_response_200",
+              "qualifiedResponseType": "api_views.users.debug_response_200",
+              "tags": [
+                "users"
+              ],
+              "handler": {
+                "file": "api_views/users.py",
+                "line": 24,
+                "className": "api_views.users",
+                "methodName": "debug"
+              },
+              "produces": [
+                "application/json"
+              ],
+              "fullPath": "http://localhost:5000/users/v1/_debug"
+            },
+            {
+              "method": "POST",
+              "path": "/users/v1/register",
+              "operationId": "api_views.users.register_user",
+              "summary": "Register new user",
+              "description": "Register new user",
+              "parameters": [
+                {
+                  "name": "body",
+                  "in": "BODY",
+                  "type": "api_views.users.register_user_request",
+                  "qualifiedType": "api_views.users.register_user_request",
+                  "required": true,
+                  "sensitive": false
+                }
+              ],
+              "responseType": "api_views.users.register_user_response_200",
+              "qualifiedResponseType": "api_views.users.register_user_response_200",
+              "tags": [
+                "users"
+              ],
+              "handler": {
+                "file": "api_views/users.py",
+                "line": 52,
+                "className": "api_views.users",
+                "methodName": "register_user"
+              },
+              "consumes": [
+                "application/json"
+              ],
+              "produces": [
+                "application/json"
+              ],
+              "fullPath": "http://localhost:5000/users/v1/register"
+            },
+            {
+              "method": "POST",
+              "path": "/users/v1/login",
+              "operationId": "api_views.users.login_user",
+              "summary": "Login to VAmPI",
+              "description": "Login to VAmPI",
+              "parameters": [
+                {
+                  "name": "body",
+                  "in": "BODY",
+                  "type": "api_views.users.login_user_request",
+                  "qualifiedType": "api_views.users.login_user_request",
+                  "required": true,
+                  "sensitive": false
+                }
+              ],
+              "responseType": "api_views.users.login_user_response_200",
+              "qualifiedResponseType": "api_views.users.login_user_response_200",
+              "tags": [
+                "users"
+              ],
+              "handler": {
+                "file": "api_views/users.py",
+                "line": 85,
+                "className": "api_views.users",
+                "methodName": "login_user"
+              },
+              "consumes": [
+                "application/json"
+              ],
+              "produces": [
+                "application/json"
+              ],
+              "fullPath": "http://localhost:5000/users/v1/login"
+            },
+            {
+              "method": "GET",
+              "path": "/me",
+              "operationId": "api_views.users.me",
+              "summary": "Retrieves currently logged in user",
+              "description": "Displays information about the currently authenticated user",
+              "responseType": "api_views.users.me_response_200",
+              "qualifiedResponseType": "api_views.users.me_response_200",
+              "tags": [
+                "users"
+              ],
+              "handler": {
+                "file": "api_views/users.py",
+                "line": 28,
+                "className": "api_views.users",
+                "methodName": "me"
+              },
+              "security": [
+                {
+                  "type": "openapi-security",
+                  "scheme": "bearerAuth",
+                  "simpleAuth": true
+                }
+              ],
+              "produces": [
+                "application/json"
+              ],
+              "fullPath": "http://localhost:5000/me"
+            },
+            {
+              "method": "GET",
+              "path": "/users/v1/{username}",
+              "operationId": "api_views.users.get_by_username",
+              "summary": "Retrieves user by username",
+              "description": "Displays user by username",
+              "parameters": [
+                {
+                  "name": "username",
+                  "in": "PATH",
+                  "type": "string",
+                  "required": true,
+                  "description": "retrieve username data",
+                  "sensitive": true
+                }
+              ],
+              "responseType": "api_views.users.get_by_username_response_200",
+              "qualifiedResponseType": "api_views.users.get_by_username_response_200",
+              "tags": [
+                "users"
+              ],
+              "handler": {
+                "file": "api_views/users.py",
+                "line": 45,
+                "className": "api_views.users",
+                "methodName": "get_by_username"
+              },
+              "produces": [
+                "application/json"
+              ],
+              "fullPath": "http://localhost:5000/users/v1/{username}"
+            },
+            {
+              "method": "DELETE",
+              "path": "/users/v1/{username}",
+              "operationId": "api_views.users.delete_user",
+              "summary": "Deletes user by username (Only Admins)",
+              "description": "Deletes user by username (Only Admins)",
+              "parameters": [
+                {
+                  "name": "username",
+                  "in": "PATH",
+                  "type": "string",
+                  "required": true,
+                  "description": "Delete username",
+                  "sensitive": true
+                }
+              ],
+              "responseType": "api_views.users.delete_user_response_200",
+              "qualifiedResponseType": "api_views.users.delete_user_response_200",
+              "tags": [
+                "users"
+              ],
+              "handler": {
+                "file": "api_views/users.py",
+                "line": 206,
+                "className": "api_views.users",
+                "methodName": "delete_user"
+              },
+              "security": [
+                {
+                  "type": "openapi-security",
+                  "scheme": "bearerAuth",
+                  "simpleAuth": true
+                }
+              ],
+              "produces": [
+                "application/json"
+              ],
+              "fullPath": "http://localhost:5000/users/v1/{username}"
+            },
+            {
+              "method": "PUT",
+              "path": "/users/v1/{username}/email",
+              "operationId": "api_views.users.update_email",
+              "summary": "Update users email",
+              "description": "Update a single users email",
+              "parameters": [
+                {
+                  "name": "username",
+                  "in": "PATH",
+                  "type": "string",
+                  "required": true,
+                  "description": "username to update email",
+                  "sensitive": true
+                },
+                {
+                  "name": "body",
+                  "in": "BODY",
+                  "type": "api_views.users.update_email_request",
+                  "qualifiedType": "api_views.users.update_email_request",
+                  "required": true,
+                  "sensitive": false
+                }
+              ],
+              "tags": [
+                "users"
+              ],
+              "handler": {
+                "file": "api_views/users.py",
+                "line": 132,
+                "className": "api_views.users",
+                "methodName": "update_email"
+              },
+              "security": [
+                {
+                  "type": "openapi-security",
+                  "scheme": "bearerAuth",
+                  "simpleAuth": true
+                }
+              ],
+              "consumes": [
+                "application/json"
+              ],
+              "produces": [
+                "application/json"
+              ],
+              "fullPath": "http://localhost:5000/users/v1/{username}/email"
+            },
+            {
+              "method": "PUT",
+              "path": "/users/v1/{username}/password",
+              "operationId": "api_views.users.update_password",
+              "summary": "Update users password",
+              "description": "Update users password",
+              "parameters": [
+                {
+                  "name": "username",
+                  "in": "PATH",
+                  "type": "string",
+                  "required": true,
+                  "description": "username to update password",
+                  "sensitive": true
+                },
+                {
+                  "name": "body",
+                  "in": "BODY",
+                  "type": "api_views.users.update_password_request",
+                  "qualifiedType": "api_views.users.update_password_request",
+                  "required": true,
+                  "sensitive": false
+                }
+              ],
+              "tags": [
+                "users"
+              ],
+              "handler": {
+                "file": "api_views/users.py",
+                "line": 179,
+                "className": "api_views.users",
+                "methodName": "update_password"
+              },
+              "security": [
+                {
+                  "type": "openapi-security",
+                  "scheme": "bearerAuth",
+                  "simpleAuth": true
+                }
+              ],
+              "consumes": [
+                "application/json"
+              ],
+              "produces": [
+                "application/json"
+              ],
+              "fullPath": "http://localhost:5000/users/v1/{username}/password"
+            },
+            {
+              "method": "GET",
+              "path": "/books/v1",
+              "operationId": "api_views.books.get_all_books",
+              "summary": "Retrieves all books",
+              "description": "Retrieves all books",
+              "responseType": "api_views.books.get_all_books_response_200",
+              "qualifiedResponseType": "api_views.books.get_all_books_response_200",
+              "tags": [
+                "books"
+              ],
+              "handler": {
+                "file": "api_views/books.py",
+                "line": 12,
+                "className": "api_views.books",
+                "methodName": "get_all_books"
+              },
+              "produces": [
+                "application/json"
+              ],
+              "fullPath": "http://localhost:5000/books/v1"
+            },
+            {
+              "method": "POST",
+              "path": "/books/v1",
+              "operationId": "api_views.books.add_new_book",
+              "summary": "Add new book",
+              "description": "Add new book",
+              "parameters": [
+                {
+                  "name": "body",
+                  "in": "BODY",
+                  "type": "api_views.books.add_new_book_request",
+                  "qualifiedType": "api_views.books.add_new_book_request",
+                  "required": true,
+                  "sensitive": false
+                }
+              ],
+              "responseType": "api_views.books.add_new_book_response_200",
+              "qualifiedResponseType": "api_views.books.add_new_book_response_200",
+              "tags": [
+                "books"
+              ],
+              "handler": {
+                "file": "api_views/books.py",
+                "line": 17,
+                "className": "api_views.books",
+                "methodName": "add_new_book"
+              },
+              "security": [
+                {
+                  "type": "openapi-security",
+                  "scheme": "bearerAuth",
+                  "simpleAuth": true
+                }
+              ],
+              "consumes": [
+                "application/json"
+              ],
+              "produces": [
+                "application/json"
+              ],
+              "fullPath": "http://localhost:5000/books/v1"
+            },
+            {
+              "method": "GET",
+              "path": "/books/v1/{book_title}",
+              "operationId": "api_views.books.get_by_title",
+              "summary": "Retrieves book by title along with secret",
+              "description": "Retrieves book by title along with secret. Only the owner may retrieve it",
+              "parameters": [
+                {
+                  "name": "book_title",
+                  "in": "PATH",
+                  "type": "string",
+                  "required": true,
+                  "description": "retrieve book data",
+                  "sensitive": false
+                }
+              ],
+              "responseType": "api_views.books.get_by_title_response_200",
+              "qualifiedResponseType": "api_views.books.get_by_title_response_200",
+              "tags": [
+                "books"
+              ],
+              "handler": {
+                "file": "api_views/books.py",
+                "line": 45,
+                "className": "api_views.books",
+                "methodName": "get_by_title"
+              },
+              "security": [
+                {
+                  "type": "openapi-security",
+                  "scheme": "bearerAuth",
+                  "simpleAuth": true
+                }
+              ],
+              "produces": [
+                "application/json"
+              ],
+              "fullPath": "http://localhost:5000/books/v1/{book_title}"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "dataObjects": [
+    {
+      "name": "api_views.main.populate_db_response_200",
+      "qualifiedName": "api_views.main.populate_db_response_200",
+      "location": {
+        "file": "openapi_specs/openapi3.yml"
+      },
+      "usedInResponse": true,
+      "fields": [
+        {
+          "name": "message",
+          "type": "string",
+          "required": false,
+          "sensitive": false
+        }
+      ]
+    },
+    {
+      "name": "api_views.main.basic_response_200",
+      "qualifiedName": "api_views.main.basic_response_200",
+      "location": {
+        "file": "openapi_specs/openapi3.yml"
+      },
+      "usedInResponse": true,
+      "fields": [
+        {
+          "name": "message",
+          "type": "string",
+          "required": false,
+          "sensitive": false
+        },
+        {
+          "name": "help",
+          "type": "string",
+          "required": false,
+          "sensitive": false
+        },
+        {
+          "name": "vulnerable",
+          "type": "number",
+          "required": false,
+          "sensitive": false
+        }
+      ]
+    },
+    {
+      "name": "api_views.users.get_all_users_response_200",
+      "qualifiedName": "api_views.users.get_all_users_response_200",
+      "location": {
+        "file": "openapi_specs/openapi3.yml"
+      },
+      "usedInResponse": true,
+      "fields": [
+        {
+          "name": "users",
+          "type": "array",
+          "required": false,
+          "sensitive": false
+        }
+      ]
+    },
+    {
+      "name": "api_views.users.debug_response_200",
+      "qualifiedName": "api_views.users.debug_response_200",
+      "location": {
+        "file": "openapi_specs/openapi3.yml"
+      },
+      "usedInResponse": true,
+      "fields": [
+        {
+          "name": "users",
+          "type": "array",
+          "required": false,
+          "sensitive": false
+        }
+      ]
+    },
+    {
+      "name": "api_views.users.register_user_response_200",
+      "qualifiedName": "api_views.users.register_user_response_200",
+      "location": {
+        "file": "openapi_specs/openapi3.yml"
+      },
+      "usedInResponse": true,
+      "fields": [
+        {
+          "name": "message",
+          "type": "string",
+          "required": false,
+          "sensitive": false
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": false,
+          "sensitive": false
+        }
+      ]
+    },
+    {
+      "name": "api_views.users.register_user_request",
+      "qualifiedName": "api_views.users.register_user_request",
+      "location": {
+        "file": "openapi_specs/openapi3.yml"
+      },
+      "usedInRequest": true,
+      "fields": [
+        {
+          "name": "username",
+          "type": "string",
+          "required": false,
+          "sensitivityTag": "PII",
+          "sensitive": true
+        },
+        {
+          "name": "password",
+          "type": "string",
+          "required": false,
+          "sensitivityTag": "CREDENTIAL",
+          "sensitive": true
+        },
+        {
+          "name": "email",
+          "type": "string",
+          "required": false,
+          "sensitivityTag": "PII",
+          "sensitive": true
+        }
+      ]
+    },
+    {
+      "name": "api_views.users.login_user_response_200",
+      "qualifiedName": "api_views.users.login_user_response_200",
+      "location": {
+        "file": "openapi_specs/openapi3.yml"
+      },
+      "usedInResponse": true,
+      "fields": [
+        {
+          "name": "auth_token",
+          "type": "string",
+          "required": false,
+          "sensitivityTag": "CREDENTIAL",
+          "sensitive": true
+        },
+        {
+          "name": "message",
+          "type": "string",
+          "required": false,
+          "sensitive": false
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": false,
+          "sensitive": false
+        }
+      ]
+    },
+    {
+      "name": "api_views.users.login_user_request",
+      "qualifiedName": "api_views.users.login_user_request",
+      "location": {
+        "file": "openapi_specs/openapi3.yml"
+      },
+      "usedInRequest": true,
+      "fields": [
+        {
+          "name": "username",
+          "type": "string",
+          "required": false,
+          "sensitivityTag": "PII",
+          "sensitive": true
+        },
+        {
+          "name": "password",
+          "type": "string",
+          "required": false,
+          "sensitivityTag": "CREDENTIAL",
+          "sensitive": true
+        }
+      ]
+    },
+    {
+      "name": "api_views.users.me_response_200",
+      "qualifiedName": "api_views.users.me_response_200",
+      "location": {
+        "file": "openapi_specs/openapi3.yml"
+      },
+      "usedInResponse": true,
+      "fields": [
+        {
+          "name": "data",
+          "type": "object",
+          "required": false,
+          "sensitive": false
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": false,
+          "sensitive": false
+        }
+      ]
+    },
+    {
+      "name": "api_views.users.get_by_username_response_200",
+      "qualifiedName": "api_views.users.get_by_username_response_200",
+      "location": {
+        "file": "openapi_specs/openapi3.yml"
+      },
+      "usedInResponse": true,
+      "fields": [
+        {
+          "name": "username",
+          "type": "string",
+          "required": false,
+          "sensitivityTag": "PII",
+          "sensitive": true
+        },
+        {
+          "name": "email",
+          "type": "string",
+          "required": false,
+          "sensitivityTag": "PII",
+          "sensitive": true
+        }
+      ]
+    },
+    {
+      "name": "api_views.users.delete_user_response_200",
+      "qualifiedName": "api_views.users.delete_user_response_200",
+      "location": {
+        "file": "openapi_specs/openapi3.yml"
+      },
+      "usedInResponse": true,
+      "fields": [
+        {
+          "name": "message",
+          "type": "string",
+          "required": false,
+          "sensitive": false
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": false,
+          "sensitive": false
+        }
+      ]
+    },
+    {
+      "name": "api_views.users.update_email_request",
+      "qualifiedName": "api_views.users.update_email_request",
+      "location": {
+        "file": "openapi_specs/openapi3.yml"
+      },
+      "usedInRequest": true,
+      "fields": [
+        {
+          "name": "email",
+          "type": "string",
+          "required": false,
+          "sensitivityTag": "PII",
+          "sensitive": true
+        }
+      ]
+    },
+    {
+      "name": "api_views.users.update_password_request",
+      "qualifiedName": "api_views.users.update_password_request",
+      "location": {
+        "file": "openapi_specs/openapi3.yml"
+      },
+      "usedInRequest": true,
+      "fields": [
+        {
+          "name": "password",
+          "type": "string",
+          "required": false,
+          "sensitivityTag": "CREDENTIAL",
+          "sensitive": true
+        }
+      ]
+    },
+    {
+      "name": "api_views.books.get_all_books_response_200",
+      "qualifiedName": "api_views.books.get_all_books_response_200",
+      "location": {
+        "file": "openapi_specs/openapi3.yml"
+      },
+      "usedInResponse": true,
+      "fields": [
+        {
+          "name": "Books",
+          "type": "array",
+          "required": false,
+          "sensitive": false
+        }
+      ]
+    },
+    {
+      "name": "api_views.books.add_new_book_response_200",
+      "qualifiedName": "api_views.books.add_new_book_response_200",
+      "location": {
+        "file": "openapi_specs/openapi3.yml"
+      },
+      "usedInResponse": true,
+      "fields": [
+        {
+          "name": "message",
+          "type": "string",
+          "required": false,
+          "sensitive": false
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": false,
+          "sensitive": false
+        }
+      ]
+    },
+    {
+      "name": "api_views.books.add_new_book_request",
+      "qualifiedName": "api_views.books.add_new_book_request",
+      "location": {
+        "file": "openapi_specs/openapi3.yml"
+      },
+      "usedInRequest": true,
+      "fields": [
+        {
+          "name": "book_title",
+          "type": "string",
+          "required": false,
+          "sensitive": false
+        },
+        {
+          "name": "secret",
+          "type": "string",
+          "required": false,
+          "sensitivityTag": "CREDENTIAL",
+          "sensitive": true
+        }
+      ]
+    },
+    {
+      "name": "api_views.books.get_by_title_response_200",
+      "qualifiedName": "api_views.books.get_by_title_response_200",
+      "location": {
+        "file": "openapi_specs/openapi3.yml"
+      },
+      "usedInResponse": true,
+      "fields": [
+        {
+          "name": "book_title",
+          "type": "string",
+          "required": false,
+          "sensitive": false
+        },
+        {
+          "name": "owner",
+          "type": "string",
+          "required": false,
+          "sensitive": false
+        },
+        {
+          "name": "secret",
+          "type": "string",
+          "required": false,
+          "sensitivityTag": "CREDENTIAL",
+          "sensitive": true
+        }
+      ]
+    }
+  ],
+  "issuesAssetMapping": {
+    "links": {},
+    "userLinks": {}
+  },
+  "statistics": {
+    "totalServices": 1,
+    "totalModules": 1,
+    "totalEndpoints": 14,
+    "authenticatedEndpoints": 6,
+    "deprecatedEndpoints": 0,
+    "fromSourceCode": 0,
+    "fromOpenApi": 14,
+    "totalDataObjects": 17,
+    "endpointsByMethod": {
+      "GET": 8,
+      "POST": 3,
+      "PUT": 2,
+      "DELETE": 1
+    },
+    "detectedFrameworks": [
+      {
+        "id": "flask",
+        "confidence": 0.95,
+        "source": "requirements.txt:flask"
+      }
+    ],
+    "flaws": 7,
+    "flawsByKind": {
+      "data_exposure": 4,
+      "authorization": 1,
+      "configuration": 1,
+      "authentication": 1
+    },
+    "flawsByDetector": {
+      "excessive_data_exposure_python": 3,
+      "rate_limit_absence": 1,
+      "unauthenticated_endpoint": 1,
+      "pii_leak_in_response_python": 1,
+      "broken_function_level_authorization": 1
+    },
+    "flawsBySeverity": {
+      "high": 6,
+      "low": 1
+    },
+    "detectors": 22,
+    "files": 1,
+    "elapsedTime": 0.427,
+    "authenticatedPercentage": 42.857142857142854
+  },
+  "errors": [],
+  "flaws": [
+    {
+      "issueId": "API-excessive_data_exposure_python-POST /users/v1/login",
+      "detector": "excessive_data_exposure_python",
+      "flawType": "excessive_data_exposure",
+      "severity": "high",
+      "criticality": "neutral",
+      "title": "Response DTO returns sensitive fields the client did not request: POST /users/v1/login",
+      "explanation": "The endpoint POST /users/v1/login returns a response DTO containing fields the operation arguably did not need to expose: auth_token (HIGH/CREDENTIAL). Constraining the response to only the fields the client actually needs reduces the blast radius of accidental data leaks. See remediation guidance.",
+      "remediation": "1. Define a dedicated response model per operation:\n   - FastAPI: declare `response_model=PublicUser` instead of the persistence model.\n   - DRF: use a separate `Serializer` (or `serializer_class`) per view.\n   - Flask: build the dict explicitly with the fields you intend to expose.\n2. Use Pydantic field exclusion (`exclude={\"password\", \"ssn\"}`) or `model_dump(include=...)`.\n3. For DRF, set `fields = (...)` (not `__all__`) on the serializer Meta.\n4. If the sensitivity tag is wrong for your project, exclude the field via\n   per-project sensitivity overrides.\n",
+      "cwes": [
+        "CWE-213",
+        "CWE-200"
+      ],
+      "owaspApiTop10": [
+        "API3:2023"
+      ],
+      "tags": [
+        "PII",
+        "PCI-DSS:3.4",
+        "OWASP-API:2023:API3",
+        "data-exposure",
+        "GDPR:Art-32"
+      ],
+      "properties": {
+        "responseType": "api_views.users.login_user_response_200",
+        "flaggedFields": [
+          {
+            "name": "auth_token",
+            "confidence": "HIGH",
+            "sensitivityTag": "CREDENTIAL"
+          }
+        ],
+        "minConfidence": "HIGH"
+      },
+      "moduleName": "VAmPI",
+      "endpointPath": "/users/v1/login",
+      "endpointMethod": "POST",
+      "endpointId": "POST /users/v1/login",
+      "serviceName": "VAmPI"
+    },
+    {
+      "issueId": "API-rate_limit_absence-service:VAmPI",
+      "detector": "rate_limit_absence",
+      "flawType": "rate_limit_absence",
+      "severity": "low",
+      "criticality": "neutral",
+      "title": "No application rate-limit detected for service VAmPI",
+      "explanation": "No rate-limiting library or middleware was found in the service's handlers or common entry points (app.js / server.js / main.py / Program.cs / bucket4j / Resilience4j / etc.). Without rate limits the API is exposed to OWASP API4:2023 \u2014 Unrestricted Resource Consumption: credential stuffing, denial of wallet, brute-force and scraping. Reported once per service: confirm rate limiting is enforced either in the application or at the infrastructure edge (API gateway, CloudFront, ALB, WAF) \u2014 infra-level limits are not visible to static analysis.",
+      "remediation": "Add a rate-limit middleware or per-route annotation appropriate to your stack:\n  - Express:        `app.use(rateLimit({ windowMs: 60000, max: 100 }))`\n  - Flask:          `@limiter.limit(\"100/minute\")` from flask-limiter\n  - DRF:            `throttle_classes = [UserRateThrottle]`\n  - Spring:         bucket4j Bucket + filter, or @RateLimiter (Resilience4j)\n  - ASP.NET:        `services.AddRateLimiter(...)` + `app.UseRateLimiter()`\n  - Laravel:        `Route::middleware(['throttle:60,1'])`\nOr rely on gateway-level limits (nginx, AWS API Gateway, Cloudflare) and\ndocument the choice.\n",
+      "cwes": [
+        "CWE-770"
+      ],
+      "owaspApiTop10": [
+        "API4:2023"
+      ],
+      "tags": [
+        "resource-consumption",
+        "rate-limiting",
+        "OWASP-API:2023:API4"
+      ],
+      "properties": {
+        "scope": "service",
+        "handler_file": "api_views/users.py",
+        "note": "Reported once per service. Infra-level rate limiting (API gateway, WAF, CloudFront, ALB, nginx) is not visible to static analysis."
+      },
+      "serviceName": "VAmPI"
+    },
+    {
+      "issueId": "API-excessive_data_exposure_python-GET /users/v1/{username}",
+      "detector": "excessive_data_exposure_python",
+      "flawType": "excessive_data_exposure",
+      "severity": "high",
+      "criticality": "neutral",
+      "title": "Response DTO returns sensitive fields the client did not request: GET /users/v1/{username}",
+      "explanation": "The endpoint GET /users/v1/{username} returns a response DTO containing fields the operation arguably did not need to expose: email (HIGH/PII). Constraining the response to only the fields the client actually needs reduces the blast radius of accidental data leaks. See remediation guidance.",
+      "remediation": "1. Define a dedicated response model per operation:\n   - FastAPI: declare `response_model=PublicUser` instead of the persistence model.\n   - DRF: use a separate `Serializer` (or `serializer_class`) per view.\n   - Flask: build the dict explicitly with the fields you intend to expose.\n2. Use Pydantic field exclusion (`exclude={\"password\", \"ssn\"}`) or `model_dump(include=...)`.\n3. For DRF, set `fields = (...)` (not `__all__`) on the serializer Meta.\n4. If the sensitivity tag is wrong for your project, exclude the field via\n   per-project sensitivity overrides.\n",
+      "cwes": [
+        "CWE-213",
+        "CWE-200"
+      ],
+      "owaspApiTop10": [
+        "API3:2023"
+      ],
+      "tags": [
+        "PII",
+        "PCI-DSS:3.4",
+        "OWASP-API:2023:API3",
+        "data-exposure",
+        "GDPR:Art-32"
+      ],
+      "properties": {
+        "responseType": "api_views.users.get_by_username_response_200",
+        "flaggedFields": [
+          {
+            "name": "email",
+            "confidence": "HIGH",
+            "sensitivityTag": "PII"
+          }
+        ],
+        "minConfidence": "HIGH"
+      },
+      "moduleName": "VAmPI",
+      "endpointPath": "/users/v1/{username}",
+      "endpointMethod": "GET",
+      "endpointId": "GET /users/v1/{username}",
+      "serviceName": "VAmPI"
+    },
+    {
+      "issueId": "API-unauthenticated_endpoint-GET /users/v1/{username}",
+      "detector": "unauthenticated_endpoint",
+      "flawType": "unauthenticated_endpoint",
+      "severity": "high",
+      "criticality": "neutral",
+      "title": "Endpoint reachable without authentication: GET /users/v1/{username}",
+      "explanation": "The endpoint GET /users/v1/{username} does not declare any authentication requirement, and multiple signals indicate it should require one. Either add an authentication requirement via the framework's standard mechanism (e.g., @PreAuthorize / [Authorize] / auth middleware), or add the path to the detector's `publicPaths` allowlist if exposure is intentional. Signals raising the auth-required score: response returns sensitive (PII/PCI/PHI) fields; accepts sensitive input (non-credential); path matches resource convention (/admin /users /payments \u2026).",
+      "remediation": "Add an authentication requirement at the endpoint, controller, or service level using\nthe framework's standard mechanism:\n- Spring / Spring Boot: @PreAuthorize, @Secured, @RolesAllowed, or method security in\n  SecurityConfig.\n- ASP.NET Core: [Authorize] attribute (controller or action).\n- JAX-RS: @RolesAllowed / @DenyAll / SecurityContext check.\n- Express / NestJS / Fastify / Koa / Hono: an authentication middleware\n  (passport, express-jwt, NestJS Guard, etc.) registered before the handler.\n- FastAPI / Flask: a Depends(...) / before_request authentication callback.\n- OpenAPI: a `security:` requirement on the operation or globally.\n\nIf the endpoint is intentionally public (health checks, public marketing endpoints, \u2026),\nadd its path to the detector's `publicPaths` configuration.\n",
+      "cwes": [
+        "CWE-306"
+      ],
+      "owaspApiTop10": [
+        "API2:2023"
+      ],
+      "tags": [
+        "NIST.SP.800-53:IA-2",
+        "OWASP-API:2023:API2",
+        "authentication",
+        "PCI-DSS:8.3"
+      ],
+      "properties": {
+        "classification": {
+          "verdict": "AUTH_REQUIRED",
+          "anonymousScore": 0,
+          "authRequiredScore": 10,
+          "anonymousReasons": [],
+          "authRequiredReasons": [
+            "response returns sensitive (PII/PCI/PHI) fields",
+            "accepts sensitive input (non-credential)",
+            "path matches resource convention (/admin /users /payments \u2026)"
+          ]
+        }
+      },
+      "moduleName": "VAmPI",
+      "endpointPath": "/users/v1/{username}",
+      "endpointMethod": "GET",
+      "endpointId": "GET /users/v1/{username}",
+      "serviceName": "VAmPI"
+    },
+    {
+      "issueId": "API-pii_leak_in_response_python-GET /users/v1/{username}",
+      "detector": "pii_leak_in_response_python",
+      "flawType": "pii_leak_in_response",
+      "severity": "high",
+      "criticality": "neutral",
+      "title": "Response carries PII / PCI / PHI fields: GET /users/v1/{username}",
+      "explanation": "The endpoint GET /users/v1/{username} returns a response whose fields username (PII), email (PII) are tagged sensitive (PII / PCI / PHI). Verify the field is required by the operation, authorization is enforced for the caller, and the data is masked / redacted where appropriate.",
+      "remediation": "1. Confirm the field is genuinely required by the operation; otherwise remove it.\n   - FastAPI: declare a narrower `response_model` or use `model_dump(exclude=...)`.\n   - DRF: use a dedicated read-only serializer with explicit `fields = (...)`.\n   - Flask: build the JSON dict explicitly with the fields you intend to expose.\n2. Ensure authorization is enforced before returning the response.\n3. Mask / redact the field if full disclosure isn't necessary.\n4. If the sensitivity tag is wrong for your project, exclude the field via per-project\n   sensitivity overrides.\n",
+      "cwes": [
+        "CWE-359"
+      ],
+      "owaspApiTop10": [
+        "API3:2023",
+        "API10:2023"
+      ],
+      "tags": [
+        "PII",
+        "PCI-DSS:3.4",
+        "OWASP-API:2023:API3",
+        "data-exposure",
+        "GDPR:Art-32",
+        "OWASP-API:2023:API10"
+      ],
+      "properties": {
+        "responseType": "api_views.users.get_by_username_response_200",
+        "leakedFields": [
+          {
+            "name": "username",
+            "sensitivityTag": "PII"
+          },
+          {
+            "name": "email",
+            "sensitivityTag": "PII"
+          }
+        ]
+      },
+      "moduleName": "VAmPI",
+      "endpointPath": "/users/v1/{username}",
+      "endpointMethod": "GET",
+      "endpointId": "GET /users/v1/{username}",
+      "serviceName": "VAmPI"
+    },
+    {
+      "issueId": "API-broken_function_level_authorization-DELETE /users/v1/{username}",
+      "detector": "broken_function_level_authorization",
+      "flawType": "broken_function_level_authorization",
+      "severity": "high",
+      "criticality": "neutral",
+      "title": "BFLA-candidate endpoint: DELETE /users/v1/{username}",
+      "explanation": "The endpoint DELETE /users/v1/{username} looks administrative / privileged (destructive handler method (delete_user)) and requires authentication, but none of its declared security requirements carries a role / scope / authority marker, and Phase B walked the handler (python) and found no recognised role-check pattern (no @PreAuthorize, no [Authorize(Roles=...)], no IsAdminUser, no requireRole middleware). Verify that the handler enforces an appropriate role check before performing the operation. Without it, any authenticated caller may be able to reach a function intended only for privileged users \u2014 the classic Broken Function Level Authorization (BFLA) pattern.",
+      "remediation": "1. Implement role-based access control (RBAC)\n2. Use @PreAuthorize, @Secured, or [Authorize(Roles=...)]\n3. Separate admin and user API paths\n4. Implement least privilege principle\n5. Log and audit privileged operations\n",
+      "cwes": [
+        "CWE-285",
+        "CWE-269"
+      ],
+      "owaspApiTop10": [
+        "API5:2023"
+      ],
+      "tags": [
+        "authorization",
+        "PCI-DSS:7.2",
+        "OWASP-API:2023:API5",
+        "privilege-escalation",
+        "NIST.SP.800-53:AC-6"
+      ],
+      "properties": {
+        "privileged_signal": "destructive handler method (delete_user)",
+        "declared_security": {
+          "requirements": 1,
+          "schemes": [
+            "openapi-security:bearerAuth"
+          ]
+        },
+        "phase_b_checked": true,
+        "phase_b_language": "python",
+        "phase_b_evidence": [],
+        "confidence": "high"
+      },
+      "moduleName": "VAmPI",
+      "endpointPath": "/users/v1/{username}",
+      "endpointMethod": "DELETE",
+      "endpointId": "DELETE /users/v1/{username}",
+      "serviceName": "VAmPI"
+    },
+    {
+      "issueId": "API-excessive_data_exposure_python-GET /books/v1/{book_title}",
+      "detector": "excessive_data_exposure_python",
+      "flawType": "excessive_data_exposure",
+      "severity": "high",
+      "criticality": "neutral",
+      "title": "Response DTO returns sensitive fields the client did not request: GET /books/v1/{book_title}",
+      "explanation": "The endpoint GET /books/v1/{book_title} returns a response DTO containing fields the operation arguably did not need to expose: secret (HIGH/CREDENTIAL). Constraining the response to only the fields the client actually needs reduces the blast radius of accidental data leaks. See remediation guidance.",
+      "remediation": "1. Define a dedicated response model per operation:\n   - FastAPI: declare `response_model=PublicUser` instead of the persistence model.\n   - DRF: use a separate `Serializer` (or `serializer_class`) per view.\n   - Flask: build the dict explicitly with the fields you intend to expose.\n2. Use Pydantic field exclusion (`exclude={\"password\", \"ssn\"}`) or `model_dump(include=...)`.\n3. For DRF, set `fields = (...)` (not `__all__`) on the serializer Meta.\n4. If the sensitivity tag is wrong for your project, exclude the field via\n   per-project sensitivity overrides.\n",
+      "cwes": [
+        "CWE-213",
+        "CWE-200"
+      ],
+      "owaspApiTop10": [
+        "API3:2023"
+      ],
+      "tags": [
+        "PII",
+        "PCI-DSS:3.4",
+        "OWASP-API:2023:API3",
+        "data-exposure",
+        "GDPR:Art-32"
+      ],
+      "properties": {
+        "responseType": "api_views.books.get_by_title_response_200",
+        "flaggedFields": [
+          {
+            "name": "secret",
+            "confidence": "HIGH",
+            "sensitivityTag": "CREDENTIAL"
+          }
+        ],
+        "minConfidence": "HIGH"
+      },
+      "moduleName": "VAmPI",
+      "endpointPath": "/books/v1/{book_title}",
+      "endpointMethod": "GET",
+      "endpointId": "GET /books/v1/{book_title}",
+      "serviceName": "VAmPI"
+    }
+  ],
+  "currentBranch": "origin/master"
+}
