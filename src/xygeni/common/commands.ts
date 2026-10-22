@@ -225,9 +225,9 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
       if (!override && await InstallerService.getInstance().isScannerInstalled()) {
         Logger.log('=== Xygeni Scanner already installed. ===');
         this.installerOk();
-        this.setMcpLibraryInstalled();
-        Logger.log(`=== MCP Library is ready. Check Xygeni MCP Setup to configure it. ===`);
-        
+        // The scanner being installed says nothing about the MCP library: it lives in its own shared folder.
+        this.installMcpLibrary(false);
+
         return Promise.resolve();
       }
 
@@ -345,17 +345,10 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
       installer.install(xygeniUrl, xygeniToken, override).then(() => {
 
         setTimeout(() => {
-          this.installerOk(); 
-          
-          // Download MCP library
-          installer.downloadMCPLibrary()
-            .then(() => {
-              this.setMcpLibraryInstalled();
-              return Promise.resolve();
-            })
-            .catch((error) => {
-              Logger.log(" Error downloading Xygeni MCP library. MCP Server will not be available: " + error);
-            });
+          this.installerOk();
+
+          // Download MCP library; a reinstall (override) also refreshes it
+          this.installMcpLibrary(override === true);
 
         }, 500); // allow user see transition
 
@@ -526,6 +519,34 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
 
   showMcpSetupView() {
     void McpSetupView.showMcpSetup(this);
+  }
+
+  /**
+   * Installs the MCP library in the shared folder when missing (always with `force`). When it replaced a copy
+   * inside an extension folder, the path in the user's MCP client config is stale: tell them and offer the guide.
+   */
+  private installMcpLibrary(force: boolean): void {
+    const installer = InstallerService.getInstance();
+    installer.downloadMCPLibrary(force)
+      .then((movedFromLegacyPath) => {
+        if (!installer.isMcpLibraryInstalled()) {
+          return;
+        }
+        this.setMcpLibraryInstalled();
+        Logger.log(`=== MCP Library is ready. Check Xygeni MCP Setup to configure it. ===`);
+        if (movedFromLegacyPath) {
+          const message = `The Xygeni MCP server moved to ${installer.getMcpLibraryPath()}. Update the path in your MCP client configuration.`;
+          Logger.log(message);
+          vscode.window.showWarningMessage(message, 'Open MCP Setup').then((choice) => {
+            if (choice) {
+              this.showMcpSetupView();
+            }
+          });
+        }
+      })
+      .catch((error) => {
+        Logger.log(" Error downloading Xygeni MCP library. MCP Server will not be available: " + error);
+      });
   }
 
   openDiffViewCommand(uri: string, tempFile: string): void {

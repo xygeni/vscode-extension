@@ -40,7 +40,7 @@ export abstract class IssueView implements vscode.TreeDataProvider<XygeniTreeIte
 
     private getCategoryNodes(): XygeniCategoryItem[] {
         const allIssues = this.getIssues();
-        const categories: ('iac' | 'sast' | 'sca' | 'secrets' | 'misconf' | 'quality' | 'apisec' | 'ai')[] = [this.getCategory()];
+        const categories: ('iac' | 'sast' | 'sca' | 'secrets' | 'misconf' | 'quality' | 'apisec' | 'ai' | 'malware')[] = [this.getCategory()];
 
         //Logger.log(`Issues by category ${this.getCategory()}: ${allIssues.length}}`);
         return categories.map(category => {
@@ -101,7 +101,7 @@ export type XygeniTreeItem = XygeniCategoryItem | XygeniIssueItem;
 
 export class XygeniCategoryItem extends vscode.TreeItem {
     constructor(
-        public readonly category: 'secrets' | 'misconf' | 'iac' | 'sast' | 'sca' | 'quality' | 'apisec' | 'ai',
+        public readonly category: 'secrets' | 'misconf' | 'iac' | 'sast' | 'sca' | 'quality' | 'apisec' | 'ai' | 'malware',
         public readonly issueCount: number,
         private commands: IssueViewEmitter
     ) {
@@ -113,7 +113,8 @@ export class XygeniCategoryItem extends vscode.TreeItem {
             'sca': 'Dependency Analysis',
             'quality': 'Code Quality',
             'apisec': 'API Security',
-            'ai': 'AI Security'
+            'ai': 'AI Security',
+            'malware': 'Malware'
         };
 
         super(categoryNames[category], vscode.TreeItemCollapsibleState.Expanded);
@@ -130,7 +131,8 @@ export class XygeniCategoryItem extends vscode.TreeItem {
             'sca': 'open-source.svg',
             'quality': 'code-quality.svg',
             'apisec': 'api-security.svg',
-            'ai': 'ai-security.svg'
+            'ai': 'ai-security.svg',
+            'malware': 'malware.svg'
         };
 
         this.iconPath = this.commands.getIconPath(categoryIcons[category]);
@@ -251,6 +253,22 @@ export class ApisecIssueView extends IssueView {
 
 export class AiIssueView extends IssueView {
     private category = 'ai';
+
+    constructor(commands: IssueViewEmitter) {
+        super(commands);
+    }
+
+    getIssues(): XygeniIssue[] {
+        return this.commands.getIssuesByCategory(this.category);
+    }
+
+    getCategory(): string {
+        return this.category;
+    }
+}
+
+export class MalwareIssueView extends IssueView {
+    private category = 'malware';
 
     constructor(commands: IssueViewEmitter) {
         super(commands);

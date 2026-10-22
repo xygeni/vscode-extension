@@ -114,11 +114,11 @@ export interface XygeniIssueData {
   type: string;
   detector: string;
   tool: string;
-  kind: 'secret' | 'misconfiguration' | 'iac_flaw' | 'code_vulnerability' | 'sca_vulnerability' | 'quality_issue' | 'api_flaw' | 'ia_vulnerability';
+  kind: 'secret' | 'misconfiguration' | 'iac_flaw' | 'code_vulnerability' | 'sca_vulnerability' | 'quality_issue' | 'api_flaw' | 'ia_vulnerability' | 'malware_evidence';
   severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
   confidence: 'highest' | 'high' | 'medium' | 'low';
-  category: 'secrets' | 'misconf' | 'iac' | 'sast' | 'sca' | 'quality' | 'apisec' | 'ai';
-  categoryName: 'Secret' | 'Misconfiguration' | 'IaC' | 'SAST' | 'Vulnerability' | 'Quality' | 'API Security' | 'AI Security';
+  category: 'secrets' | 'misconf' | 'iac' | 'sast' | 'sca' | 'quality' | 'apisec' | 'ai' | 'malware';
+  categoryName: 'Secret' | 'Misconfiguration' | 'IaC' | 'SAST' | 'Vulnerability' | 'Quality' | 'API Security' | 'AI Security' | 'Malware';
   file?: string;
   beginLine: number;
   endLine: number;

@@ -7,6 +7,7 @@ import { SecretsXygeniIssue } from './secrets-issue';
 import { QualityXygeniIssue } from './quality-issue';
 import { ApisecXygeniIssue } from './apisec-issue';
 import { AiXygeniIssue } from './ai-issue';
+import { MalwareXygeniIssue } from './malware-issue';
 import { VulnXygeniIssue } from './vuln-issue';
 import { XygeniIssue } from '../common/interfaces';
 
@@ -71,6 +72,7 @@ export default class IssuesService {
     { scanType: 'quality', category: 'quality', read: (filename) => this.readQualityReport(filename) },
     { scanType: 'apisec', category: 'apisec', read: (filename) => this.readApisecReport(filename) },
     { scanType: 'ai', category: 'ai', read: (filename) => this.readAiReport(filename) },
+    { scanType: 'malware', category: 'malware', read: (filename) => this.readMalwareReport(filename) },
   ];
 
 
@@ -657,6 +659,76 @@ export default class IssuesService {
         redTeamVectors: rawVulnerability.redTeamVectors,
         remediationHint: rawVulnerability.remediationHint,
         remediableLevel: 'AUTO' // AI fix via scanner 'util rectify --ai' (RectifyCommand.java: --ai → runAiRectify)
+      });
+      this.issues.push(issue);
+    });
+  }
+
+  public async readMalwareReport(filename: string): Promise<void> {
+    if (!(await this.commands.fileExists(filename))) {
+      return;
+    }
+
+    try {
+      const data = await this.commands.readFile(filename);
+      const rawData = JSON.parse(data);
+      this.processMalwareReport(rawData);
+    } catch (error) {
+      this.logger.error(error, 'Error reading malware output:');
+      throw error;
+    }
+  }
+
+  /** Maps the `malware.<suffix>` report: its findings live under `evidences`, not `vulnerabilities`. */
+  processMalwareReport(jsonRaw: any): void {
+    const rawEvidences = jsonRaw.evidences ?? [];
+    const evidences = Array.isArray(rawEvidences) ? rawEvidences : [rawEvidences];
+    const tool = jsonRaw.metadata?.reportProperties?.['tool.name'];
+
+    evidences.forEach((rawEvidence: any) => {
+      if (!rawEvidence) { return; }
+      const issue = new MalwareXygeniIssue({
+        id: rawEvidence.issueId,
+        type: rawEvidence.kind ?? '',
+        detector: rawEvidence.detector ?? '',
+        tool: tool,
+        kind: 'malware_evidence',
+        severity: (rawEvidence.severity ?? 'info') as 'critical' | 'high' | 'medium' | 'low' | 'info',
+        confidence: 'high',
+        category: 'malware',
+        categoryName: 'Malware',
+        file: rawEvidence.location?.filepath ?? '',
+        beginLine: rawEvidence.location?.beginLine ?? 0,
+        endLine: rawEvidence.location?.endLine ?? 0,
+        beginColumn: rawEvidence.location?.beginColumn ?? 0,
+        endColumn: rawEvidence.location?.endColumn ?? 0,
+        code: rawEvidence.location?.code ?? '',
+        explanation: rawEvidence.explanation ?? '',
+        url: '',
+        tags: rawEvidence.tags?.length > 0 ? rawEvidence.tags : undefined,
+        branch: jsonRaw.currentBranch ? jsonRaw.currentBranch : '',
+        scanType: rawEvidence.properties?.scanType,
+        resolvedCode: rawEvidence.properties?.['resolved.code'],
+        remediableLevel: 'none', // no 'util rectify --malware' (RectifyCommand.java has no malware flag)
+        codeFlows: rawEvidence.codeFlows
+          ?.filter((codeFlow: any) => codeFlow.frames?.length > 0)
+          .map((codeFlow: any) => ({
+            tags: codeFlow.tags ?? [],
+            frames: codeFlow.frames.map((frame: any) => ({
+              kind: frame.kind,
+              filePath: frame.location?.filepath ?? '',
+              beginLine: frame.location?.beginLine ?? 0,
+              endLine: frame.location?.endLine ?? 0,
+              code: frame.location?.code ?? '',
+              beginColumn: frame.location?.beginColumn ?? 0,
+              endColumn: frame.location?.endColumn ?? 0,
+              container: frame.container ?? '',
+              // The malware report serializes the frame's injection point as `injectionPoint`.
+              injectPoint: frame.injectionPoint,
+              category: frame.category
+            })),
+          })) ?? [],
+        vulnerabilityRaw: rawEvidence,
       });
       this.issues.push(issue);
     });

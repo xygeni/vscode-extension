@@ -31,11 +31,14 @@ export default class InstallerService {
 
     private readonly xygeniMCPLibraryUrl = 'https://get.xygeni.io/latest/mcp-server/xygeni-mcp-server.jar';
     private readonly xygeniMCPLibraryName = 'xygeni-mcp-server.jar';
+    // Folder the MCP server was installed in before #2382, inside each extension version folder.
+    private readonly legacyMcpLibraryFolder = '.xygeni-mcp';
+    // The MCP folder is shared by every IDE plugin: the lock keeps two of them from writing the JAR at once.
+    private readonly mcpLockName = '.lock';
+    private readonly mcpLockStaleMs = 10 * 60 * 1000;
+    private readonly mcpLockWaitMs = 2 * 60 * 1000;
 
     private static instance: InstallerService;
-
-    /** Path to the MCP library if downloaded */
-    private mcpLibraryPath: string | undefined;
 
     public installationRunning: boolean | undefined;
     public status: string | undefined;
@@ -77,12 +80,18 @@ export default class InstallerService {
         return this.extensionPath + '/.xygeni';
     }
 
+    /**
+     * The MCP server lives outside the extension folder (~/.xygeni/mcp, shared with the other Xygeni IDE
+     * plugins), so the path the user pasted into their MCP client survives extension updates.
+     */
     public getMcpLibratyInstallationDir(): string {
-        return this.extensionPath + '/.xygeni-mcp';
+        return path.join(os.homedir(), '.xygeni', 'mcp');
     }
 
+    /** Path to the MCP library, or undefined while it is not on disk. */
     public getMcpLibraryPath(): string | undefined {
-        return this.mcpLibraryPath;
+        const mcpLibraryPath = path.join(this.getMcpLibratyInstallationDir(), this.xygeniMCPLibraryName);
+        return fs.existsSync(mcpLibraryPath) ? mcpLibraryPath : undefined;
     }
 
     public isScannerInstalled(): boolean {
@@ -91,7 +100,7 @@ export default class InstallerService {
     }
 
     public isMcpLibraryInstalled(): boolean {
-        return this.mcpLibraryPath !== undefined;
+        return this.getMcpLibraryPath() !== undefined;
     }
 
     async install(apiUrl?: string, token?: string, override?: boolean): Promise<void> {
@@ -202,43 +211,116 @@ export default class InstallerService {
         }
     }
 
-    public async downloadMCPLibrary(): Promise<void> {
-
-        
+    /**
+     * Makes sure the MCP library is in the shared folder: downloads it when it is missing, or always when
+     * `force` is set (reinstall). Legacy copies inside extension folders are removed afterwards.
+     * @returns true when a legacy copy was found, so the user must update the path in their MCP client.
+     */
+    public async downloadMCPLibrary(force?: boolean): Promise<boolean> {
         const installMcpPath = this.getMcpLibratyInstallationDir();
-        this.mcpLibraryPath = `${installMcpPath}/${this.xygeniMCPLibraryName}`;
+        const mcpLibraryPath = path.join(installMcpPath, this.xygeniMCPLibraryName);
+        const legacyMcpLibraryDirs = this.findLegacyMcpLibraryDirs();
 
-        this.logger.log("");
-        this.logger.log("============================================================");
+        if (force || !fs.existsSync(mcpLibraryPath)) {
+            fs.mkdirSync(installMcpPath, { recursive: true });
+            await this.withMcpLock(installMcpPath, async () => {
+                // Another IDE may have installed it while this one waited for the lock.
+                if (!force && fs.existsSync(mcpLibraryPath)) {
+                    return;
+                }
+                this.logger.log("");
+                this.logger.log("============================================================");
+                this.logger.log(`  Downloading MCP library... from : ${this.xygeniMCPLibraryUrl}  to: ${installMcpPath}`);
 
-        // remove installPath if exists, force fresh install
-        if (fs.existsSync(this.mcpLibraryPath)) {
-            this.logger.log(`  Removing existing installation at: ${this.mcpLibraryPath}`);
-            fs.rmSync(this.mcpLibraryPath, { recursive: true, force: true });
+                // Download next to the JAR and rename it into place, so an MCP client never runs a half-written JAR.
+                const temporaryPath = await this.downloadFile(this.xygeniMCPLibraryUrl, installMcpPath, this.xygeniMCPLibraryName + '.tmp');
+                try {
+                    fs.renameSync(temporaryPath, mcpLibraryPath);
+                } catch (error: any) {
+                    fs.rmSync(temporaryPath, { force: true });
+                    // On Windows a running MCP client locks the JAR; the copy already installed keeps working.
+                    if (!fs.existsSync(mcpLibraryPath)) {
+                        throw error;
+                    }
+                    this.logger.log(`  Could not replace ${mcpLibraryPath} (${error.message}). Close your MCP client and reinstall to update it.`);
+                    return;
+                }
+                if (Platform.get() !== 'win32') {
+                    await this.makeExecutable(mcpLibraryPath);
+                }
+                this.logger.log(`  Xygeni MCP Library Downloaded to: ${installMcpPath}`);
+                this.logger.log(`   Check Xygeni MCP Setup to configure it.`);
+                this.logger.log("============================================================");
+            });
         }
-        // create folder if not yet
-        if (!fs.existsSync(installMcpPath)){
-            fs.mkdirSync(installMcpPath);
-        }
 
-        this.logger.log(`  Downloading MCP library... from : ${this.xygeniMCPLibraryUrl}  to: ${installMcpPath}`);
-
-        // Download the install script
-        await this.downloadFile(this.xygeniMCPLibraryUrl, installMcpPath, this.xygeniMCPLibraryName);
-
-        if (!fs.existsSync(this.mcpLibraryPath)) {
+        if (!fs.existsSync(mcpLibraryPath)) {
             this.logger.log(`  MCP Library not found at: ${installMcpPath}. MCP server is not Available.`);
-            return Promise.resolve();
+            return false;
         }
-        // Make script executable (Unix-like systems)
-        if (Platform.get() !== 'win32') {
-            await this.makeExecutable(this.mcpLibraryPath);
+        for (const legacyDir of legacyMcpLibraryDirs) {
+            this.logger.log(`  Removing previous MCP library folder: ${legacyDir}`);
+            try {
+                fs.rmSync(legacyDir, { recursive: true, force: true });
+            } catch (error: any) {
+                // An MCP client still running the old JAR locks it on Windows; it is retried on the next start.
+                this.logger.log(`  Could not remove ${legacyDir}: ${error.message}`);
+            }
         }
+        return legacyMcpLibraryDirs.length > 0;
+    }
 
-        this.logger.log(`  Xygeni MCP Library Downloaded to: ${installMcpPath}`);
-        this.logger.log(`   Check Xygeni MCP Setup to configure it.`);
-        this.logger.log("============================================================");
-        
+    /**
+     * MCP library folders left by versions before #2382: `.xygeni-mcp` inside this extension folder and
+     * inside the folders of other installed versions of this extension (`<publisher>.<name>-<version>`).
+     */
+    private findLegacyMcpLibraryDirs(): string[] {
+        const extensionFolder = path.basename(this.extensionPath);
+        const extensionFolderWithoutVersion = extensionFolder.replace(/-\d+\.\d+\.\d+.*$/, '');
+        const candidateFolders = [this.extensionPath];
+        if (extensionFolderWithoutVersion !== extensionFolder) {
+            const extensionsDir = path.dirname(this.extensionPath);
+            for (const folderName of fs.readdirSync(extensionsDir)) {
+                if (folderName !== extensionFolder && folderName.startsWith(extensionFolderWithoutVersion + '-')) {
+                    candidateFolders.push(path.join(extensionsDir, folderName));
+                }
+            }
+        }
+        return candidateFolders
+            .map(folder => path.join(folder, this.legacyMcpLibraryFolder))
+            .filter(legacyDir => fs.existsSync(path.join(legacyDir, this.xygeniMCPLibraryName)));
+    }
+
+    /**
+     * Runs `action` holding `<mcpDir>/.lock`, created exclusively. A lock held by another IDE is waited for;
+     * one older than `mcpLockStaleMs` was left by a crashed process and is taken over.
+     */
+    private async withMcpLock(mcpDir: string, action: () => Promise<void>): Promise<void> {
+        const lockPath = path.join(mcpDir, this.mcpLockName);
+        const waitUntil = Date.now() + this.mcpLockWaitMs;
+        for (;;) {
+            try {
+                fs.writeFileSync(lockPath, `${process.pid}`, { flag: 'wx' });
+                break;
+            } catch (error: any) {
+                if (error.code !== 'EEXIST') {
+                    throw error;
+                }
+            }
+            const lockStat = fs.statSync(lockPath, { throwIfNoEntry: false });
+            if (lockStat && Date.now() - lockStat.mtimeMs > this.mcpLockStaleMs) {
+                fs.rmSync(lockPath, { force: true });
+            } else if (Date.now() > waitUntil) {
+                throw new Error(`MCP library is being installed by another IDE (${lockPath})`);
+            } else if (lockStat) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+        try {
+            await action();
+        } finally {
+            fs.rmSync(lockPath, { force: true });
+        }
     }
 
 

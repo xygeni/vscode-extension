@@ -69,3 +69,11 @@
 - A scan that only skipped an unlicensed scan type (or that found issues) is now reported as completed instead of failed (xygeni/eclipse-plugin#22, xygeni/visual-studio-extension#15)
 - Scanner global options (xygeni/tech-support#378): Skip SSL Verification (`--skip-ssl-verify`, for corporate proxies that inspect TLS traffic), Skip Scanner Update and Verbose Scanner Output checkboxes plus an Additional Global Options field in the Scan Settings. Skip SSL Verification can be toggled from the Configuration view, where the other options also show while they are on; a scan that fails on the SSL certificate offers to enable it
 - Gear icon in the Configuration view to open the Xygeni settings
+
+
+## [Unreleased]
+
+- The MCP server is installed in `~/.xygeni/mcp/xygeni-mcp-server.jar`, shared with the other Xygeni IDE plugins, so its path no longer changes when the extension is updated. An existing copy inside the extension folder is moved there and a notification asks to update the path in the MCP client configuration (xygeni/xygeni-product-backlog#2382)
+- The MCP server is downloaded when it is missing even if the scanner is already installed; before, it was reported as installed without checking the file (xygeni/xygeni-product-backlog#2382)
+- New "Malware" view listing the malware evidences of the scan (kind, detector, severity, explanation, scan type, location, resolved code and tags, plus the CODE FLOW tab with graph, path and AI explain for the evidences that carry code flows), which were already scanned but never shown (xygeni/xygeni-product-backlog#1473)
+- The CODE FLOW tab no longer breaks when the scanned code of a step contains `</script>` or `$` replacement patterns: the flow data is written script-safe and inserted as is

@@ -1,5 +1,3 @@
-import * as fs from 'fs';
-import * as path from 'path';
 import * as vscode from 'vscode';
 import { Commands } from '../common/interfaces';
 import { Logger } from '../common/logger';
@@ -39,9 +37,7 @@ export class McpSetupView {
     }
 
     const nonce = this.getNonce();
-    const configuredMcpLibraryPath = commands.getMcpLibraryPath();
-    const fallbackMcpLibraryPath = path.join(commands.getExtensionPath(), '.xygeni-mcp', 'xygeni-mcp-server.jar');
-    const mcpLibraryPath = configuredMcpLibraryPath || (fs.existsSync(fallbackMcpLibraryPath) ? fallbackMcpLibraryPath : undefined);
+    const mcpLibraryPath = commands.getMcpLibraryPath();
     const isMcpLibraryInstalled = mcpLibraryPath !== undefined;
     const scannerInstallDirectory = commands.getScannerInstallationDir();
     const scannerInstalled = commands.isInstallReady();
