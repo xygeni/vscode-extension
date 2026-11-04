@@ -1,6 +1,16 @@
 import * as vscode from 'vscode';
 import { Commands, McpStatus } from '../common/interfaces';
+import { MCP_RESTART_NOTE } from '../common/constants';
 import { Logger } from '../common/logger';
+
+/** How to make each MCP client start the server again after the JAR was replaced (xygeni/xygeni-product-backlog#2382). */
+const RESTART_STEPS = `                <ul>
+                    <li><strong>GitHub Copilot in VS Code:</strong> Command Palette → <em>MCP: List Servers</em> → <em>xygeni</em> → <em>Restart</em>. Or simply reload the VS Code window.</li>
+                    <li><strong>Claude Code:</strong> type <code>/mcp</code> and reconnect <em>xygeni</em>. Or close Claude Code and open it again.</li>
+                    <li><strong>Cursor:</strong> Settings → <em>MCP</em> → switch <em>xygeni</em> off and on. Or restart Cursor.</li>
+                    <li><strong>Claude Desktop:</strong> quit the application and open it again.</li>
+                    <li><strong>Any other assistant:</strong> close it and open it again. Its Xygeni configuration does not change.</li>
+                </ul>`;
 
 export class McpSetupView {
   public static readonly ID = 'xygeni.views.mcpSetup';
@@ -88,6 +98,10 @@ export class McpSetupView {
         <title>Xygeni MCP Server Setup Guide</title>
         <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; img-src ${panel.webview.cspSource}; style-src 'nonce-${nonce}'; font-src https://fonts.gstatic.com;">
         <style nonce="${nonce}">
+        .banner { margin: 0 0 16px 0; padding: 10px 12px; border-left: 3px solid var(--vscode-notificationsWarningIcon-foreground, #cca700); background: var(--vscode-textBlockQuote-background); border-radius: 0 4px 4px 0; }
+        .banner strong { display: block; margin-bottom: 4px; }
+        .banner ul { margin: 6px 0 6px 0; padding-left: 20px; }
+        .banner p { margin: 6px 0 0 0; }
             body {
                 font-family: var(--vscode-font-family);
                 font-size: var(--vscode-font-size);
@@ -227,6 +241,12 @@ export class McpSetupView {
                 <p>Set up your Xygeni API URL and authentication token and
                 ensure the Xygeni scanner is properly installed through the VSCode extension.</p>
             </div>
+            <div class="step">
+                <div class="step-number">Java 17 or later</div>
+                <p>The MCP server is a Java program: your AI assistant starts it with <code>java -jar</code>. Check with
+                   <code>java -version</code> in a terminal. The configuration below sets <code>JAVA_HOME</code> to
+                   <code>${this.escapeHtml(javaHome)}</code>; change it if your Java lives elsewhere.</p>
+            </div>
             ${scannerInstalled && isMcpLibraryInstalled ? `
             <h2>Setup Instructions</h2>
 
@@ -256,15 +276,41 @@ export class McpSetupView {
             </div>
 
             <div class="step">
-                <div class="step-number">Step 2: Configure Your MCP Client</div>
-                <p>Depending on your MCP client (VSCode extension, IDE, or AI assistant), follow these general steps:</p>
+                <div class="step-number">Step 2: Give the configuration to your AI assistant</div>
+                <p>Each assistant reads it from its own file. The JSON above is in the VS Code format (top key <code>servers</code>);
+                   the others call that key <code>mcpServers</code>, everything inside stays the same.</p>
+                <ul>
+                    <li><strong>GitHub Copilot in VS Code:</strong> create <code>.vscode/mcp.json</code> in your project and paste the JSON as is.
+                        For every project: Command Palette → <em>MCP: Open User Configuration</em> and paste it there.</li>
+                    <li><strong>Claude Code:</strong> create <code>.mcp.json</code> at the project root with the JSON, renaming <code>servers</code> to <code>mcpServers</code>.
+                        Or in a terminal: <code>claude mcp add-json xygeni-mcp-server '&lt;the object under servers&gt;'</code>.</li>
+                    <li><strong>Cursor:</strong> <code>.cursor/mcp.json</code> in the project (or <code>~/.cursor/mcp.json</code> for all of them), key <code>mcpServers</code>.</li>
+                    <li><strong>Claude Desktop:</strong> Settings → Developer → <em>Edit Config</em> opens <code>claude_desktop_config.json</code>; key <code>mcpServers</code>.</li>
+                    <li><strong>Codex CLI:</strong> <code>~/.codex/config.toml</code> with the TOML above, renaming <code>[servers.…]</code> to <code>[mcp_servers.…]</code>.</li>
+                    <li><strong>Any other assistant:</strong> look for "MCP servers" in its settings and add a <em>stdio</em> server with the same command, arguments and environment.</li>
+                </ul>
+                <p>Then start (or restart) the assistant so it reads the file: <a href="#restart-guide">how, for each one</a>.</p>
+            </div>
 
-                <h3>For MCP-compatible AI Assistants:</h3>
-                <ol>
-                    <li>Locate your MCP configuration file (usually <code>mcp.json</code>, <code>.mcp/config.json</code>, or client-specific <code>mcp.toml</code>)</li>
-                    <li>Add the Xygeni server configuration as shown above</li>
-                    <li>Restart your MCP client or reload the configuration</li>
-                </ol>
+            <div class="step">
+                <div class="step-number">Step 3: Check that it works</div>
+                <ul>
+                    <li>Copilot in VS Code: Command Palette → <em>MCP: List Servers</em> → <em>xygeni-mcp-server</em> should say <em>Running</em>, and the chat's tools picker lists the Xygeni tools.</li>
+                    <li>Claude Code: type <code>/mcp</code>; <em>xygeni-mcp-server</em> should be connected.</li>
+                    <li>Any assistant: ask it <em>"Using Xygeni, scan this project for secrets"</em>. It should call a Xygeni tool and report findings.</li>
+                </ul>
+            </div>
+
+            <div class="step">
+                <div class="step-number">If something fails</div>
+                <ul>
+                    <li><strong>"java: command not found" or the server never starts:</strong> install Java 17 or later, or point <code>JAVA_HOME</code> in the configuration to it.</li>
+                    <li><strong>The assistant lists the server but no Xygeni tools:</strong> restart the assistant (<a href="#restart-guide">how</a>); it was started before the configuration or before an update.</li>
+                    <li><strong>401 / 403 or "invalid token":</strong> the token in the configuration is not the one of this extension any more. Copy the configuration again from this page.</li>
+                    <li><strong>To see the real error:</strong> run in a terminal
+                        <code>java -jar ${this.escapeHtml(jarPath)} ${this.escapeHtml(scannerPathArg)}</code>
+                        with <code>XYGENI_URL</code> and <code>XYGENI_TOKEN</code> set; the message it prints is what the assistant hides.</li>
+                </ul>
             </div>
             ` : ''}
             ${scannerInstalled ? '' : 
@@ -312,14 +358,28 @@ export class McpSetupView {
       ? 'not checked yet in this session'
       : status.updateAvailable ? `version ${status.availableVersion} is available` : 'up to date';
     const mode = status?.updateMode ?? 'notify';
+    const restartBanner = status?.restartPending
+      ? `<div class="banner"><strong>Updated to ${this.escapeHtml(status.restartPending)}. Your AI assistant keeps the old version until it is restarted. How, for each one:</strong>
+                ${RESTART_STEPS}
+                <p>Not using an AI assistant with Xygeni yet? Nothing to do. Hide this note with <em>OK</em> in the Configuration view.</p></div>`
+      : '';
     return `
+            ${restartBanner}
             <div class="step">
                 <div class="step-number">Installed MCP server</div>
                 <p><strong>Path:</strong> <code>${this.escapeHtml(jarPath)}</code></p>
                 <p><strong>Installed version:</strong> ${this.escapeHtml(installedVersion)}</p>
                 <p><strong>Updates:</strong> ${this.escapeHtml(updateLine)} (setting <code>xygeni.mcp.updates</code>: ${this.escapeHtml(mode)})</p>
-                <p>The published version is checked once a day. Run <em>Xygeni: Check for MCP Server Updates</em> to check now,
-                   and restart your MCP client after an update so it loads the new JAR.</p>
+                <p>The published version is checked once a day. Run <em>Xygeni: Check for MCP Server Updates</em> to check now.
+                   After an update, restart your AI assistant so it uses the new version
+                   (<a href="#restart-guide">how, for each one</a>).</p>
+            </div>
+            <div class="step" id="restart-guide">
+                <div class="step-number">After an update: restart your AI assistant</div>
+                <p>An update only replaces the Xygeni MCP server file in <code>~/.xygeni/mcp</code>. The AI assistant that uses it
+                   (Copilot, Claude Code, Cursor, Claude Desktop…) keeps the old version loaded until it is restarted:</p>
+                ${RESTART_STEPS}
+                <p>Not using an AI assistant with Xygeni yet? Nothing to do: the first start already loads the new version.</p>
             </div>`;
   }
 

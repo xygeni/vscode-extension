@@ -6,7 +6,7 @@ import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ConfigManager, ProxySettings } from "../config/xygeni-configuration";
-import { ISSUE_DETAILS_REMEDIATE_FUNCTION, ISSUE_DETAILS_SAVE_FUNCTION, STATE_MCP_IGNORED_VERSION, STATUS, XYGENI_CONTEXT, XYGENI_PRICING_URL, XYGENI_SCANNER_OUTPUT_NAME, XYGENI_SCANNER_REPORT_SUFFIX } from './constants';
+import { ISSUE_DETAILS_REMEDIATE_FUNCTION, ISSUE_DETAILS_SAVE_FUNCTION, MCP_RESTART_NOTE, STATE_MCP_IGNORED_VERSION, STATE_MCP_RESTART_PENDING, STATUS, XYGENI_CONTEXT, XYGENI_PRICING_URL, XYGENI_SCANNER_OUTPUT_NAME, XYGENI_SCANNER_REPORT_SUFFIX } from './constants';
 import { EventEmitter } from 'vscode';
 import { Commands, XyContext, ScanResult, IHttpClient, XygeniMedia, XygeniIssue, McpStatus } from './interfaces';
 import InstallerService from '../service/installer';
@@ -353,13 +353,22 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
   public getMcpStatus(): McpStatus {
     const installer = InstallerService.getInstance();
     const lastCheck = installer.lastMcpUpdateCheck;
+    const restartPending = GlobalContextImpl.getInstance().getGlobalStateValue(STATE_MCP_RESTART_PENDING);
     return {
       installedVersion: installer.getMcpInstalledVersion(),
       availableVersion: lastCheck?.available,
       updateAvailable: lastCheck?.updateAvailable,
-      updateMode: ConfigManager.getMcpUpdateMode()
+      updateMode: ConfigManager.getMcpUpdateMode(),
+      restartPending: typeof restartPending === 'string' && restartPending.length > 0 ? restartPending : undefined
     };
   }
+
+  /** The user restarted (or never had running) the MCP client: the "restart pending" note goes away. */
+  public async dismissMcpRestart(): Promise<void> {
+    await GlobalContextImpl.getInstance().updateGlobalStateValue(STATE_MCP_RESTART_PENDING, undefined);
+    this.refreshConfigView();
+  }
+
 
 
   public getScanOutputChannel(): OutputChannelWrapper {
@@ -848,8 +857,16 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
       const version = installer.getMcpInstalledVersion() ?? 'the published version';
       const openMcpSetup = 'Open MCP Setup';
       if (outcome === 'installed') {
-        vscode.window.showInformationMessage(`Xygeni MCP server updated to ${version}. Restart your MCP client to load it.`, openMcpSetup)
-          .then((choice) => { if (choice) { this.showMcpSetupView(); } });
+        // The note stays in the Configuration view and MCP Setup until the user says the client was restarted.
+        await GlobalContextImpl.getInstance().updateGlobalStateValue(STATE_MCP_RESTART_PENDING, version);
+        this.refreshConfigView();
+        const restarted = 'OK';
+        const howTo = 'Show me how';
+        vscode.window.showInformationMessage(`Xygeni MCP server updated to ${version}. ${MCP_RESTART_NOTE}`, howTo, restarted)
+          .then((choice) => {
+            if (choice === restarted) { void this.dismissMcpRestart(); }
+            else if (choice === howTo) { this.showMcpSetupView(); }
+          });
       } else {
         vscode.window.showWarningMessage('The Xygeni MCP server update was downloaded but the installed JAR is in use. '
           + 'Close your MCP client; the update is applied the next time VS Code starts.', openMcpSetup)

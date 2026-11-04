@@ -80,6 +80,12 @@
 - Run one scan type alone: a play button in the title of each results view (SAST, SCA, Secrets…) runs just that scan
   and refreshes only its findings.
 - Configuration view: more room between rows and blocks.
+- MCP server updates (xygeni/xygeni-product-backlog#2382): after an update the extension says what to do in plain words (restart your
+  AI assistant so it uses the new version), with a "Show me how" guide per assistant (Copilot, Claude Code, Cursor, Claude Desktop) and
+  a note in the Configuration view that stays until dismissed; the status no longer keeps saying "available" for the version just
+  installed; at startup the MCP server shows "Installed" from the JAR on disk, or "Checking…" while the connection check runs,
+  instead of "Not installed yet". The MCP Setup guide gains the Java prerequisite, where the configuration goes for each
+  assistant (`servers` vs `mcpServers`), a check-that-it-works step and troubleshooting.
 - Security (xygeni/xygeni-product-backlog#2628, CWE-77): JAVA_HOME is read from the login shell with an argument array
   instead of a command string built from `$SHELL`, and only an absolute, existing `$SHELL` is used. The scanner itself was
   already spawned shell-free with an argument array; a test now pins that a workspace path with shell metacharacters

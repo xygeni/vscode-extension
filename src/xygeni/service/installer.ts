@@ -289,7 +289,13 @@ export default class InstallerService {
     public async updateMcpLibrary(): Promise<McpDownloadOutcome> {
         const installMcpPath = this.getMcpLibratyInstallationDir();
         fs.mkdirSync(installMcpPath, { recursive: true });
-        return this.withMcpLock(installMcpPath, () => this.downloadMcpJarLocked());
+        const outcome = await this.withMcpLock(installMcpPath, () => this.downloadMcpJarLocked());
+        // The last check said "update available"; once installed it would keep saying so until the next check.
+        if (outcome === 'installed' && this.lastMcpUpdateCheck) {
+            const installed = this.getMcpInstalledVersion();
+            this.lastMcpUpdateCheck = { installed, available: this.lastMcpUpdateCheck.available, updateAvailable: false };
+        }
+        return outcome;
     }
 
     /**

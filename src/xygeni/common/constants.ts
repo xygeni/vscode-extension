@@ -67,6 +67,10 @@ export const XYGENI_PRICING_URL = 'https://xygeni.io/pricing/';
 export const CONFIG_XYGENI_API_URL = 'xygeni.api.xygeniUrl';
 // global state
 export const STATE_MCP_IGNORED_VERSION = 'xygeni.mcp.ignoredVersion';
+/** Version installed by an update that MCP clients have not loaded yet (cleared when the user dismisses it). */
+export const STATE_MCP_RESTART_PENDING = 'xygeni.mcp.restartPending';
+/** What the user must do after an MCP server update: the plugin only replaces the JAR, the MCP client owns the process. */
+export const MCP_RESTART_NOTE = 'Your AI assistant (Copilot, Claude Code, Cursor…) will use it the next time it starts: if it is open now, restart it.';
 
 export const XYGENI_CONTEXT = {
     WELCOME: 'welcome',

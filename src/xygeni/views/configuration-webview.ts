@@ -44,6 +44,7 @@ export interface ConfigurationWebviewHost {
     addScanOption(text: string): string | undefined;
     removeScanOption(name: string): void;
     openScanConfigFile(): Promise<void>;
+    dismissMcpRestart(): Promise<void>;
 }
 
 /** The icon of each scanner row, from media/icons (the same files the issue views use). */
@@ -72,7 +73,7 @@ interface ConfigurationState {
         installing: boolean; installReady: boolean; installError: boolean; licenseAvailable: boolean; licenseFree: boolean;
         autoScan: boolean;
         options: { setting: string; label: string; option: string; enabled: boolean; alwaysVisible: boolean }[];
-        mcp: { installed: boolean; path?: string; installedVersion?: string; availableVersion?: string; updateAvailable?: boolean; updateMode: string };
+        mcp: { installed: boolean; checking: boolean; path?: string; installedVersion?: string; availableVersion?: string; updateAvailable?: boolean; updateMode: string; restartPending?: string };
     };
     scan: {
         running: boolean;
@@ -144,7 +145,13 @@ export class ConfigurationWebview implements vscode.WebviewViewProvider {
                 licenseAvailable: flag(XYGENI_CONTEXT.LICENSE_IDE_AVAILABLE), licenseFree: flag(XYGENI_CONTEXT.LICENSE_FREE),
                 autoScan: ConfigManager.getAutoScan(),
                 options: GLOBAL_OPTION_TOGGLES.map(toggle => ({ setting: toggle.setting, label: toggle.label, option: toggle.option, enabled: ConfigManager.getScanFlag(toggle.setting), alwaysVisible: toggle.alwaysVisible })),
-                mcp: { installed: flag(XYGENI_CONTEXT.MCP_LIBRARY_INSTALLED), path: this.host.getMcpLibraryPath(), ...mcp }
+                // The JAR on disk says "installed" from the first paint; the context flag only arrives after the startup
+                // check. Without a JAR, the status is "checking" until the connection check (which installs it) is over.
+                mcp: {
+                    installed: flag(XYGENI_CONTEXT.MCP_LIBRARY_INSTALLED) || !!this.host.getMcpLibraryPath(),
+                    checking: !this.host.getMcpLibraryPath() && !flag(XYGENI_CONTEXT.CONNECTION_READY) && !flag(XYGENI_CONTEXT.INSTALL_ERROR) && !!url && !!token,
+                    path: this.host.getMcpLibraryPath(), ...mcp
+                }
             },
             scan: {
                 running: scans.some(scan => scan.status === 'running'),
@@ -171,6 +178,7 @@ export class ConfigurationWebview implements vscode.WebviewViewProvider {
             case 'settings': this.host.openProxySettings(); break;
             case 'mcpSetup': this.host.showMcpSetupView(); break;
             case 'mcpCheck': await this.host.checkMcpUpdates(true); break;
+            case 'mcpRestarted': await this.host.dismissMcpRestart(); break;
             // scan
             case 'runScan': void this.host.runScanner(); break;
             case 'scanOutput': this.host.showScanOutput(); break;
@@ -372,6 +380,7 @@ export function renderConfigurationPage(options: ConfigurationPageOptions): stri
                 <span class="k">MCP server</span><span class="v status"><span class="dot" id="mcpDot"></span><span id="mcpText"></span></span>
             </div>
             <div class="actions"><a id="mcpSetup">MCP Setup</a><a id="mcpCheck">Check for updates</a><span style="flex:1"></span><a id="settings">All settings</a></div>
+            <div class="warn" id="mcpRestart" style="display:none"><span id="mcpRestartText"></span> <a id="mcpRestartHow">Show me how</a> · <a id="mcpRestarted" title="Hide this note">OK</a></div>
         </div>
     </div>
 
@@ -427,7 +436,7 @@ export function renderConfigurationPage(options: ConfigurationPageOptions): stri
         }));
         const click = (id, message) => byId(id).addEventListener('click', (event) => { event.preventDefault(); post(message); });
         click('editUrl', { type: 'editUrl' }); click('editToken', { type: 'editToken' }); click('upgrade', { type: 'upgrade' });
-        click('settings', { type: 'settings' }); click('mcpSetup', { type: 'mcpSetup' }); click('mcpCheck', { type: 'mcpCheck' });
+        click('settings', { type: 'settings' }); click('mcpSetup', { type: 'mcpSetup' }); click('mcpCheck', { type: 'mcpCheck' }); click('mcpRestarted', { type: 'mcpRestarted' }); click('mcpRestartHow', { type: 'mcpSetup' });
         click('runScan', { type: 'runScan' }); click('scanOutput', { type: 'scanOutput' });
         click('selectAll', { type: 'selectAll' }); click('clear', { type: 'clear' }); click('restore', { type: 'restoreDefaults' });
         click('openFile', { type: 'openFile' }); click('addFolder', { type: 'addFolder' }); click('addPattern', { type: 'addPattern' });
@@ -467,10 +476,13 @@ export function renderConfigurationPage(options: ConfigurationPageOptions): stri
                 + '<label class="sw"><input type="checkbox" role="switch" data-switch="option" data-key="' + esc(o.setting) + '" aria-label="' + esc(o.label) + '"' + (o.enabled ? ' checked' : '') + ' /><span class="track"></span></label></div>').join('');
             byId('options').querySelectorAll('input[data-switch]').forEach((input) => input.addEventListener('change', () => post({ type: 'toggleOption', setting: input.dataset.key })));
             const m = c.mcp;
-            byId('mcpDot').className = 'dot ' + (m.installed ? (m.updateAvailable ? 'busy' : 'ok') : '');
-            byId('mcpText').textContent = !m.installed ? 'Not installed yet'
-                : (m.installedVersion ? m.installedVersion : 'Installed') + (m.updateAvailable ? ' → ' + m.availableVersion + ' available' : m.updateAvailable === false ? ' · up to date' : '');
+            byId('mcpDot').className = 'dot ' + (m.installed ? (m.updateAvailable || m.restartPending ? 'busy' : 'ok') : m.checking ? 'busy' : '');
+            byId('mcpText').textContent = !m.installed ? (m.checking ? 'Checking…' : 'Not installed yet')
+                : (m.installedVersion ? m.installedVersion : 'Installed') + (m.updateAvailable ? ' → ' + m.availableVersion + ' available' : m.updateAvailable === false ? ' · up to date' : '')
+                + (m.restartPending ? ' · restart your AI assistant' : '');
             byId('mcpText').title = (m.path || '') + ' · updates: ' + m.updateMode;
+            byId('mcpRestart').style.display = m.installed && m.restartPending ? '' : 'none';
+            byId('mcpRestartText').textContent = m.restartPending ? 'Updated to ' + m.restartPending + '. Restart your AI assistant (Copilot, Claude Code, Cursor…) so it uses the new version.' : '';
             byId('mcpSetup').style.display = m.installed ? '' : 'none'; byId('mcpCheck').style.display = m.installed ? '' : 'none';
             byId('connSub').textContent = ready ? (c.url + ' · ready') : (c.configValid ? text : 'not configured');
         }

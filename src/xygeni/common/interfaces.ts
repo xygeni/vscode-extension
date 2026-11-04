@@ -97,6 +97,8 @@ export interface McpStatus {
   /** Undefined until a check ran in this session. */
   updateAvailable?: boolean;
   updateMode: string;
+  /** Set after an update until the user confirms the MCP client was restarted: the JAR on disk is newer than what a running client loaded. */
+  restartPending?: string;
 }
 
 export interface ScanResult {
