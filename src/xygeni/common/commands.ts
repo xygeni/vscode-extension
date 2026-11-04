@@ -3,10 +3,12 @@ import * as vscode from 'vscode';
 // eslint-disable-next-line @typescript-eslint/naming-convention
 import * as _ from 'lodash';
 import * as os from 'os';
+import * as fs from 'fs';
+import * as path from 'path';
 import { ConfigManager, ProxySettings } from "../config/xygeni-configuration";
-import { ISSUE_DETAILS_REMEDIATE_FUNCTION, ISSUE_DETAILS_SAVE_FUNCTION, STATUS, XYGENI_CONTEXT, XYGENI_PRICING_URL, XYGENI_SCANNER_OUTPUT_NAME, XYGENI_SCANNER_REPORT_SUFFIX } from './constants';
+import { ISSUE_DETAILS_REMEDIATE_FUNCTION, ISSUE_DETAILS_SAVE_FUNCTION, STATE_MCP_IGNORED_VERSION, STATUS, XYGENI_CONTEXT, XYGENI_PRICING_URL, XYGENI_SCANNER_OUTPUT_NAME, XYGENI_SCANNER_REPORT_SUFFIX } from './constants';
 import { EventEmitter } from 'vscode';
-import { Commands, XyContext, ScanResult, IHttpClient, XygeniMedia, XygeniIssue } from './interfaces';
+import { Commands, XyContext, ScanResult, IHttpClient, XygeniMedia, XygeniIssue, McpStatus } from './interfaces';
 import InstallerService from '../service/installer';
 import { Logger, OutputChannelWrapper } from './logger';
 import XygeniScannerService from '../service/scanner';
@@ -24,6 +26,9 @@ import LicenseStateService from '../service/license-state';
 import { VulnXygeniIssue } from '../service/vuln-issue';
 import { RemediationService } from '../service/remediation';
 import { McpSetupView } from '../views/mcp-setup-view';
+import GlobalContextImpl from '../service/global-context';
+import { ScanConfig, ScanType, SCANNERS, defaultScanConfig, excludePatternForFolder, loadScanConfig, saveScanConfig, scanConfigPath, serializeScanConfig, withAllScanTypes, withDefaultOnSave, withExclude, withOnSaveType, withScanOption, withScanType, withoutExclude, withoutScanOption } from '../service/scan-config';
+import { SCAN_OPTIONS, validateScanOption } from '../service/scan-options';
 
 
 
@@ -185,11 +190,48 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
   }
 
   /**
+   * A backend that is starting (a local one, a deploy) answers 5xx or refuses the connection for a few seconds:
+   * the ping is retried before the extension calls it disconnected, so the user does not have to reconnect by hand.
+   */
+  private async pingWithRetries(xygeniUrl: string, attempts = 3, delayMs = 3000): Promise<boolean> {
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        if (await InstallerService.getInstance().isValidApiUrl(xygeniUrl)) { return true; }
+        return false;
+      } catch (error: any) {
+        const message = String(error?.message ?? error);
+        const transient = /: 5\d\d\b/.test(message) || /ECONNREFUSED|ECONNRESET|ETIMEDOUT|EAI_AGAIN|socket hang up/i.test(message);
+        Logger.log(`Connection check failed (${attempt}/${attempts}): ${message}`);
+        if (!transient || attempt === attempts) { throw error; }
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+    return false;
+  }
+
+  // False until the first connection check of this session ends, so the Configuration view shows "Connecting…"
+  // rather than "Disconnected" while the check is still in flight.
+  private connectionChecked = false;
+
+  public isConnectionChecked(): boolean {
+    return this.connectionChecked;
+  }
+
+  /**
    * Refresh connection and run installer 
    * @param override if true, force installation even if scanner is already installed
    * @returns 
    */
   public async refreshAndInstall(override?: boolean): Promise<unknown> {
+    try {
+      return await this.doRefreshAndInstall(override);
+    } finally {
+      this.connectionChecked = true;
+      this.refreshConfigView();
+    }
+  }
+
+  private async doRefreshAndInstall(override?: boolean): Promise<unknown> {
 
     const xygeniUrl = ConfigManager.getXygeniUrl();
     const xygeniToken = await ConfigManager.getXygeniToken(this.context);
@@ -205,7 +247,7 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
       new URL(xygeniUrl);
 
       this.connecting();
-      if (!await InstallerService.getInstance().isValidApiUrl(xygeniUrl)) {
+      if (!await this.pingWithRetries(xygeniUrl)) {
         this.resetConnectionStatus();
         throw new Error('Xygeni API URL is not valid or not reachable.');
       }
@@ -308,6 +350,17 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     return InstallerService.getInstance().getMcpLibraryPath();
   }
 
+  public getMcpStatus(): McpStatus {
+    const installer = InstallerService.getInstance();
+    const lastCheck = installer.lastMcpUpdateCheck;
+    return {
+      installedVersion: installer.getMcpInstalledVersion(),
+      availableVersion: lastCheck?.available,
+      updateAvailable: lastCheck?.updateAvailable,
+      updateMode: ConfigManager.getMcpUpdateMode()
+    };
+  }
+
 
   public getScanOutputChannel(): OutputChannelWrapper {
     if (this.scanOutputChannel === undefined) {
@@ -361,10 +414,11 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
   }
 
   /**
-   * Run Xygeni Scanner
+   * Run Xygeni Scanner: the configured full scan, or with `only` just those scan types (the play button of a
+   * results view), refreshing only their findings.
    * @returns
    */
-  public async runScanner(): Promise<void> {
+  public async runScanner(only?: ScanType[]): Promise<void> {
     if (!this.isLicenseAvailable()) {
       Logger.log('Xygeni IDE License is not available. Scan aborted.');
       vscode.window.showWarningMessage('Xygeni IDE License is not available. Please contact your administrator.');
@@ -381,8 +435,12 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     const sourceFolder = this.getWorkspaceFolders()[0];
 
     try {
-      await scanner.runAnalysis(sourceFolder, this.getXygeniInstallPath(), this.getScanOutputChannel());
-      this.readIssues();
+      scanner.setScanConfig(this.getScanConfig());
+      const types = only && only.length > 0 ? this.withCompanions(only) : undefined;
+      await scanner.runAnalysis(sourceFolder, this.getXygeniInstallPath(), this.getScanOutputChannel(), types);
+      // Only the configured scan types ran: their reports are re-read and the other categories are dropped (#415).
+      // A single scan type keeps the findings of the others.
+      this.readIssues(types ?? scanner.getFullScanTypes(), types !== undefined);
       this.refreshAllViews();
     } catch (error) {
       Logger.error(error, "Error running scanner");
@@ -390,11 +448,170 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     }
   }
 
+  /** The scan types plus the ones that run with them (SCA brings suspect dependencies). */
+  private withCompanions(types: ScanType[]): ScanType[] {
+    const all = new Set(types);
+    for (const scanner of SCANNERS) {
+      if (scanner.runsWith && all.has(scanner.runsWith)) { all.add(scanner.key); }
+    }
+    return SCANNERS.map(scanner => scanner.key).filter(type => all.has(type));
+  }
+
+  // ============================================================================
+  // Per-project scan configuration (.xygeni/ide.json, xygeni/xygeni-product-backlog#415)
+  // ==========================================================================
+
+  /** The configuration of the first workspace folder; the defaults without a workspace. */
+  public getScanConfig(): ScanConfig {
+    return loadScanConfig(this.getWorkspaceFolders()[0]);
+  }
+
+  public getScanConfigPath(): string | undefined {
+    const root = this.getWorkspaceFolders()[0];
+    return root ? scanConfigPath(root) : undefined;
+  }
+
+  private saveScanConfig(config: ScanConfig): void {
+    const root = this.getWorkspaceFolders()[0];
+    if (!root) {
+      vscode.window.showWarningMessage('Open a workspace folder to configure its Xygeni scan.');
+      return;
+    }
+    try {
+      saveScanConfig(root, config);
+      XygeniScannerService.getInstance().setScanConfig(config);
+    } catch (error: any) {
+      Logger.error(error, 'Error saving the scan configuration');
+      vscode.window.showErrorMessage(`Could not save the Xygeni scan configuration: ${error.message}`);
+    }
+    this.refreshConfigView();
+  }
+
+  public toggleScanType(type: ScanType, enabled?: boolean): void {
+    const config = this.getScanConfig();
+    this.saveScanConfig(withScanType(config, type, enabled ?? !config.scans.includes(type)));
+  }
+
+  public toggleOnSaveScanType(type: ScanType, enabled?: boolean): void {
+    const config = this.getScanConfig();
+    const next = withOnSaveType(config, type, enabled ?? !config.onSave.includes(type));
+    this.saveScanConfig(next);
+    // The on-save column and Auto Scan on Save help each other (#415): switching a type on turns Auto Scan on
+    // Save on; switching the last one off turns it off, as nothing would run on save.
+    if (next.onSave.includes(type) && !ConfigManager.getAutoScan()) {
+      void ConfigManager.setAutoScan(true).then(() => this.refreshAllViews());
+    } else if (next.onSave.length === 0 && ConfigManager.getAutoScan()) {
+      void ConfigManager.setAutoScan(false).then(() => this.refreshAllViews());
+    }
+  }
+
+  public setAllScanTypes(enabled: boolean): void {
+    this.saveScanConfig(withAllScanTypes(this.getScanConfig(), enabled));
+  }
+
+  public restoreScanDefaults(): void {
+    this.saveScanConfig(defaultScanConfig());
+  }
+
+  /** Picks a folder of the workspace and excludes everything under it (`<folder>/**`). */
+  public async addExcludeFolder(): Promise<void> {
+    const root = this.getWorkspaceFolders()[0];
+    if (!root) {
+      vscode.window.showWarningMessage('Open a workspace folder to configure its Xygeni scan.');
+      return;
+    }
+    const picked = await vscode.window.showOpenDialog({
+      canSelectFolders: true, canSelectFiles: false, canSelectMany: true, defaultUri: vscode.Uri.file(root),
+      openLabel: 'Exclude from the scan', title: 'Folders to exclude from the Xygeni scan'
+    });
+    if (!picked || picked.length === 0) { return; }
+    let config = this.getScanConfig();
+    const outside: string[] = [];
+    for (const folder of picked) {
+      const pattern = excludePatternForFolder(root, folder.fsPath);
+      if (pattern) { config = withExclude(config, pattern); } else { outside.push(folder.fsPath); }
+    }
+    if (outside.length > 0) {
+      vscode.window.showWarningMessage(`Only folders inside the workspace can be excluded: ${outside.join(', ')}`);
+    }
+    this.saveScanConfig(config);
+  }
+
+  /** Types a glob pattern (scanner syntax: `*` file wildcard, `**` any depth, `path:` prefix for a sub-project). */
+  public async addExcludePattern(): Promise<void> {
+    const pattern = await vscode.window.showInputBox({
+      prompt: 'Pattern to exclude from the Xygeni scan (added to the scanner defaults)',
+      placeHolder: '**/fixtures/**',
+      validateInput: (value) => value.trim().length === 0 ? 'Enter a pattern' : value.includes(',') ? 'One pattern at a time (no commas)' : null
+    });
+    if (pattern === undefined) { return; }
+    this.saveScanConfig(withExclude(this.getScanConfig(), pattern.trim()));
+  }
+
+  public removeExclude(pattern: string): void {
+    this.saveScanConfig(withoutExclude(this.getScanConfig(), pattern));
+  }
+
+  /**
+   * Adds one `xygeni scan` option, typed as on the command line (`--ai-review=all`). Only the options in
+   * SCAN_OPTIONS are accepted; the text is validated here again, whatever the view checked.
+   * @returns the error to show next to the input, or undefined when added
+   */
+  public addScanOption(text: string): string | undefined {
+    const result = validateScanOption(text);
+    if (!result.ok) { return result.error; }
+    this.saveScanConfig(withScanOption(this.getScanConfig(), result.option));
+    return undefined;
+  }
+
+  /** The same from the command palette, with the options as the quick pick items. */
+  public async addScanOptionFromPalette(): Promise<void> {
+    const picked = await vscode.window.showQuickPick(
+      SCAN_OPTIONS.map(spec => ({ label: spec.name, description: spec.kind === 'flag' ? '' : `=${spec.placeholder ?? spec.values?.join('|') ?? 'value'}`, detail: spec.description, spec })),
+      { placeHolder: 'Scanner option to add to the scans of this workspace', matchOnDetail: true });
+    if (!picked) { return; }
+    let text = picked.spec.name;
+    if (picked.spec.kind === 'enum') {
+      const value = await vscode.window.showQuickPick([...picked.spec.values!], { placeHolder: `${picked.spec.name}=` });
+      if (!value) { return; }
+      text = `${picked.spec.name}=${value}`;
+    } else if (picked.spec.kind !== 'flag') {
+      const value = await vscode.window.showInputBox({
+        prompt: `${picked.spec.name}: ${picked.spec.description}`, placeHolder: picked.spec.placeholder,
+        validateInput: (input) => { const check = validateScanOption(`${picked.spec.name}=${input}`); return check.ok ? null : check.error; }
+      });
+      if (value === undefined) { return; }
+      text = `${picked.spec.name}=${value}`;
+    }
+    const error = this.addScanOption(text);
+    if (error) { vscode.window.showWarningMessage(error); }
+  }
+
+  public removeScanOption(name: string): void {
+    this.saveScanConfig(withoutScanOption(this.getScanConfig(), name));
+  }
+
+  /** Opens `.xygeni/ide.json`, writing the current (maybe default) configuration first when it does not exist. */
+  public async openScanConfigFile(): Promise<void> {
+    const filePath = this.getScanConfigPath();
+    if (!filePath) { return; }
+    if (!fs.existsSync(filePath)) {
+      fs.mkdirSync(path.dirname(filePath), { recursive: true });
+      fs.writeFileSync(filePath, serializeScanConfig(this.getScanConfig()));
+    }
+    const document = await vscode.workspace.openTextDocument(vscode.Uri.file(filePath));
+    await vscode.window.showTextDocument(document);
+  }
+
   /**
    * Toggle auto-scan on save setting
    */
   public async toggleAutoScan(): Promise<void> {
     const newValue = await ConfigManager.toggleAutoScan();
+    // Switched on with nothing chosen for on save: start from the default on-save types (#415).
+    if (newValue && this.getScanConfig().onSave.length === 0 && this.getWorkspaceFolders()[0]) {
+      this.saveScanConfig(withDefaultOnSave(this.getScanConfig()));
+    }
     this.refreshAllViews();
   }
 
@@ -445,6 +662,12 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     const sourceFolder = this.getWorkspaceFolders()[0];
     if (!sourceFolder) return;
 
+    scanner.setScanConfig(this.getScanConfig());
+    if (scanner.getIncrementalScanTypes().length === 0) {
+      Logger.log('No scan type is configured to run on save (.xygeni/ide.json). Incremental scan skipped.');
+      return;
+    }
+
     try {
       await scanner.runIncrementalAnalysis(sourceFolder, this.getXygeniInstallPath(), this.getScanOutputChannel());
       this.readIssues(scanner.getIncrementalScanTypes());
@@ -456,8 +679,8 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
 
   /** With `scanTypes` only those reports are re-read (incremental scan); without, all of them. */
   public readIssues = _.throttle(
-    (scanTypes?: string[]) => {
-      IssuesService.getInstance().readIssues(scanTypes);
+    (scanTypes?: string[], keepOthers = true) => {
+      IssuesService.getInstance().readIssues(scanTypes, keepOthers);
     },
     2000,
     { leading: false, trailing: true }
@@ -543,10 +766,101 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
             }
           });
         }
+        // The connection and license were validated before the install: time for the daily version check.
+        return this.checkMcpUpdates(false);
       })
       .catch((error) => {
         Logger.log(" Error downloading Xygeni MCP library. MCP Server will not be available: " + error);
       });
+  }
+
+  /**
+   * Checks whether a newer MCP server is published and acts on the `xygeni.mcp.updates` setting: notify
+   * (Update / Ignore this version), update in the background, or nothing. The installer checks at most once
+   * every 24 h across IDEs unless `force` (the command, which also reports "up to date" and failures). A failed
+   * check is only logged (xygeni/xygeni-product-backlog#2382).
+   */
+  public async checkMcpUpdates(force: boolean): Promise<void> {
+    const mode = ConfigManager.getMcpUpdateMode();
+    if (!force && mode === 'off') {
+      return;
+    }
+    let result;
+    try {
+      result = await InstallerService.getInstance().checkMcpUpdate(force);
+    } catch (error: any) {
+      Logger.error(error, 'MCP server update check failed');
+      if (force) {
+        vscode.window.showWarningMessage(`Could not check for Xygeni MCP server updates: ${error.message}`);
+      }
+      return;
+    }
+    switch (result.status) {
+      case 'not-installed':
+        if (force) {
+          vscode.window.showWarningMessage('The Xygeni MCP server is not installed yet. Connect to Xygeni and install the scanner first.');
+        }
+        return;
+      case 'skipped':
+        return;
+      case 'unavailable':
+        if (force) {
+          vscode.window.showWarningMessage('Could not check for Xygeni MCP server updates: the published version is not available.');
+        }
+        return;
+      case 'up-to-date':
+        if (force) {
+          vscode.window.showInformationMessage(`The Xygeni MCP server is up to date (${result.available}).`);
+        }
+        return;
+      case 'update-available':
+        break;
+    }
+    const ignoredVersion = GlobalContextImpl.getInstance().getGlobalStateValue(STATE_MCP_IGNORED_VERSION);
+    if (!force && ignoredVersion === result.available) {
+      Logger.log(`MCP server ${result.available} is ignored by the user`);
+      return;
+    }
+    if (!force && mode === 'auto') {
+      await this.updateMcpLibrary();
+      return;
+    }
+    const message = `A new version of the Xygeni MCP server is available (${result.installed ?? 'unknown'} → ${result.available}).`;
+    const update = 'Update';
+    const ignore = 'Ignore this version';
+    const choice = await vscode.window.showInformationMessage(message, update, ignore);
+    if (choice === update) {
+      await this.updateMcpLibrary();
+    } else if (choice === ignore) {
+      await GlobalContextImpl.getInstance().updateGlobalStateValue(STATE_MCP_IGNORED_VERSION, result.available);
+      Logger.log(`MCP server ${result.available} will not be offered again`);
+    }
+  }
+
+  /** Downloads the published MCP server over the installed one and says when it is loaded. */
+  public async updateMcpLibrary(): Promise<void> {
+    const installer = InstallerService.getInstance();
+    try {
+      const outcome = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: 'Updating Xygeni MCP server...' },
+        () => installer.updateMcpLibrary()
+      );
+      const version = installer.getMcpInstalledVersion() ?? 'the published version';
+      const openMcpSetup = 'Open MCP Setup';
+      if (outcome === 'installed') {
+        vscode.window.showInformationMessage(`Xygeni MCP server updated to ${version}. Restart your MCP client to load it.`, openMcpSetup)
+          .then((choice) => { if (choice) { this.showMcpSetupView(); } });
+      } else {
+        vscode.window.showWarningMessage('The Xygeni MCP server update was downloaded but the installed JAR is in use. '
+          + 'Close your MCP client; the update is applied the next time VS Code starts.', openMcpSetup)
+          .then((choice) => { if (choice) { this.showMcpSetupView(); } });
+      }
+    } catch (error: any) {
+      Logger.error(error, 'Error updating the MCP server');
+      const retry = 'Retry';
+      vscode.window.showErrorMessage(`Failed to update the Xygeni MCP server: ${error.message}`, retry)
+        .then((choice) => { if (choice === retry) { void this.updateMcpLibrary(); } });
+    }
   }
 
   openDiffViewCommand(uri: string, tempFile: string): void {

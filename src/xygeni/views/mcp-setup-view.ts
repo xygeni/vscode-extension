@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { Commands } from '../common/interfaces';
+import { Commands, McpStatus } from '../common/interfaces';
 import { Logger } from '../common/logger';
 
 export class McpSetupView {
@@ -75,6 +75,7 @@ export class McpSetupView {
     }, null, 2);
 
     const tomlConfig = this.buildTomlConfig(serverName, jarPath, scannerPathArg, javaHome, xygeniUrl, xygeniToken);
+    const statusSection = isMcpLibraryInstalled ? this.buildStatusSection(jarPath, commands.getMcpStatus?.()) : '';
 
     // Auto-import the MCP documentation
     this.loadMcpDocumentation();
@@ -239,6 +240,8 @@ export class McpSetupView {
                   : '<strong>Warning:</strong> No token is currently stored in Xygeni settings. Replace <code>$XYGENI_TOKEN</code> with your real token before using the config.'}
             </div>
 
+            ${statusSection}
+
             <div class="step">
                 <div class="step-number">Step 1: Create MCP Server Configuration</div>
                 <p>Create a new MCP server configuration file. Use JSON or TOML depending on your MCP client:</p>
@@ -299,6 +302,25 @@ export class McpSetupView {
     if (this.panel === panel) {
       panel.webview.html = html;
     }
+  }
+
+  /** Installed path and version plus what the last update check found (xygeni/xygeni-product-backlog#2382). */
+  private static buildStatusSection(jarPath: string, status: McpStatus | undefined): string {
+    const installedVersion = status?.installedVersion
+      ?? 'unknown (installed before version tracking; it is updated on the next check)';
+    const updateLine = status?.updateAvailable === undefined
+      ? 'not checked yet in this session'
+      : status.updateAvailable ? `version ${status.availableVersion} is available` : 'up to date';
+    const mode = status?.updateMode ?? 'notify';
+    return `
+            <div class="step">
+                <div class="step-number">Installed MCP server</div>
+                <p><strong>Path:</strong> <code>${this.escapeHtml(jarPath)}</code></p>
+                <p><strong>Installed version:</strong> ${this.escapeHtml(installedVersion)}</p>
+                <p><strong>Updates:</strong> ${this.escapeHtml(updateLine)} (setting <code>xygeni.mcp.updates</code>: ${this.escapeHtml(mode)})</p>
+                <p>The published version is checked once a day. Run <em>Xygeni: Check for MCP Server Updates</em> to check now,
+                   and restart your MCP client after an update so it loads the new JAR.</p>
+            </div>`;
   }
 
   private static getNonce() {

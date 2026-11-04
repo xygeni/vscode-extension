@@ -1,11 +1,11 @@
 import * as vscode from 'vscode';
 // eslint-disable-next-line @typescript-eslint/naming-convention
 import * as _ from 'lodash';
-import ConfigurationView from './views/configuration-view';
-import { ScanView } from './views/scan-view';
 import { AiIssueView, ApisecIssueView, IaCIssueView, IssueView, MalwareIssueView, MisconfIssueView, QualityIssueView, SastIssueView, ScaIssueView, SecretsIssueView } from './views/issue-view';
 import { HelpView } from './views/help-view';
-import { XYGENI_SHOW_CONFIG_COMMAND, XYGENI_CONTEXT, COMMAND_EDIT_XYGENI_API_URL, COMMAND_EDIT_XYGENI_TOKEN, COMMAND_TEST_XYGENI_CONNECTION, COMMAND_INSTALL_SCANNER, XYGENI_CLOSE_CONFIG_COMMAND, COMMAND_RUN_SCANNER, COMMAND_SHOW_OUTPUT, COMMAND_OPEN_PROXY_CONFIG, COMMAND_OPEN_SETTINGS, COMMAND_SHOW_SCAN_OUTPUT, COMMAND_SHOW_MCP_SETUP, COMMAND_TOGGLE_AUTO_SCAN, COMMAND_TOGGLE_GLOBAL_OPTION, COMMAND_UPGRADE_LICENSE } from './common/constants';
+import { ConfigurationWebview } from './views/configuration-webview';
+import { XYGENI_SHOW_CONFIG_COMMAND, XYGENI_CONTEXT, COMMAND_EDIT_XYGENI_API_URL, COMMAND_EDIT_XYGENI_TOKEN, COMMAND_TEST_XYGENI_CONNECTION, COMMAND_INSTALL_SCANNER, XYGENI_CLOSE_CONFIG_COMMAND, COMMAND_RUN_SCANNER, COMMAND_SHOW_OUTPUT, COMMAND_OPEN_PROXY_CONFIG, COMMAND_OPEN_SETTINGS, COMMAND_SHOW_SCAN_OUTPUT, COMMAND_SHOW_MCP_SETUP, COMMAND_CHECK_MCP_UPDATES, COMMAND_TOGGLE_AUTO_SCAN, COMMAND_TOGGLE_GLOBAL_OPTION, COMMAND_UPGRADE_LICENSE, COMMAND_TOGGLE_SCAN_TYPE, COMMAND_TOGGLE_ON_SAVE_SCAN_TYPE, COMMAND_SELECT_ALL_SCAN_TYPES, COMMAND_CLEAR_SCAN_TYPES, COMMAND_RESTORE_SCAN_DEFAULTS, COMMAND_OPEN_SCAN_CONFIG_FILE, COMMAND_ADD_EXCLUDE_FOLDER, COMMAND_ADD_EXCLUDE_PATTERN, COMMAND_REMOVE_EXCLUDE, COMMAND_ADD_SCAN_OPTION, COMMAND_REMOVE_SCAN_OPTION, COMMAND_RUN_SCAN_TYPE_PREFIX, RESULT_VIEW_SCAN_TYPES } from './common/constants';
+import { ScanType } from './service/scan-config';
 import { XyContextImpl } from './common/context';
 import InstallerService from './service/installer';
 import { Logger } from './common/logger';
@@ -33,12 +33,14 @@ class XygeniExtension {
     const xygeniContext = XyContextImpl.getInstance();
     const commands = CommandsImpl.getInstance(context, xygeniContext);
 
-    // Create and register view providers
-    const configViewProvider = new ConfigurationView(
-      context,
-      xygeniContext,
-      commands);
-    const scanViewProvider = new ScanView(context, commands);
+    // Create and register view providers. Configuration (connection, scan, scan configuration) is a webview
+    // (#415); ConfigurationView / ScanView keep the tree versions, unused.
+    const resultTreeViews: Record<string, vscode.TreeView<unknown>> = {};
+    const resultTree = (id: string, treeDataProvider: vscode.TreeDataProvider<any>) => {
+      const treeView = vscode.window.createTreeView(id, { treeDataProvider });
+      resultTreeViews[id] = treeView;
+      return treeView;
+    };
 
     const sastViewProvider = new SastIssueView(commands);
     const scaViewProvider = new ScaIssueView(commands);
@@ -66,45 +68,25 @@ class XygeniExtension {
       // Register help webview provider
       vscode.window.registerWebviewViewProvider(HelpView.viewType, new HelpView(xygeniVersion)),
 
+      // Configuration (#415): connection, scan and scan configuration in one webview section.
+      vscode.window.registerWebviewViewProvider(ConfigurationWebview.viewType,
+        new ConfigurationWebview(context.extensionUri, commands, xygeniContext, (view) => resultTreeViews[view]?.visible ?? false),
+        { webviewOptions: { retainContextWhenHidden: true } }),
+
       // Register welcome view provider
       vscode.window.createTreeView('xygeni.views.welcome', {
         treeDataProvider: new EmptyTreeDataProvider(),
       }),
 
-      // Register configuration view
-      vscode.window.createTreeView('xygeni.views.configuration', {
-        treeDataProvider: configViewProvider
-      }),
-      vscode.window.createTreeView('xygeni.views.scan', {
-        treeDataProvider: scanViewProvider
-      }),
-      vscode.window.createTreeView('xygeni.views.sast', {
-        treeDataProvider: sastViewProvider
-      }),
-      vscode.window.createTreeView('xygeni.views.sca', {
-        treeDataProvider: scaViewProvider
-      }),
-      vscode.window.createTreeView('xygeni.views.cicd', {
-        treeDataProvider: misconfViewProvider
-      }),
-      vscode.window.createTreeView('xygeni.views.secrets', {
-        treeDataProvider: secretsViewProvider
-      }),
-      vscode.window.createTreeView('xygeni.views.iac', {
-        treeDataProvider: iacViewProvider
-      }),
-      vscode.window.createTreeView('xygeni.views.quality', {
-        treeDataProvider: qualityViewProvider
-      }),
-      vscode.window.createTreeView('xygeni.views.apisec', {
-        treeDataProvider: apisecViewProvider
-      }),
-      vscode.window.createTreeView('xygeni.views.ai', {
-        treeDataProvider: aiViewProvider
-      }),
-      vscode.window.createTreeView('xygeni.views.malware', {
-        treeDataProvider: malwareViewProvider
-      }),
+      resultTree('xygeni.views.sast', sastViewProvider),
+      resultTree('xygeni.views.sca', scaViewProvider),
+      resultTree('xygeni.views.cicd', misconfViewProvider),
+      resultTree('xygeni.views.secrets', secretsViewProvider),
+      resultTree('xygeni.views.iac', iacViewProvider),
+      resultTree('xygeni.views.quality', qualityViewProvider),
+      resultTree('xygeni.views.apisec', apisecViewProvider),
+      resultTree('xygeni.views.ai', aiViewProvider),
+      resultTree('xygeni.views.malware', malwareViewProvider),
 
       // Commands
       vscode.commands.registerCommand(XYGENI_SHOW_CONFIG_COMMAND, () => {
@@ -162,8 +144,52 @@ class XygeniExtension {
         commands.openUpgradePage();
       }),
 
+      // per-project scan configuration (#415)
+      vscode.commands.registerCommand(COMMAND_TOGGLE_SCAN_TYPE, (type: ScanType) => {
+        commands.toggleScanType(type);
+      }),
+      vscode.commands.registerCommand(COMMAND_TOGGLE_ON_SAVE_SCAN_TYPE, (type: ScanType) => {
+        commands.toggleOnSaveScanType(type);
+      }),
+      vscode.commands.registerCommand(COMMAND_SELECT_ALL_SCAN_TYPES, () => {
+        commands.setAllScanTypes(true);
+      }),
+      vscode.commands.registerCommand(COMMAND_CLEAR_SCAN_TYPES, () => {
+        commands.setAllScanTypes(false);
+      }),
+      vscode.commands.registerCommand(COMMAND_RESTORE_SCAN_DEFAULTS, () => {
+        commands.restoreScanDefaults();
+      }),
+      vscode.commands.registerCommand(COMMAND_OPEN_SCAN_CONFIG_FILE, async () => {
+        await commands.openScanConfigFile();
+      }),
+      vscode.commands.registerCommand(COMMAND_ADD_EXCLUDE_FOLDER, async () => {
+        await commands.addExcludeFolder();
+      }),
+      vscode.commands.registerCommand(COMMAND_ADD_EXCLUDE_PATTERN, async () => {
+        await commands.addExcludePattern();
+      }),
+      vscode.commands.registerCommand(COMMAND_ADD_SCAN_OPTION, async () => {
+        await commands.addScanOptionFromPalette();
+      }),
+      vscode.commands.registerCommand(COMMAND_REMOVE_SCAN_OPTION, (name: string) => {
+        commands.removeScanOption(name);
+      }),
+      // One command per results view: its play button runs that scan type alone (#415).
+      ...Object.values(RESULT_VIEW_SCAN_TYPES).map((type) =>
+        vscode.commands.registerCommand(`${COMMAND_RUN_SCAN_TYPE_PREFIX}${type}`, async () => {
+          await commands.runScanner([type as ScanType]);
+        })),
+      vscode.commands.registerCommand(COMMAND_REMOVE_EXCLUDE, (pattern: string) => {
+        commands.removeExclude(pattern);
+      }),
+
       vscode.commands.registerCommand(COMMAND_SHOW_MCP_SETUP, (issue) => {
         commands.showMcpSetupView();
+      }),
+
+      vscode.commands.registerCommand(COMMAND_CHECK_MCP_UPDATES, async () => {
+        await commands.checkMcpUpdates(true);
       }),
 
       vscode.commands.registerCommand('xygeni.showIssueDetails', (issue) => {

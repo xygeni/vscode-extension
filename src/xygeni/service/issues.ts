@@ -82,7 +82,7 @@ export default class IssuesService {
    * are re-read and the other categories keep their current findings: their report files on
    * disk were not rewritten, so re-reading them would only bring back stale results.
    */
-  public async readIssues(scanTypes?: string[]): Promise<void> {
+  public async readIssues(scanTypes?: string[], keepOthers = true): Promise<void> {
     if (this.isReadingIssues) {
       this.logger.log('Issues are already being read, skipping...');
       return;
@@ -95,7 +95,7 @@ export default class IssuesService {
     this.logger.log("  Reading issues...");
 
     try {
-      await this.readScannerOutput(XYGENI_SCANNER_REPORT_SUFFIX, scanTypes);
+      await this.readScannerOutput(XYGENI_SCANNER_REPORT_SUFFIX, scanTypes, keepOthers);
 
       this.logger.log("  " + this.issues.length + " issues read.");
       this.logger.log("==================================================");
@@ -110,13 +110,17 @@ export default class IssuesService {
   }
 
 
-  public async readScannerOutput(suffix: string, scanTypes?: string[]): Promise<void> {
+  /**
+   * With `keepOthers` false (a full scan limited to the configured scan types, #415) the findings of the
+   * categories that did not run are dropped too, instead of lingering from an earlier scan.
+   */
+  public async readScannerOutput(suffix: string, scanTypes?: string[], keepOthers = true): Promise<void> {
     const readers = scanTypes
       ? this.reportReaders.filter((reader) => scanTypes.includes(reader.scanType))
       : this.reportReaders;
 
     const categoriesToReplace = new Set(readers.map((reader) => reader.category));
-    this.issues = this.issues.filter((issue) => !categoriesToReplace.has(issue.category));
+    this.issues = keepOthers ? this.issues.filter((issue) => !categoriesToReplace.has(issue.category)) : [];
 
     // Read each domain report independently. A failure in one domain (a missing, partial or
     // corrupt report — e.g. when an analyzer such as misconf timed out) must NOT prevent the

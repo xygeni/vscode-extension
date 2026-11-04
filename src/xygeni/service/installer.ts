@@ -7,7 +7,17 @@ import * as zlib from 'zlib';
 import { spawn } from 'child_process';
 import { ILogger, IOutputChannel, EventEmitter, Commands } from '../common/interfaces';
 import { Platform } from '../common/platform';
-import { reject } from 'lodash';
+import { checksumFromFile, isNewerVersion, McpUpdateCheck, versionFromFile } from './mcp-version';
+
+/** What an MCP server download left behind: the JAR in place, or a `.pending` copy while a client locks it. */
+export type McpDownloadOutcome = 'installed' | 'pending';
+
+/** Result of `checkMcpUpdate`; the caller decides what to show (xygeni/xygeni-product-backlog#2382). */
+export type McpUpdateCheckResult =
+    | { status: 'not-installed' }
+    | { status: 'skipped' }
+    | { status: 'unavailable' }
+    | ({ status: 'up-to-date' | 'update-available' } & McpUpdateCheck);
 
 
 /**
@@ -29,8 +39,20 @@ export default class InstallerService {
     private readonly xygeniScannerChecksumUrl = 'https://raw.githubusercontent.com/xygeni/xygeni/main/checksum/latest/xygeni-release.zip.sha256';
 
 
-    private readonly xygeniMCPLibraryUrl = 'https://get.xygeni.io/latest/mcp-server/xygeni-mcp-server.jar';
+    private readonly xygeniMCPBaseUrl = 'https://get.xygeni.io/latest/mcp-server';
+    private readonly xygeniMCPLibraryUrl = `${this.xygeniMCPBaseUrl}/xygeni-mcp-server.jar`;
+    // `<hash>  xygeni-mcp-server.jar` and the version on a single line, published with the JAR (#2381).
+    private readonly xygeniMCPChecksumUrl = `${this.xygeniMCPBaseUrl}/xygeni-mcp-server.jar.sha256`;
+    private readonly xygeniMCPVersionUrl = `${this.xygeniMCPBaseUrl}/version.txt`;
     private readonly xygeniMCPLibraryName = 'xygeni-mcp-server.jar';
+    // Installed version, last remote check (shared by every IDE) and an update waiting for a locked JAR (#2382).
+    private readonly mcpVersionFileName = 'version.txt';
+    private readonly mcpLastCheckFileName = 'last-check.txt';
+    private readonly mcpPendingLibraryName = 'xygeni-mcp-server.jar.pending';
+    private readonly mcpPendingVersionFileName = 'version.txt.pending';
+    private readonly mcpCheckIntervalMs = 24 * 60 * 60 * 1000;
+    /** What the last version check found; shown in the MCP Setup view. */
+    public lastMcpUpdateCheck: McpUpdateCheck | undefined;
     // Folder the MCP server was installed in before #2382, inside each extension version folder.
     private readonly legacyMcpLibraryFolder = '.xygeni-mcp';
     // The MCP folder is shared by every IDE plugin: the lock keeps two of them from writing the JAR at once.
@@ -211,6 +233,14 @@ export default class InstallerService {
         }
     }
 
+    /** The version written next to the installed JAR, or undefined when the JAR is missing or predates version.txt. */
+    public getMcpInstalledVersion(): string | undefined {
+        if (!this.isMcpLibraryInstalled()) {
+            return undefined;
+        }
+        return versionFromFile(this.readTextOrUndefined(path.join(this.getMcpLibratyInstallationDir(), this.mcpVersionFileName)));
+    }
+
     /**
      * Makes sure the MCP library is in the shared folder: downloads it when it is missing, or always when
      * `force` is set (reinstall). Legacy copies inside extension folders are removed afterwards.
@@ -230,26 +260,11 @@ export default class InstallerService {
                 }
                 this.logger.log("");
                 this.logger.log("============================================================");
-                this.logger.log(`  Downloading MCP library... from : ${this.xygeniMCPLibraryUrl}  to: ${installMcpPath}`);
-
-                // Download next to the JAR and rename it into place, so an MCP client never runs a half-written JAR.
-                const temporaryPath = await this.downloadFile(this.xygeniMCPLibraryUrl, installMcpPath, this.xygeniMCPLibraryName + '.tmp');
-                try {
-                    fs.renameSync(temporaryPath, mcpLibraryPath);
-                } catch (error: any) {
-                    fs.rmSync(temporaryPath, { force: true });
-                    // On Windows a running MCP client locks the JAR; the copy already installed keeps working.
-                    if (!fs.existsSync(mcpLibraryPath)) {
-                        throw error;
-                    }
-                    this.logger.log(`  Could not replace ${mcpLibraryPath} (${error.message}). Close your MCP client and reinstall to update it.`);
-                    return;
+                const outcome = await this.downloadMcpJarLocked();
+                if (outcome === 'installed') {
+                    this.logger.log(`  Xygeni MCP Library Downloaded to: ${installMcpPath}`);
+                    this.logger.log(`   Check Xygeni MCP Setup to configure it.`);
                 }
-                if (Platform.get() !== 'win32') {
-                    await this.makeExecutable(mcpLibraryPath);
-                }
-                this.logger.log(`  Xygeni MCP Library Downloaded to: ${installMcpPath}`);
-                this.logger.log(`   Check Xygeni MCP Setup to configure it.`);
                 this.logger.log("============================================================");
             });
         }
@@ -268,6 +283,186 @@ export default class InstallerService {
             }
         }
         return legacyMcpLibraryDirs.length > 0;
+    }
+
+    /** Downloads the published MCP server over the installed one (the "Update" action). */
+    public async updateMcpLibrary(): Promise<McpDownloadOutcome> {
+        const installMcpPath = this.getMcpLibratyInstallationDir();
+        fs.mkdirSync(installMcpPath, { recursive: true });
+        return this.withMcpLock(installMcpPath, () => this.downloadMcpJarLocked());
+    }
+
+    /**
+     * Downloads the published JAR and puts it in place. Runs under the MCP lock. The remote `version.txt` is
+     * read first and written next to the JAR once it is installed; the download is verified against the
+     * published `.sha256` when that file is available, and a mismatch keeps the JAR already installed (#2382).
+     * On Windows a running MCP client locks the JAR: the download is then kept as `.pending` and applied on
+     * the next start.
+     */
+    private async downloadMcpJarLocked(): Promise<McpDownloadOutcome> {
+        const installMcpPath = this.getMcpLibratyInstallationDir();
+        const mcpLibraryPath = path.join(installMcpPath, this.xygeniMCPLibraryName);
+        const remoteVersion = versionFromFile(await this.fetchText(this.xygeniMCPVersionUrl));
+        this.logger.log(`  MCP server published version: ${remoteVersion ?? 'unknown'}`);
+        this.logger.log(`  Downloading MCP library... from : ${this.xygeniMCPLibraryUrl}  to: ${installMcpPath}`);
+
+        // Download next to the JAR and rename it into place, so an MCP client never runs a half-written JAR.
+        const temporaryPath = await this.downloadFile(this.xygeniMCPLibraryUrl, installMcpPath, this.xygeniMCPLibraryName + '.tmp');
+        try {
+            const expectedChecksum = checksumFromFile(await this.fetchText(this.xygeniMCPChecksumUrl));
+            if (expectedChecksum === undefined) {
+                this.logger.log(`  MCP server checksum is not available at ${this.xygeniMCPChecksumUrl}; the download is not verified`);
+            } else {
+                const actualChecksum = await this.calculateChecksum(temporaryPath);
+                if (actualChecksum.toLowerCase() !== expectedChecksum) {
+                    throw new Error(`MCP server checksum mismatch (expected ${expectedChecksum}, got ${actualChecksum}); the installed copy is kept`);
+                }
+                this.logger.log('  MCP server checksum verified');
+            }
+        } catch (error) {
+            fs.rmSync(temporaryPath, { force: true });
+            throw error;
+        }
+
+        try {
+            fs.renameSync(temporaryPath, mcpLibraryPath);
+        } catch (error: any) {
+            if (!fs.existsSync(mcpLibraryPath)) {
+                fs.rmSync(temporaryPath, { force: true });
+                throw error;
+            }
+            // On Windows a running MCP client locks the JAR; the copy already installed keeps working and the
+            // update waits as `.pending` until the next start.
+            fs.renameSync(temporaryPath, path.join(installMcpPath, this.mcpPendingLibraryName));
+            this.writeVersionFile(path.join(installMcpPath, this.mcpPendingVersionFileName), remoteVersion);
+            this.logger.log(`  Could not replace ${mcpLibraryPath} (${error.message}). Close your MCP client; the update is applied on the next start.`);
+            return 'pending';
+        }
+        if (Platform.get() !== 'win32') {
+            await this.makeExecutable(mcpLibraryPath);
+        }
+        this.writeVersionFile(path.join(installMcpPath, this.mcpVersionFileName), remoteVersion);
+        this.discardPendingMcpUpdate();
+        return 'installed';
+    }
+
+    /**
+     * Compares the installed MCP server with the published one. At most once every 24 h across IDEs unless
+     * `force`; a `.pending` download is put in place first when the JAR is no longer locked. A remote version
+     * that cannot be read (no network, not published yet) gives `unavailable` and is only logged (#2382).
+     */
+    public async checkMcpUpdate(force: boolean): Promise<McpUpdateCheckResult> {
+        if (!this.isMcpLibraryInstalled()) {
+            return { status: 'not-installed' };
+        }
+        const installMcpPath = this.getMcpLibratyInstallationDir();
+        if (fs.existsSync(path.join(installMcpPath, this.mcpPendingLibraryName))) {
+            await this.withMcpLock(installMcpPath, async () => this.applyPendingMcpUpdateLocked());
+        }
+        if (!force && !this.isMcpCheckDue()) {
+            return { status: 'skipped' };
+        }
+        const available = versionFromFile(await this.fetchText(this.xygeniMCPVersionUrl));
+        if (available === undefined) {
+            this.logger.log(`  MCP server version not available at ${this.xygeniMCPVersionUrl}; update check skipped`);
+            return { status: 'unavailable' };
+        }
+        this.writeTextQuietly(path.join(installMcpPath, this.mcpLastCheckFileName), `${Date.now()}`);
+        const installed = this.getMcpInstalledVersion();
+        const updateAvailable = isNewerVersion(available, installed);
+        this.lastMcpUpdateCheck = { installed, available, updateAvailable };
+        this.logger.log(`  MCP server installed: ${installed ?? 'unknown'}, published: ${available}`);
+        return { status: updateAvailable ? 'update-available' : 'up-to-date', installed, available, updateAvailable };
+    }
+
+    /** Puts a `.pending` download in place once the MCP client that locked the JAR is gone. Under the MCP lock. */
+    private applyPendingMcpUpdateLocked(): boolean {
+        const installMcpPath = this.getMcpLibratyInstallationDir();
+        const pendingPath = path.join(installMcpPath, this.mcpPendingLibraryName);
+        const pendingVersionPath = path.join(installMcpPath, this.mcpPendingVersionFileName);
+        if (!fs.existsSync(pendingPath)) {
+            return false;
+        }
+        try {
+            fs.renameSync(pendingPath, path.join(installMcpPath, this.xygeniMCPLibraryName));
+        } catch (error: any) {
+            this.logger.log(`  Pending Xygeni MCP server update not applied yet, the JAR is still in use: ${error.message}`);
+            return false;
+        }
+        const pendingVersion = versionFromFile(this.readTextOrUndefined(pendingVersionPath));
+        this.writeVersionFile(path.join(installMcpPath, this.mcpVersionFileName), pendingVersion);
+        fs.rmSync(pendingVersionPath, { force: true });
+        this.logger.log(`  Pending Xygeni MCP server update applied (${pendingVersion ?? 'unknown version'})`);
+        return true;
+    }
+
+    private discardPendingMcpUpdate(): void {
+        const installMcpPath = this.getMcpLibratyInstallationDir();
+        fs.rmSync(path.join(installMcpPath, this.mcpPendingLibraryName), { force: true });
+        fs.rmSync(path.join(installMcpPath, this.mcpPendingVersionFileName), { force: true });
+    }
+
+    private isMcpCheckDue(): boolean {
+        const lastCheck = Number(this.readTextOrUndefined(path.join(this.getMcpLibratyInstallationDir(), this.mcpLastCheckFileName))?.trim());
+        return !Number.isFinite(lastCheck) || Date.now() - lastCheck > this.mcpCheckIntervalMs;
+    }
+
+    /** GET a small text resource (version, checksum); undefined on any failure, which is logged and never thrown. */
+    private fetchText(url: string): Promise<string | undefined> {
+        return new Promise((resolve) => {
+            const finish = (value: string | undefined, reason?: string) => {
+                if (reason) {
+                    this.logger.log(`  GET ${url}: ${reason}`);
+                }
+                resolve(value);
+            };
+            try {
+                const request = this.commands.getHttpClient(url).get(url, (response) => {
+                    if (response.statusCode !== 200) {
+                        response.resume();
+                        finish(undefined, `HTTP ${response.statusCode}`);
+                        return;
+                    }
+                    const chunks: Buffer[] = [];
+                    response.on('data', (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
+                    response.on('end', () => finish(Buffer.concat(chunks).toString('utf8')));
+                    response.on('error', (error) => finish(undefined, error.message));
+                });
+                request.on('error', (error) => finish(undefined, error.message));
+                // Tiny files read at startup: fail fast rather than hold anything up.
+                request.setTimeout(10000, () => {
+                    request.destroy();
+                    finish(undefined, 'timeout');
+                });
+            } catch (error: any) {
+                finish(undefined, error.message);
+            }
+        });
+    }
+
+    private readTextOrUndefined(filePath: string): string | undefined {
+        try {
+            return fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf8') : undefined;
+        } catch {
+            return undefined;
+        }
+    }
+
+    private writeTextQuietly(filePath: string, content: string): void {
+        try {
+            fs.writeFileSync(filePath, content);
+        } catch (error: any) {
+            this.logger.log(`  Could not write ${filePath}: ${error.message}`);
+        }
+    }
+
+    /** Writes the version next to the JAR; an unknown version removes the file so the next check updates it. */
+    private writeVersionFile(filePath: string, version: string | undefined): void {
+        if (version === undefined) {
+            fs.rmSync(filePath, { force: true });
+        } else {
+            this.writeTextQuietly(filePath, version + '\n');
+        }
     }
 
     /**
@@ -295,7 +490,7 @@ export default class InstallerService {
      * Runs `action` holding `<mcpDir>/.lock`, created exclusively. A lock held by another IDE is waited for;
      * one older than `mcpLockStaleMs` was left by a crashed process and is taken over.
      */
-    private async withMcpLock(mcpDir: string, action: () => Promise<void>): Promise<void> {
+    private async withMcpLock<T>(mcpDir: string, action: () => Promise<T>): Promise<T> {
         const lockPath = path.join(mcpDir, this.mcpLockName);
         const waitUntil = Date.now() + this.mcpLockWaitMs;
         for (;;) {
@@ -317,24 +512,34 @@ export default class InstallerService {
             }
         }
         try {
-            await action();
+            return await action();
         } finally {
             fs.rmSync(lockPath, { force: true });
         }
     }
 
 
+    /**
+     * True for a valid token, false for a refused one. Rejects when the server, not the token, is the problem
+     * (5xx or no answer), so the caller can say "server unavailable" instead of "invalid token".
+     */
     public async isValidToken(xygeniApiUrl: string, xygeniToken: string): Promise<boolean> {
         const testApiUrl = `${xygeniApiUrl}/language`;
-        return new Promise<boolean>((resolve) => {
+        return new Promise<boolean>((resolve, reject) => {
             const request = this.commands.getHttpClient(xygeniApiUrl)
                 .setAuthToken(xygeniToken)
                 .get(testApiUrl, (res) => {
+                    res.resume?.();
+                    if ((res.statusCode ?? 0) >= 500) {
+                        reject(new Error(`The Xygeni server is unavailable (HTTP ${res.statusCode}). Try again later.`));
+                        return;
+                    }
                     resolve(res.statusCode === 200);
                 });
 
+            // The previous version used lodash's reject here: a network error never settled the promise.
             request.on('error', (error) => {
-                reject(new Error(`Error checking Xygeni Token: ${error.message}`));
+                reject(new Error(`The Xygeni server is unreachable (${error.message}). Try again later.`));
             });
         });
 
@@ -346,7 +551,14 @@ export default class InstallerService {
         return new Promise<boolean>((resolve, reject) => {
             const request = this.commands.getHttpClient(pingUrl)
                 .get(pingUrl, (res) => {
-                    //Logger.log(`Xygeni API URL is correct: ${pingUrl} ${res.statusCode}`);
+                    // 503 = the server answered but is busy: its /ping reports 503 above a CPU threshold
+                    // (PingController.max.cpu). The URL is right; the token check decides. Only an unreachable
+                    // host or a wrong path make the URL invalid.
+                    if (res.statusCode === 503) {
+                        this.logger.log('The Xygeni server is busy (503 on /ping); going on with the token check');
+                        resolve(true);
+                        return;
+                    }
                     if (res.statusCode !== 200) {
                         reject(new Error(`Error checking Xygeni API URL: ${res.statusCode}`));
                     }

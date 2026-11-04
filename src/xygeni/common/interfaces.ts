@@ -77,6 +77,8 @@ export interface Commands extends WorkspaceFiles {
   openUpgradePage(): void;
   getScannerInstallationDir(): string;
   getMcpLibraryPath(): string | undefined;
+  /** Installed MCP server version, what the last check found and the update setting (#2382). Optional for mocks. */
+  getMcpStatus?(): McpStatus;
 
   getXygeniMedia(): XygeniMedia;
 
@@ -88,6 +90,14 @@ export interface Commands extends WorkspaceFiles {
 
 }
 
+
+export interface McpStatus {
+  installedVersion?: string;
+  availableVersion?: string;
+  /** Undefined until a check ran in this session. */
+  updateAvailable?: boolean;
+  updateMode: string;
+}
 
 export interface ScanResult {
   timestamp: Date;

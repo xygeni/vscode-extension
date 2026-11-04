@@ -1,13 +1,30 @@
 import * as vscode from 'vscode';
 import { ConfigManager } from '../config/xygeni-configuration';
-import { COMMAND_EDIT_XYGENI_API_URL, COMMAND_INSTALL_SCANNER, COMMAND_SHOW_MCP_SETUP, COMMAND_TEST_XYGENI_CONNECTION, COMMAND_TOGGLE_AUTO_SCAN, COMMAND_TOGGLE_GLOBAL_OPTION, COMMAND_UPGRADE_LICENSE, STATUS, XYGENI_CONTEXT } from '../common/constants';
+import { COMMAND_EDIT_XYGENI_API_URL, COMMAND_INSTALL_SCANNER, COMMAND_OPEN_SCAN_CONFIG_FILE, COMMAND_REMOVE_EXCLUDE, COMMAND_RESTORE_SCAN_DEFAULTS, COMMAND_SHOW_MCP_SETUP, COMMAND_TEST_XYGENI_CONNECTION, COMMAND_TOGGLE_AUTO_SCAN, COMMAND_TOGGLE_GLOBAL_OPTION, COMMAND_UPGRADE_LICENSE, STATUS, XYGENI_CONTEXT } from '../common/constants';
 import { Commands, XyContext } from '../common/interfaces';
 import { GLOBAL_OPTION_TOGGLES } from '../service/scanner-options';
+import { ON_SAVE_SCANNERS, SCAN_CONFIG_DIR, SCAN_CONFIG_FILE, SWITCHABLE_SCANNERS, ScanConfig, ScanType, ScannerOption, isDefaultScanConfig } from '../service/scan-config';
 
 
 export interface ConfigurationViewEmitter {
     refreshConfigEventEmitter: vscode.Event<void>;
+    /** The per-project scan configuration (#415). */
+    getScanConfig(): ScanConfig;
+    getScanConfigPath(): string | undefined;
 }
+
+/** What a checkbox row of the Scan configuration section switches. */
+export interface ScanTypeToggle {
+    type: ScanType;
+    onSave: boolean;
+}
+
+const SCAN_CONFIG_SECTION = 'scan-config';
+/** The same configuration as a tree section with checkboxes; off since the webview view (ScanConfigView) replaced it. */
+const SHOW_SCAN_CONFIG_IN_TREE = false;
+const SCAN_CONFIG_FULL = 'scan-config-full';
+const SCAN_CONFIG_ON_SAVE = 'scan-config-on-save';
+const SCAN_CONFIG_EXCLUDES = 'scan-config-excludes';
 
 export default class ConfigurationView implements vscode.TreeDataProvider<ConfigItem> {
 
@@ -171,11 +188,121 @@ export default class ConfigurationView implements vscode.TreeDataProvider<Config
                     )
                 );
             }
-            
+
+            // Per-project scan configuration (#415): which scan types run, in the full scan and on save.
+            if (SHOW_SCAN_CONFIG_IN_TREE && isXygeniInstalled) {
+                this.configItems.push(this.scanConfigSection());
+            }
 
             return this.configItems;
         }
+        if (element.contextValue === SCAN_CONFIG_SECTION) {
+            return this.scanConfigChildren();
+        }
+        if (element.contextValue === SCAN_CONFIG_FULL) {
+            return SWITCHABLE_SCANNERS.map(scanner => this.scannerRow(scanner, false));
+        }
+        if (element.contextValue === SCAN_CONFIG_ON_SAVE) {
+            return ON_SAVE_SCANNERS.map(scanner => this.scannerRow(scanner, true));
+        }
+        if (element.contextValue === SCAN_CONFIG_EXCLUDES) {
+            return this.excludeRows();
+        }
         return [];
+    }
+
+    /** The toggle behind a checkbox row, or undefined for any other item. */
+    checkboxToggle(item: ConfigItem): ScanTypeToggle | undefined {
+        return item.scanTypeToggle;
+    }
+
+    private scanConfigSection(): ConfigItem {
+        const config = this.commands.getScanConfig();
+        const section = new ConfigItem(
+            'Scan configuration',
+            `${config.scans.filter(type => type !== 'suspectdeps').length}/${SWITCHABLE_SCANNERS.length} scanners · ${config.onSave.length} on save`,
+            vscode.TreeItemCollapsibleState.Collapsed,
+            SCAN_CONFIG_SECTION
+        );
+        section.iconPath = new vscode.ThemeIcon('settings');
+        section.tooltip = `Which scan types run in this project. Saved in ${SCAN_CONFIG_DIR}/${SCAN_CONFIG_FILE} at the workspace root, `
+            + 'shared with the other Xygeni IDE plugins; commit it to share it with your team.';
+        return section;
+    }
+
+    private scanConfigChildren(): ConfigItem[] {
+        const config = this.commands.getScanConfig();
+        const full = new ConfigItem(
+            'Full scan',
+            `${config.scans.filter(type => type !== 'suspectdeps').length}/${SWITCHABLE_SCANNERS.length}`,
+            vscode.TreeItemCollapsibleState.Expanded,
+            SCAN_CONFIG_FULL
+        );
+        full.iconPath = new vscode.ThemeIcon('play');
+        full.tooltip = 'The scan types of Run Scanner. With SCA on, suspect dependencies also run. At least one is required.';
+
+        const onSave = new ConfigItem(
+            'On save',
+            `${config.onSave.length}/${ON_SAVE_SCANNERS.length}`,
+            vscode.TreeItemCollapsibleState.Expanded,
+            SCAN_CONFIG_ON_SAVE
+        );
+        onSave.iconPath = new vscode.ThemeIcon('save');
+        onSave.tooltip = 'The scan types of Auto Scan on Save. Only the scan types that can analyze just the changed files are '
+            + 'offered; the others would scan the whole project on every save. A type must be in the full scan to run on save.';
+
+        const excludes = new ConfigItem(
+            'Excluded folders',
+            `${config.excludes.length}`,
+            config.excludes.length > 0 ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed,
+            SCAN_CONFIG_EXCLUDES
+        );
+        excludes.iconPath = new vscode.ThemeIcon('folder');
+        excludes.tooltip = 'Folders and patterns excluded from every scan, added to the scanner defaults (node_modules, target, '
+            + 'dist…). Glob patterns: * file wildcard, ** any depth, "path:" prefix for a sub-project. Needs scanner 6.23 or later.';
+
+        const file = new ConfigItem(
+            isDefaultScanConfig(config) ? 'Defaults' : `${SCAN_CONFIG_DIR}/${SCAN_CONFIG_FILE}`,
+            isDefaultScanConfig(config) ? 'Nothing written yet. Click to edit the file.' : 'Click to open. Restore defaults with the icon.',
+            vscode.TreeItemCollapsibleState.None,
+            isDefaultScanConfig(config) ? 'scan-config-defaults' : 'scan-config-file',
+            { command: COMMAND_OPEN_SCAN_CONFIG_FILE, title: 'Open the scan configuration file', arguments: [] }
+        );
+        file.iconPath = new vscode.ThemeIcon('json');
+        return [full, onSave, excludes, file];
+    }
+
+    private excludeRows(): ConfigItem[] {
+        const config = this.commands.getScanConfig();
+        if (config.excludes.length === 0) {
+            const none = new ConfigItem('None', 'Use the folder or + icon to add one', vscode.TreeItemCollapsibleState.None, 'scan-exclude-none');
+            none.iconPath = new vscode.ThemeIcon('info');
+            return [none];
+        }
+        return config.excludes.map(pattern => {
+            const row = new ConfigItem(pattern, '', vscode.TreeItemCollapsibleState.None, 'scan-exclude',
+                { command: COMMAND_REMOVE_EXCLUDE, title: 'Stop excluding', arguments: [pattern] });
+            row.iconPath = new vscode.ThemeIcon(/^[^*?]+\/\*\*$/.test(pattern) ? 'folder' : 'regex');
+            row.tooltip = `${pattern}: click to stop excluding it`;
+            return row;
+        });
+    }
+
+    private scannerRow(scanner: ScannerOption, onSave: boolean): ConfigItem {
+        const config = this.commands.getScanConfig();
+        const inFullScan = config.scans.includes(scanner.key);
+        const checked = onSave ? config.onSave.includes(scanner.key) : inFullScan;
+        const row = new ConfigItem(scanner.label, scanner.description, vscode.TreeItemCollapsibleState.None, 'scan-type');
+        row.iconPath = new vscode.ThemeIcon(scanner.icon);
+        row.checkboxState = checked ? vscode.TreeItemCheckboxState.Checked : vscode.TreeItemCheckboxState.Unchecked;
+        row.scanTypeToggle = { type: scanner.key, onSave };
+        if (onSave && !inFullScan) {
+            row.description = 'Not in the full scan';
+            row.tooltip = `${scanner.label} runs on save only while it is in the full scan.`;
+        } else {
+            row.tooltip = `${scanner.label}: ${scanner.description}`;
+        }
+        return row;
     }
 
 
@@ -233,6 +360,8 @@ class ConfigItem extends vscode.TreeItem {
     public value: string;
     public contextValue: string;
     public lastRefreshTime?: Date;
+    /** Set on the checkbox rows of the Scan configuration section (#415). */
+    public scanTypeToggle?: ScanTypeToggle;
 
     constructor(
         public readonly label: string,

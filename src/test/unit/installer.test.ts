@@ -558,6 +558,23 @@ suite('Installer Test Suite', () => {
             assert.strictEqual(result, true);
         });
 
+        test('isValidToken rejects with "server unavailable" on a 5xx, so it is not reported as a bad token', async () => {
+            const mockHttpClient = new MockHttpClient(new MockResponse(503), new MockRequest());
+            commandsMock.getHttpClient = () => mockHttpClient;
+            await assert.rejects(installer.isValidToken('http://api', 'token'), /unavailable \(HTTP 503\)/);
+        });
+
+        test('isValidToken rejects (instead of hanging) when the request fails', async () => {
+            const mockRequest = new MockRequest();
+            const mockHttpClient = new MockHttpClient(new MockResponse(200), mockRequest);
+            mockHttpClient.get = (_url: string, _callback: any) => {
+                setTimeout(() => mockRequest.emit('error', new Error('ECONNREFUSED')), 5);
+                return mockRequest as any;
+            };
+            commandsMock.getHttpClient = () => mockHttpClient;
+            await assert.rejects(installer.isValidToken('http://api', 'token'), /unreachable \(ECONNREFUSED\)/);
+        });
+
         test('isValidToken should return false for non-200 status', async () => {
             const mockResponse = new MockResponse(401);
             const mockRequest = new MockRequest();
