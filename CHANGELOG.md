@@ -80,6 +80,11 @@
 - Run one scan type alone: a play button in the title of each results view (SAST, SCA, Secrets…) runs just that scan
   and refreshes only its findings.
 - Configuration view: more room between rows and blocks.
+- Security (xygeni/xygeni-product-backlog#1438): a server URL that uses `http://` to a host other than localhost is refused,
+  with the reason in the connection error, because the API token would travel in clear on every request. `http://localhost`
+  stays allowed (the traffic never leaves the machine). The new setting `xygeni.api.allowInsecureHttp` lets a server without
+  TLS through on purpose; the connection status then keeps warning "insecure http: token in clear". The HTTP client refuses
+  such URLs too, so no request path can send the token in clear by accident.
 - MCP server updates (xygeni/xygeni-product-backlog#2382): after an update the extension says what to do in plain words (restart your
   AI assistant so it uses the new version), with a "Show me how" guide per assistant (Copilot, Claude Code, Cursor, Claude Desktop) and
   a note in the Configuration view that stays until dismissed; the status no longer keeps saying "available" for the version just

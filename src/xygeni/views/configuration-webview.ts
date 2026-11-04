@@ -45,6 +45,7 @@ export interface ConfigurationWebviewHost {
     removeScanOption(name: string): void;
     openScanConfigFile(): Promise<void>;
     dismissMcpRestart(): Promise<void>;
+    isInsecureHttp(): boolean;
 }
 
 /** The icon of each scanner row, from media/icons (the same files the issue views use). */
@@ -71,7 +72,7 @@ interface ConfigurationState {
     connection: {
         url: string; hasToken: boolean; configValid: boolean; checked: boolean; connecting: boolean; connectionReady: boolean;
         installing: boolean; installReady: boolean; installError: boolean; licenseAvailable: boolean; licenseFree: boolean;
-        autoScan: boolean;
+        autoScan: boolean; insecureHttp: boolean;
         options: { setting: string; label: string; option: string; enabled: boolean; alwaysVisible: boolean }[];
         mcp: { installed: boolean; checking: boolean; path?: string; installedVersion?: string; availableVersion?: string; updateAvailable?: boolean; updateMode: string; restartPending?: string };
     };
@@ -144,6 +145,7 @@ export class ConfigurationWebview implements vscode.WebviewViewProvider {
                 installing: flag(XYGENI_CONTEXT.INSTALLING), installReady: flag(XYGENI_CONTEXT.INSTALL_READY), installError: flag(XYGENI_CONTEXT.INSTALL_ERROR),
                 licenseAvailable: flag(XYGENI_CONTEXT.LICENSE_IDE_AVAILABLE), licenseFree: flag(XYGENI_CONTEXT.LICENSE_FREE),
                 autoScan: ConfigManager.getAutoScan(),
+                insecureHttp: this.host.isInsecureHttp(),
                 options: GLOBAL_OPTION_TOGGLES.map(toggle => ({ setting: toggle.setting, label: toggle.label, option: toggle.option, enabled: ConfigManager.getScanFlag(toggle.setting), alwaysVisible: toggle.alwaysVisible })),
                 // The JAR on disk says "installed" from the first paint; the context flag only arrives after the startup
                 // check. Without a JAR, the status is "checking" until the connection check (which installs it) is over.
@@ -462,6 +464,7 @@ export function renderConfigurationPage(options: ConfigurationPageOptions): stri
             else if (c.installError) { text = 'Installation failed. Click to retry'; dot = 'err'; cliMessage = { type: 'install' }; }
             else if (c.installReady) { text = 'Ready to scan. Click to reinstall'; dot = 'ok'; cliMessage = { type: 'reinstall' }; }
             else { text = 'Click to install the scanner'; dot = 'ok'; cliMessage = { type: 'install' }; }
+            if (c.insecureHttp && c.connectionReady) { text += ' · insecure http: token in clear'; dot = 'busy'; }
             byId('cliAction').textContent = text; byId('cliDot').className = 'dot ' + dot;
             const licDot = byId('licDot'), licText = byId('licText'), upgrade = byId('upgrade');
             if (!c.connectionReady) { licDot.className = 'dot'; licText.textContent = 'Unknown'; upgrade.style.display = 'none'; }

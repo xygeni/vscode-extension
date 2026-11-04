@@ -29,6 +29,7 @@ import { McpSetupView } from '../views/mcp-setup-view';
 import GlobalContextImpl from '../service/global-context';
 import { ScanConfig, ScanType, SCANNERS, defaultScanConfig, excludePatternForFolder, loadScanConfig, saveScanConfig, scanConfigPath, serializeScanConfig, withAllScanTypes, withDefaultOnSave, withExclude, withOnSaveType, withScanOption, withScanType, withoutExclude, withoutScanOption } from '../service/scan-config';
 import { SCAN_OPTIONS, validateScanOption } from '../service/scan-options';
+import { INSECURE_HTTP_WARNING, insecureUrlProblem, isInsecureRemoteUrl } from './insecure-url';
 
 
 
@@ -246,6 +247,17 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
       // Validate URL format
       new URL(xygeniUrl);
 
+      // An http URL to a non-loopback host sends the token in clear: refused unless the user allowed it (#1438).
+      const insecureProblem = insecureUrlProblem(xygeniUrl, ConfigManager.getAllowInsecureHttp());
+      if (insecureProblem) {
+        this.resetConnectionStatus();
+        throw new Error(insecureProblem);
+      }
+      this.insecureHttp = isInsecureRemoteUrl(xygeniUrl);
+      if (this.insecureHttp) {
+        Logger.log(`WARNING: ${INSECURE_HTTP_WARNING} (${xygeniUrl}). Allowed by the "Allow insecure HTTP" setting.`);
+      }
+
       this.connecting();
       if (!await this.pingWithRetries(xygeniUrl)) {
         this.resetConnectionStatus();
@@ -420,6 +432,13 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
         }, 500); // allow user see transition
       });
     });
+  }
+
+  /** True while the configured URL is http to a non-loopback host and the user allowed it: the status keeps warning. */
+  private insecureHttp = false;
+
+  public isInsecureHttp(): boolean {
+    return this.insecureHttp;
   }
 
   /**

@@ -137,6 +137,11 @@ export class ConfigManager {
     }
 
     /** `xygeni.mcp.updates`: notify (default), auto or off. */
+    /** "Allow insecure HTTP": an http server URL to a non-loopback host is refused unless this is on (#1438). */
+    public static getAllowInsecureHttp(): boolean {
+        return vscode.workspace.getConfiguration(this.XYGENI_CONFIG_SECTION).get<boolean>('allowInsecureHttp', false);
+    }
+
     public static getMcpUpdateMode(): McpUpdateMode {
         const config = vscode.workspace.getConfiguration(this.MCP_CONFIG_SECTION);
         const mode = config.get<string>('updates', 'notify');
