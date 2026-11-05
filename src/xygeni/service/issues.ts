@@ -5,6 +5,8 @@ import { MisconfXygeniIssue } from './misconf-issue';
 import { SastXygeniIssue } from './sast-issue';
 import { SecretsXygeniIssue } from './secrets-issue';
 import { QualityXygeniIssue } from './quality-issue';
+import { ApisecXygeniIssue } from './apisec-issue';
+import { AiXygeniIssue } from './ai-issue';
 import { VulnXygeniIssue } from './vuln-issue';
 import { XygeniIssue } from '../common/interfaces';
 
@@ -59,22 +61,39 @@ export default class IssuesService {
   private issues: XygeniIssue[] = [];
   private isReadingIssues = false;
 
+  /** One entry per report the scanner writes: the `--run=` scan type and the issue category it fills. */
+  private readonly reportReaders: ReadonlyArray<ReportReader> = [
+    { scanType: 'secrets', category: 'secrets', read: (filename) => this.readSecretsReport(filename) },
+    { scanType: 'misconf', category: 'misconf', read: (filename) => this.readMisconfReport(filename) },
+    { scanType: 'sast', category: 'sast', read: (filename) => this.readSastReport(filename) },
+    { scanType: 'iac', category: 'iac', read: (filename) => this.readIacReport(filename) },
+    { scanType: 'deps', category: 'sca', read: (filename) => this.readDepsReport(filename) },
+    { scanType: 'quality', category: 'quality', read: (filename) => this.readQualityReport(filename) },
+    { scanType: 'apisec', category: 'apisec', read: (filename) => this.readApisecReport(filename) },
+    { scanType: 'ai', category: 'ai', read: (filename) => this.readAiReport(filename) },
+  ];
 
-  public async readIssues(): Promise<void> {
+
+  /**
+   * Re-reads the scanner reports. Without `scanTypes` every report is read from scratch (full
+   * scan, activation). With the scan types that just ran (incremental scan) only their reports
+   * are re-read and the other categories keep their current findings: their report files on
+   * disk were not rewritten, so re-reading them would only bring back stale results.
+   */
+  public async readIssues(scanTypes?: string[]): Promise<void> {
     if (this.isReadingIssues) {
       this.logger.log('Issues are already being read, skipping...');
       return;
     }
 
     this.isReadingIssues = true;
-    this.issues = [];
 
     this.logger.log("");
     this.logger.log("==================================================");
     this.logger.log("  Reading issues...");
 
     try {
-      await this.readScannerOutput(XYGENI_SCANNER_REPORT_SUFFIX);
+      await this.readScannerOutput(XYGENI_SCANNER_REPORT_SUFFIX, scanTypes);
 
       this.logger.log("  " + this.issues.length + " issues read.");
       this.logger.log("==================================================");
@@ -89,16 +108,21 @@ export default class IssuesService {
   }
 
 
-  public async readScannerOutput(suffix: string): Promise<void> {
+  public async readScannerOutput(suffix: string, scanTypes?: string[]): Promise<void> {
+    const readers = scanTypes
+      ? this.reportReaders.filter((reader) => scanTypes.includes(reader.scanType))
+      : this.reportReaders;
+
+    const categoriesToReplace = new Set(readers.map((reader) => reader.category));
+    this.issues = this.issues.filter((issue) => !categoriesToReplace.has(issue.category));
+
     // Read each domain report independently. A failure in one domain (a missing, partial or
     // corrupt report — e.g. when an analyzer such as misconf timed out) must NOT prevent the
     // remaining domains from being read and rendered. See xygeni/product-backlog#835.
-    await this.readReportSafely('secrets', `secrets.${suffix}`, f => this.readSecretsReport(f));
-    await this.readReportSafely('misconf', `misconf.${suffix}`, f => this.readMisconfReport(f));
-    await this.readReportSafely('sast', `sast.${suffix}`, f => this.readSastReport(f));
-    await this.readReportSafely('iac', `iac.${suffix}`, f => this.readIacReport(f));
-    await this.readReportSafely('deps', `deps.${suffix}`, f => this.readDepsReport(f));
-    await this.readReportSafely('quality', `quality.${suffix}`, f => this.readQualityReport(f));
+    // The reports are independent files and the readers only push into `this.issues`, so they are
+    // read concurrently; the severity sort below is the only join point.
+    await Promise.all(readers.map((reader) =>
+      this.readReportSafely(reader.scanType, `${reader.scanType}.${suffix}`, reader.read)));
 
     // sort issues by severity
     this.issues.sort((a, b) => {
@@ -461,6 +485,183 @@ export default class IssuesService {
     });
   }
 
+  public async readApisecReport(filename: string): Promise<void> {
+    if (!(await this.commands.fileExists(filename))) {
+      return;
+    }
+
+    try {
+      const data = await this.commands.readFile(filename);
+      const rawData = JSON.parse(data);
+      this.processApisecReport(rawData);
+    } catch (error) {
+      this.logger.error(error, 'Error reading apisec output:');
+      throw error;
+    }
+  }
+
+  /**
+   * Maps the `apisec.<suffix>` report. Findings live under `flaws` — the sibling `services` /
+   * `dataObjects` arrays are the discovered API inventory, not findings, and are deliberately
+   * not surfaced as issues (verified on `ApiSecurityReport`, whose `getIssues()` returns the
+   * flaws only).
+   */
+  processApisecReport(jsonRaw: any): void {
+    const rawFlaws = jsonRaw.flaws ?? [];
+    const flaws = Array.isArray(rawFlaws) ? rawFlaws : [rawFlaws];
+    const tool = jsonRaw.metadata?.reportProperties?.['tool.name'];
+    const inventory = this.indexApisecInventory(jsonRaw.services);
+
+    flaws.forEach((rawFlaw: any) => {
+      if (!rawFlaw) { return; }
+      const location = this.resolveApisecLocation(rawFlaw, inventory);
+      const issue = new ApisecXygeniIssue({
+        id: rawFlaw.issueId,
+        // `flawType` is the machine type (excessive_data_exposure, bola, bfla...): the tree label,
+        // like every other category. `title` is the human sentence (it embeds the endpoint) and
+        // goes to the details panel; it is only a fallback label when the type is missing.
+        type: rawFlaw.flawType ?? rawFlaw.title,
+        title: rawFlaw.title,
+        detector: rawFlaw.detector,
+        tool: tool,
+        kind: 'api_flaw',
+        severity: (rawFlaw.severity ?? 'info') as 'critical' | 'high' | 'medium' | 'low' | 'info',
+        confidence: rawFlaw.confidence ? rawFlaw.confidence as 'highest' | 'high' | 'medium' | 'low' : 'high',
+        category: 'apisec',
+        categoryName: 'API Security',
+        // The inventory gives a file and a line but no source excerpt, so `code` stays empty.
+        file: location.file,
+        beginLine: location.line,
+        endLine: location.line,
+        beginColumn: 0,
+        endColumn: 0,
+        code: '',
+        explanation: rawFlaw.explanation ?? '',
+        url: rawFlaw.url ? rawFlaw.url : '',
+        tags: rawFlaw.tags?.length > 0 ? rawFlaw.tags : undefined,
+        branch: jsonRaw.currentBranch ? jsonRaw.currentBranch : '',
+        endpointMethod: rawFlaw.endpointMethod,
+        endpointPath: rawFlaw.endpointPath,
+        moduleName: rawFlaw.moduleName,
+        serviceName: rawFlaw.serviceName,
+        owaspApiTop10: rawFlaw.owaspApiTop10,
+        cwes: rawFlaw.cwes,
+        remediation: rawFlaw.remediation,
+        remediableLevel: 'none' // no `util rectify --apisec` in the scanner
+      });
+      this.issues.push(issue);
+    });
+  }
+
+  /**
+   * API flaws carry no `location`; the report ties them to the API inventory instead. Resolve
+   * the file in decreasing precision: the handler of the flaw's endpoint (`endpointId` is
+   * "<METHOD> <path>"), the `handler_file` property, then the module's OpenAPI spec file.
+   */
+  private resolveApisecLocation(rawFlaw: any, inventory: ApisecInventoryIndex): { file: string; line: number } {
+    if (rawFlaw.location?.filepath) {
+      return { file: rawFlaw.location.filepath, line: rawFlaw.location.beginLine ?? 0 };
+    }
+
+    const endpointId = rawFlaw.endpointId
+      ?? (rawFlaw.endpointMethod && rawFlaw.endpointPath ? `${rawFlaw.endpointMethod} ${rawFlaw.endpointPath}` : undefined);
+    const handler = endpointId ? inventory.handlersByEndpointId.get(endpointId) : undefined;
+    if (handler) {
+      return handler;
+    }
+
+    const handlerFile = rawFlaw.properties?.handler_file;
+    if (handlerFile) {
+      return { file: handlerFile, line: 0 };
+    }
+
+    const specFile = rawFlaw.moduleName ? inventory.specFilesByModuleName.get(rawFlaw.moduleName) : undefined;
+    return { file: specFile ?? '', line: 0 };
+  }
+
+  private indexApisecInventory(services: any): ApisecInventoryIndex {
+    const handlersByEndpointId = new Map<string, { file: string; line: number }>();
+    const specFilesByModuleName = new Map<string, string>();
+
+    const serviceList = Array.isArray(services) ? services : [];
+    for (const service of serviceList) {
+      for (const apiModule of service?.modules ?? []) {
+        if (apiModule?.name && apiModule.location?.file) {
+          specFilesByModuleName.set(apiModule.name, apiModule.location.file);
+        }
+        for (const endpoint of apiModule?.endpoints ?? []) {
+          if (endpoint?.method && endpoint.path && endpoint.handler?.file) {
+            handlersByEndpointId.set(`${endpoint.method} ${endpoint.path}`, { file: endpoint.handler.file, line: endpoint.handler.line ?? 0 });
+          }
+        }
+      }
+    }
+    return { handlersByEndpointId, specFilesByModuleName };
+  }
+
+  public async readAiReport(filename: string): Promise<void> {
+    if (!(await this.commands.fileExists(filename))) {
+      return;
+    }
+
+    try {
+      const data = await this.commands.readFile(filename);
+      const rawData = JSON.parse(data);
+      this.processAiReport(rawData);
+    } catch (error) {
+      this.logger.error(error, 'Error reading ai output:');
+      throw error;
+    }
+  }
+
+  /**
+   * Maps the `ai.<suffix>` report. `AIVulnerability` does NOT reuse the SAST field names: its
+   * `getSeverity()` / `getIssueId()` / `getDetector()` / `getExplanation()` are all @JsonIgnore,
+   * so the serialized keys are `severityFloor`, `id`, `detectorId` and `description`. Reading
+   * `severity` / `issueId` / `detector` / `explanation` here would silently yield undefined.
+   */
+  processAiReport(jsonRaw: any): void {
+    const rawVulnerabilities = jsonRaw.vulnerabilities ?? [];
+    const vulnerabilities = Array.isArray(rawVulnerabilities) ? rawVulnerabilities : [rawVulnerabilities];
+    const tool = jsonRaw.metadata?.reportProperties?.['tool.name'];
+
+    vulnerabilities.forEach((rawVulnerability: any) => {
+      if (!rawVulnerability) { return; }
+      const issue = new AiXygeniIssue({
+        id: rawVulnerability.id,
+        // The AI report carries no `kind`/`type`: the detector id is the finding's label.
+        type: rawVulnerability.detectorId,
+        detector: rawVulnerability.detectorId,
+        tool: tool,
+        kind: 'ia_vulnerability',
+        severity: (rawVulnerability.severityFloor ?? 'info') as 'critical' | 'high' | 'medium' | 'low' | 'info',
+        confidence: rawVulnerability.confidence ? rawVulnerability.confidence as 'highest' | 'high' | 'medium' | 'low' : 'high',
+        category: 'ai',
+        categoryName: 'AI Security',
+        file: rawVulnerability.location?.filepath ?? '',
+        beginLine: rawVulnerability.location?.beginLine ?? 0,
+        endLine: rawVulnerability.location?.endLine ?? 0,
+        beginColumn: rawVulnerability.location?.beginColumn ?? 0,
+        endColumn: rawVulnerability.location?.endColumn ?? 0,
+        code: rawVulnerability.location?.code ?? '',
+        explanation: rawVulnerability.description ?? '',
+        url: rawVulnerability.url ? rawVulnerability.url : '',
+        tags: rawVulnerability.tags?.length > 0 ? rawVulnerability.tags : undefined,
+        branch: jsonRaw.currentBranch ? jsonRaw.currentBranch : '',
+        assetKind: rawVulnerability.assetKind,
+        // `standards` is a list of {std, version, controlId} refs (StandardRef serializes the
+        // standard name as `std`); the control id is what reads well in the panel.
+        standards: rawVulnerability.standards
+          ?.map((standard: any) => standard?.controlId ?? standard?.std)
+          .filter((controlId: string | undefined) => !!controlId),
+        redTeamVectors: rawVulnerability.redTeamVectors,
+        remediationHint: rawVulnerability.remediationHint,
+        remediableLevel: 'AUTO' // AI fix via scanner 'util rectify --ai' (RectifyCommand.java: --ai → runAiRectify)
+      });
+      this.issues.push(issue);
+    });
+  }
+
   processMisconfReport(jsonRaw: any): void {
 
     const misconfigurations = Array.isArray(jsonRaw.misconfigurations) ? jsonRaw.misconfigurations : [jsonRaw.misconfigurations];
@@ -632,6 +833,18 @@ export default class IssuesService {
 }
 
 export type XygeniIssueType = SastXygeniIssue | IacXygeniIssue | MisconfXygeniIssue | SecretsXygeniIssue;
+
+interface ReportReader {
+  scanType: string;
+  category: XygeniIssue['category'];
+  read: (filename: string) => Promise<void>;
+}
+
+/** `services[].modules[].endpoints[]` of an apisec report, keyed for the flaw → file resolution. */
+interface ApisecInventoryIndex {
+  handlersByEndpointId: Map<string, { file: string; line: number }>;
+  specFilesByModuleName: Map<string, string>;
+}
 
 
 
