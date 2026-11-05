@@ -8,7 +8,7 @@ import * as path from 'path';
 import { ConfigManager, ProxySettings } from "../config/xygeni-configuration";
 import { ISSUE_DETAILS_REMEDIATE_FUNCTION, ISSUE_DETAILS_SAVE_FUNCTION, MCP_RESTART_NOTE, STATE_MCP_IGNORED_VERSION, STATE_MCP_RESTART_PENDING, STATUS, XYGENI_CONTEXT, XYGENI_PRICING_URL, XYGENI_SCANNER_OUTPUT_NAME, XYGENI_SCANNER_REPORT_SUFFIX } from './constants';
 import { EventEmitter } from 'vscode';
-import { Commands, XyContext, ScanResult, IHttpClient, XygeniMedia, XygeniIssue, McpStatus } from './interfaces';
+import { Commands, ConfigurationViewEmitter, IHttpClient, McpStatus, ScanResult, ScanViewEmitter, XyContext, XygeniIssue, XygeniMedia } from './interfaces';
 import InstallerService from '../service/installer';
 import { Logger, OutputChannelWrapper } from './logger';
 import XygeniScannerService from '../service/scanner';
@@ -16,9 +16,7 @@ import IssuesService from '../service/issues';
 import { ProxyConfigManager } from '../config/proxy-configuration';
 import { XygeniMediaImpl } from './media';
 import { HttpClientFactory } from './https';
-import { ScanViewEmitter } from '../views/scan-view';
 import { IssueViewEmitter } from '../views/issue-view';
-import { ConfigurationViewEmitter } from '../views/configuration-view';
 import { DetailsView } from '../views/details-view';
 import { RemediationDiffContentProvider } from '../views/remediation-providers';
 import LicenseService from '../service/license';
@@ -526,7 +524,7 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     this.saveScanConfig(next);
     // The on-save column and Auto Scan on Save help each other (#415): switching a type on turns Auto Scan on
     // Save on; switching the last one off turns it off, as nothing would run on save.
-    if (next.onSave.includes(type) && !ConfigManager.getAutoScan()) {
+    if (next.onSave.includes(type) && !ConfigManager.getAutoScan() && !this.isLicenseFree()) {
       void ConfigManager.setAutoScan(true).then(() => this.refreshAllViews());
     } else if (next.onSave.length === 0 && ConfigManager.getAutoScan()) {
       void ConfigManager.setAutoScan(false).then(() => this.refreshAllViews());
@@ -811,6 +809,8 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
   public async checkMcpUpdates(force: boolean): Promise<void> {
     const mode = ConfigManager.getMcpUpdateMode();
     if (!force && mode === 'off') {
+      // No check, but a download kept as `.pending` (JAR locked at the time) is still applied on this start (MCP.md).
+      await InstallerService.getInstance().applyPendingMcpUpdate().catch((error) => Logger.error(error, 'Pending MCP server update'));
       return;
     }
     let result;

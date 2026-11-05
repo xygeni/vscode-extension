@@ -43,7 +43,6 @@ export const COMMAND_UPGRADE_LICENSE = 'xygeni.license.upgrade';
 export const COMMAND_TOGGLE_SCAN_TYPE = 'xygeni.scan.toggleScanType';
 export const COMMAND_TOGGLE_ON_SAVE_SCAN_TYPE = 'xygeni.scan.toggleOnSaveScanType';
 export const COMMAND_SELECT_ALL_SCAN_TYPES = 'xygeni.scan.selectAllScanTypes';
-export const COMMAND_CLEAR_SCAN_TYPES = 'xygeni.scan.clearScanTypes';
 export const COMMAND_RESTORE_SCAN_DEFAULTS = 'xygeni.scan.restoreDefaults';
 export const COMMAND_OPEN_SCAN_CONFIG_FILE = 'xygeni.scan.openConfigFile';
 export const COMMAND_ADD_EXCLUDE_FOLDER = 'xygeni.scan.addExcludeFolder';

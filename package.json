@@ -184,7 +184,20 @@
           "group": "navigation"
         }
       ],
-      "commandPalette": []
+      "commandPalette": [
+        {
+          "command": "xygeni.scan.selectAllScanTypes",
+          "when": "false"
+        },
+        {
+          "command": "xygeni.scan.removeExclude",
+          "when": "false"
+        },
+        {
+          "command": "xygeni.scan.removeOption",
+          "when": "false"
+        }
+      ]
     },
     "commands": [
       {
@@ -258,11 +271,6 @@
         "command": "xygeni.scan.selectAllScanTypes",
         "title": "Select all scan types",
         "icon": "$(check-all)"
-      },
-      {
-        "command": "xygeni.scan.clearScanTypes",
-        "title": "Clear scan types",
-        "icon": "$(clear-all)"
       },
       {
         "command": "xygeni.scan.restoreDefaults",

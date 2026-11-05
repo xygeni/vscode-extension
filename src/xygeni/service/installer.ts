@@ -362,9 +362,7 @@ export default class InstallerService {
             return { status: 'not-installed' };
         }
         const installMcpPath = this.getMcpLibratyInstallationDir();
-        if (fs.existsSync(path.join(installMcpPath, this.mcpPendingLibraryName))) {
-            await this.withMcpLock(installMcpPath, async () => this.applyPendingMcpUpdateLocked());
-        }
+        await this.applyPendingMcpUpdate();
         if (!force && !this.isMcpCheckDue()) {
             return { status: 'skipped' };
         }
@@ -379,6 +377,20 @@ export default class InstallerService {
         this.lastMcpUpdateCheck = { installed, available, updateAvailable };
         this.logger.log(`  MCP server installed: ${installed ?? 'unknown'}, published: ${available}`);
         return { status: updateAvailable ? 'update-available' : 'up-to-date', installed, available, updateAvailable };
+    }
+
+    /**
+     * Puts a `.pending` download in place when the JAR is no longer locked, whatever the update mode: the
+     * download already happened, only the file swap was waiting (MCP.md). Nothing to do without a `.pending`.
+     */
+    public async applyPendingMcpUpdate(): Promise<void> {
+        if (!this.isMcpLibraryInstalled()) {
+            return;
+        }
+        const installMcpPath = this.getMcpLibratyInstallationDir();
+        if (fs.existsSync(path.join(installMcpPath, this.mcpPendingLibraryName))) {
+            await this.withMcpLock(installMcpPath, async () => this.applyPendingMcpUpdateLocked());
+        }
     }
 
     /** Puts a `.pending` download in place once the MCP client that locked the JAR is gone. Under the MCP lock. */

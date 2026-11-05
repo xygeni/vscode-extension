@@ -1,3 +1,5 @@
+import * as vscode from 'vscode';
+import type { ScanConfig } from '../service/scan-config';
 import { IncomingMessage, ClientRequest } from 'http';
 import { ProxySettings } from '../config/xygeni-configuration';
 
@@ -99,6 +101,19 @@ export interface McpStatus {
   updateMode: string;
   /** Set after an update until the user confirms the MCP client was restarted: the JAR on disk is newer than what a running client loaded. */
   restartPending?: string;
+}
+
+/** What the Scan block of the Configuration view reads from the commands. */
+export interface ScanViewEmitter {
+  refreshScannerEventEmitter: vscode.Event<void>;
+  getScans(): ScanResult[];
+}
+
+/** What the Scan configuration block of the Configuration view reads from the commands (#415). */
+export interface ConfigurationViewEmitter {
+  refreshConfigEventEmitter: vscode.Event<void>;
+  getScanConfig(): ScanConfig;
+  getScanConfigPath(): string | undefined;
 }
 
 export interface ScanResult {

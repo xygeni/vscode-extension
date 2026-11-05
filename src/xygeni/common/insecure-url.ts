@@ -19,7 +19,8 @@ export const INSECURE_HTTP_REFUSED = 'Insecure URL: the server URL uses http and
 
 export function isLoopbackHost(hostname: string): boolean {
     const host = hostname.trim().toLowerCase().replace(/^\[|\]$/g, '');
-    return host === 'localhost' || host.endsWith('.localhost') || host === '127.0.0.1' || host.startsWith('127.')
+    // The whole 127/8 block, as an address: a DNS name such as 127.example.com is not loopback.
+    return host === 'localhost' || host.endsWith('.localhost') || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)
         || host === '::1' || host === '0:0:0:0:0:0:0:1';
 }
 

@@ -4,11 +4,13 @@
 // else, and the same validation runs when `.xygeni/ide.json` is read, so a hand-edited file cannot smuggle in
 // an option the plugin manages itself (`--run`, `-o`, ...). Taken from ScanCommand and its option groups in
 // DepsDoctor-CLI (`xygeni scan --help`); the kinds decide what the autocompletion suggests after the `=`.
+// Only options of `xygeni scan` itself: `--run-languages` / `--skip-languages` belong to `xygeni sast` and
+// `xygeni quality`, and the scanner refuses them with "Unknown option" (exit 2) when passed to `scan`.
 
 export type ScanOptionKind = 'flag' | 'enum' | 'list' | 'text' | 'path';
 
 export interface ScanOptionSpec {
-    /** Long name, with the dashes (`--run-languages`). */
+    /** Long name, with the dashes (`--ai-review`). */
     name: string;
     kind: ScanOptionKind;
     /** One line, as in the CLI help. */
@@ -20,21 +22,18 @@ export interface ScanOptionSpec {
     placeholder?: string;
 }
 
-const LANGUAGES = ['csharp', 'go', 'html', 'java', 'javascript', 'kotlin', 'php', 'python', 'swift', 'typescript'] as const;
 const SEVERITIES = ['critical', 'high', 'low', 'info'] as const;
 
 /** The options offered, in the order of the autocompletion. */
 export const SCAN_OPTIONS: readonly ScanOptionSpec[] = [
-    { name: '--run-languages', kind: 'list', closed: true, values: LANGUAGES, description: 'Languages to analyze (SAST, Code Quality); all if not set', placeholder: 'java,typescript' },
-    { name: '--skip-languages', kind: 'list', closed: true, values: LANGUAGES, description: 'Languages to leave out of the analysis', placeholder: 'html' },
     { name: '--include', kind: 'list', description: 'Include patterns, comma-separated (glob, ** at any depth)', placeholder: 'src/**' },
     { name: '--detectors', kind: 'text', description: 'Detectors to include per scan: <scan>=<ids, a severity or all>, | between scans', placeholder: 'secrets=high|iac=all' },
     { name: '--skip-detectors', kind: 'text', description: 'Detectors to leave out per scan, same syntax as --detectors', placeholder: 'sast=hardcoded_password' },
     { name: '--mute', kind: 'path', description: 'Mute descriptor file (.xygeni.mute.yml) or #name of a named profile', placeholder: '.xygeni.mute.yml' },
     { name: '--standard', kind: 'text', description: 'ID of the compliance standard to check', placeholder: 'owasp-top10' },
-    { name: '--ai-review', kind: 'enum', values: ['off', 'all', 'ai-detected'], description: 'Which findings an AI agent reviews (needs an AI agent configured)' },
-    { name: '--ai-review-filter', kind: 'list', values: SEVERITIES, description: 'Findings the AI review looks at: a severity (that one and higher), detector IDs, !<id> to leave one out, or all', placeholder: 'high,!sql_injection' },
-    { name: '--ai-mode', kind: 'enum', values: ['off', 'auto', 'stored', 'rebuild'], description: 'Convention profile of the application before analyzing it (needs an AI agent configured)' },
+    { name: '--ai-review', kind: 'enum', values: ['off', 'all', 'ai-detected'], description: 'Which findings an AI agent reviews (needs an AI agent configured; scanner 6.23 or later)' },
+    { name: '--ai-review-filter', kind: 'list', values: SEVERITIES, description: 'Findings the AI review looks at: a severity (that one and higher), detector IDs, !<id> to leave one out, or all (scanner 6.23 or later)', placeholder: 'high,!sql_injection' },
+    { name: '--ai-mode', kind: 'enum', values: ['off', 'auto', 'stored', 'rebuild'], description: 'Convention profile of the application before analyzing it (needs an AI agent configured; scanner 6.23 or later)' },
     { name: '--include-license-analysis', kind: 'flag', description: 'Evaluate the licenses of the components (SCA)' },
     { name: '--conf', kind: 'path', description: 'Scan configuration file template (the filename is prefixed with SCAN.)', placeholder: 'conf/custom.yml' },
     { name: '--custom-detectors-dir', kind: 'path', description: 'Directory with custom detectors', placeholder: '.xygeni/detectors' },

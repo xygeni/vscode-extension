@@ -319,7 +319,7 @@ suite('Xygeni Extension — E2E inside VS Code', () => {
     test('Scan configuration (#415) and MCP (#2382): commands are registered', async () => {
         const commands = await vscode.commands.getCommands(true);
         for (const cmd of ['xygeni.scan.toggleScanType', 'xygeni.scan.toggleOnSaveScanType', 'xygeni.scan.selectAllScanTypes',
-            'xygeni.scan.clearScanTypes', 'xygeni.scan.restoreDefaults', 'xygeni.scan.openConfigFile', 'xygeni.scan.addExcludeFolder',
+            'xygeni.scan.restoreDefaults', 'xygeni.scan.openConfigFile', 'xygeni.scan.addExcludeFolder',
             'xygeni.scan.addExcludePattern', 'xygeni.scan.removeExclude', 'xygeni.mcp.checkUpdates', 'xygeni.showMcpSetup']) {
             assert.ok(commands.includes(cmd), `command ${cmd} should be registered`);
         }
@@ -355,10 +355,6 @@ suite('Xygeni Extension — E2E inside VS Code', () => {
         await vscode.commands.executeCommand('xygeni.scan.toggleScanType', 'sast');
         config = JSON.parse(fs.readFileSync(file, 'utf8'));
         assert.ok(!config.scans.includes('sast') && !config.onSave.includes('sast'), 'on-save follows the full scan');
-
-        await vscode.commands.executeCommand('xygeni.scan.clearScanTypes');
-        config = JSON.parse(fs.readFileSync(file, 'utf8'));
-        assert.strictEqual(config.scans.length, 10, 'clearing falls back to every type: the scanner needs at least one');
 
         await vscode.commands.executeCommand('xygeni.scan.removeExclude', 'nothing');
         await vscode.commands.executeCommand('xygeni.scan.restoreDefaults');

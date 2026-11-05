@@ -93,9 +93,9 @@ class XygeniScannerService extends EventEmitter {
         this.logger.log('');        
         this.logger.log('================================');       
         const onlyNote = only && only.length > 0 ? `${only.join(',')} - ` : '';
-        this.logger.log(`Running ${onlyNote || ''}scan on source folder: ${sourceFolder}`);
+        this.logger.log(`Running ${onlyNote}scan on source folder: ${sourceFolder}`);
 
-        this.scans.push({ timestamp: timestamp, status: 'running', issuesFound: undefined, summary: onlyNote.trim() });
+        this.scans.push({ timestamp: timestamp, status: 'running', issuesFound: undefined, summary: only?.join(',') ?? '' });
         this.emitChange();
 
         return this.runAnalysisCommand(sourceFolder, xygeniScannerPath, output, only).then((exitCode) => {
@@ -365,6 +365,7 @@ class XygeniScannerService extends EventEmitter {
                 const isScanCommand = args[0] === 'scan';
                 const startTime = reportFreshnessStartTime();
                 let sawCertificateError = false;
+                let unknownOption: string | undefined; // picocli: "Unknown option: '--x'" (exit code 2)
                 let previousTail = ''; // a marker may be split across two output chunks
 
                 const scannerProcess = spawn(shellCommand, shellArgs, {
@@ -377,6 +378,7 @@ class XygeniScannerService extends EventEmitter {
                 const onOutput = (data: Buffer) => {
                     const text = this.stripAnsiEscapeSequences(data.toString());
                     sawCertificateError = sawCertificateError || isCertificateError(previousTail + text);
+                    unknownOption = unknownOption ?? /Unknown options?: '([^']+)'/.exec(previousTail + text)?.[1];
                     previousTail = text.slice(-100);
                     output.append(text);
                 };
@@ -394,6 +396,12 @@ class XygeniScannerService extends EventEmitter {
                         }
                         if (sawCertificateError && !globalOptions.includes(SKIP_SSL_VERIFY_OPTION)) {
                             this.suggestSkipSslVerify(output);
+                        }
+                        if (isScanCommand && code === 2 && unknownOption) {
+                            // An option the installed scanner does not know, typically one added in Scanner options
+                            // that needs a newer scanner: name it instead of the bare exit code (#415).
+                            reject(new Error(`The scanner does not accept ${unknownOption}: remove it from Scanner options in the Configuration view, or update the scanner`));
+                            return;
                         }
                         reject(new Error(`Scanner process failed with exit code ${code}`));
                     }

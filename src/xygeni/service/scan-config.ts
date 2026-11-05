@@ -185,10 +185,6 @@ export function withoutExclude(config: ScanConfig, pattern: string): ScanConfig 
     return normalizeScanConfig({ ...config, excludes: config.excludes.filter(value => value !== pattern) });
 }
 
-/**
- * The exclude pattern of a folder inside the workspace: its path relative to the root, forward slashes, plus
- * `/**` (everything under it). Undefined for the root itself or a folder outside it.
- */
 /** Adds (or replaces, same option) one canonical scan option. */
 export function withScanOption(config: ScanConfig, option: string): ScanConfig {
     const name = scanOptionName(option);
@@ -200,6 +196,10 @@ export function withoutScanOption(config: ScanConfig, name: string): ScanConfig 
     return normalizeScanConfig({ ...config, options: config.options.filter((entry) => scanOptionName(entry) !== name) });
 }
 
+/**
+ * The exclude pattern of a folder inside the workspace: its path relative to the root, forward slashes, plus
+ * `/**` (everything under it). Undefined for the root itself or a folder outside it.
+ */
 export function excludePatternForFolder(workspaceRoot: string, folder: string): string | undefined {
     const relative = path.relative(workspaceRoot, folder);
     if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {

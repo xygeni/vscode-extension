@@ -74,7 +74,7 @@
 ## [1.2.11]
 
 - Scanner options (#415): a command-line-like input in Scan configuration adds `xygeni scan` options with
-  autocompletion and validation (a closed list: languages, include patterns, detectors, mute, standard, AI review,
+  autocompletion and validation (a closed list: include patterns, detectors, mute, standard, AI review,
   license analysis, custom configuration); the options the plugin sets itself (`--run`, `-o`, excludes…) are refused.
   Saved as `options` in `.xygeni/ide.json` and validated again when the file is read.
 - Run one scan type alone: a play button in the title of each results view (SAST, SCA, Secrets…) runs just that scan
@@ -85,12 +85,6 @@
   stays allowed (the traffic never leaves the machine). The new setting `xygeni.api.allowInsecureHttp` lets a server without
   TLS through on purpose; the connection status then keeps warning "insecure http: token in clear". The HTTP client refuses
   such URLs too, so no request path can send the token in clear by accident.
-- MCP server updates (xygeni/xygeni-product-backlog#2382): after an update the extension says what to do in plain words (restart your
-  AI assistant so it uses the new version), with a "Show me how" guide per assistant (Copilot, Claude Code, Cursor, Claude Desktop) and
-  a note in the Configuration view that stays until dismissed; the status no longer keeps saying "available" for the version just
-  installed; at startup the MCP server shows "Installed" from the JAR on disk, or "Checking…" while the connection check runs,
-  instead of "Not installed yet". The MCP Setup guide gains the Java prerequisite, where the configuration goes for each
-  assistant (`servers` vs `mcpServers`), a check-that-it-works step and troubleshooting.
 - Security (xygeni/xygeni-product-backlog#2628, CWE-77): JAVA_HOME is read from the login shell with an argument array
   instead of a command string built from `$SHELL`, and only an absolute, existing `$SHELL` is used. The scanner itself was
   already spawned shell-free with an argument array; a test now pins that a workspace path with shell metacharacters
@@ -100,6 +94,12 @@
 - The Configuration section of the Xygeni sidebar is now a single panel with three blocks: Connection (URL, token, scanner and licence status, Auto Scan on Save, scanner options, MCP server), Scan (Run scan, findings per category and the last scans; it replaces the Scan section) and Scan configuration (xygeni/xygeni-product-backlog#415)
 - Scan configuration per project (xygeni/xygeni-product-backlog#415): the Scan configuration block chooses which scan types the full scan runs (one checkbox per scanner; SCA brings suspect dependencies) and which of the file-scoped ones (Secrets, SAST, IaC, Malware, Code Quality) also run on save, and which folders or glob patterns are excluded from every scan (passed as `--exclude-add`, so the scanner's default excludes are kept; needs scanner 6.23 or later). Saved in `.xygeni/ide.json` at the workspace root, shared with the other Xygeni IDE plugins and meant to be committed; the defaults (every scan type, Secrets / SAST / IaC / Malware on save, nothing excluded) write nothing. A full scan now shows only the findings of the scan types it ran
 - MCP server updates (xygeni/xygeni-product-backlog#2382): once a day, after the connection is validated, the extension reads the published MCP server version and, according to the new `xygeni.mcp.updates` setting, notifies with Update / Ignore this version actions (default), updates in the background, or does nothing. The command `Xygeni: Check for MCP Server Updates` checks now. The check is shared with the other Xygeni IDE plugins through `~/.xygeni/mcp/last-check.txt`; when the published version cannot be read (no network, not published yet) nothing is shown, it is only logged
+- MCP server updates (xygeni/xygeni-product-backlog#2382): after an update the extension says what to do in plain words (restart your
+  AI assistant so it uses the new version), with a "Show me how" guide per assistant (Copilot, Claude Code, Cursor, Claude Desktop) and
+  a note in the Configuration view that stays until dismissed; the status no longer keeps saying "available" for the version just
+  installed; at startup the MCP server shows "Installed" from the JAR on disk, or "Checking…" while the connection check runs,
+  instead of "Not installed yet". The MCP Setup guide gains the Java prerequisite, where the configuration goes for each
+  assistant (`servers` vs `mcpServers`), a check-that-it-works step and troubleshooting.
 - The installed MCP server version is written to `~/.xygeni/mcp/version.txt` and shown with the path and the update status in the MCP Server Setup guide (xygeni/xygeni-product-backlog#2382)
 - The MCP server download is verified against the published SHA-256 checksum; a mismatch keeps the JAR already installed. An update that cannot replace a JAR locked by a running MCP client (Windows) is kept as `.pending` and applied the next time VS Code starts (xygeni/xygeni-product-backlog#2382)
 - The MCP server is installed in `~/.xygeni/mcp/xygeni-mcp-server.jar`, shared with the other Xygeni IDE plugins, so its path no longer changes when the extension is updated. An existing copy inside the extension folder is moved there and a notification asks to update the path in the MCP client configuration (xygeni/xygeni-product-backlog#2382)

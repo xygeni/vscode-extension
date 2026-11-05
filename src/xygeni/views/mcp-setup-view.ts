@@ -5,9 +5,9 @@ import { Logger } from '../common/logger';
 
 /** How to make each MCP client start the server again after the JAR was replaced (xygeni/xygeni-product-backlog#2382). */
 const RESTART_STEPS = `                <ul>
-                    <li><strong>GitHub Copilot in VS Code:</strong> Command Palette → <em>MCP: List Servers</em> → <em>xygeni</em> → <em>Restart</em>. Or simply reload the VS Code window.</li>
-                    <li><strong>Claude Code:</strong> type <code>/mcp</code> and reconnect <em>xygeni</em>. Or close Claude Code and open it again.</li>
-                    <li><strong>Cursor:</strong> Settings → <em>MCP</em> → switch <em>xygeni</em> off and on. Or restart Cursor.</li>
+                    <li><strong>GitHub Copilot in VS Code:</strong> Command Palette → <em>MCP: List Servers</em> → <em>xygeni-mcp-server</em> → <em>Restart</em>. Or simply reload the VS Code window.</li>
+                    <li><strong>Claude Code:</strong> type <code>/mcp</code> and reconnect <em>xygeni-mcp-server</em>. Or close Claude Code and open it again.</li>
+                    <li><strong>Cursor:</strong> Settings → <em>MCP</em> → switch <em>xygeni-mcp-server</em> off and on. Or restart Cursor.</li>
                     <li><strong>Claude Desktop:</strong> quit the application and open it again.</li>
                     <li><strong>Any other assistant:</strong> close it and open it again. Its Xygeni configuration does not change.</li>
                 </ul>`;

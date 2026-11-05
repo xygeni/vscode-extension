@@ -1,10 +1,13 @@
 import * as vscode from 'vscode';
 import { XygeniIssue } from '../common/interfaces';
+import type { ScanConfig } from '../service/scan-config';
 
 export interface IssueViewEmitter {
     refreshIssuesEventEmitter: vscode.Event<void>;
     getIssuesByCategory(category: string): XygeniIssue[]
     getIconPath(iconname: string): string
+    /** The per-project scan configuration (#415): a category switched off there says so instead of "0 issues". */
+    getScanConfig(): ScanConfig
 }
 
 export abstract class IssueView implements vscode.TreeDataProvider<XygeniTreeItem> {
@@ -119,7 +122,10 @@ export class XygeniCategoryItem extends vscode.TreeItem {
 
         super(categoryNames[category], vscode.TreeItemCollapsibleState.Expanded);
 
-        this.description = `${issueCount} issue${issueCount !== 1 ? 's' : ''}`;
+        // The scan type behind each view; 'sca' is the dependency scan.
+        const scanType = category === 'sca' ? 'deps' : category;
+        const inScanConfig = this.commands.getScanConfig().scans.includes(scanType);
+        this.description = issueCount === 0 && !inScanConfig ? 'Not in the scan configuration' : `${issueCount} issue${issueCount !== 1 ? 's' : ''}`;
         this.contextValue = 'category';
 
         // Set icon based on category

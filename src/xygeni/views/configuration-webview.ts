@@ -198,7 +198,6 @@ export class ConfigurationWebview implements vscode.WebviewViewProvider {
             case 'toggleScan': if (message.key) { this.host.toggleScanType(message.key, message.enabled); } break;
             case 'toggleOnSave': if (message.key) { this.host.toggleOnSaveScanType(message.key, message.enabled); } break;
             case 'selectAll': this.host.setAllScanTypes(true); break;
-            case 'clear': this.host.setAllScanTypes(false); break;
             case 'restoreDefaults': this.host.restoreScanDefaults(); break;
             case 'addFolder': await this.host.addExcludeFolder(); break;
             case 'addPattern': await this.host.addExcludePattern(); break;
@@ -290,6 +289,7 @@ export function renderConfigurationPage(options: ConfigurationPageOptions): stri
         .dot.ok { background: var(--vscode-testing-iconPassed, #73c991); }
         .dot.err { background: var(--vscode-testing-iconFailed, #f14c4c); }
         .dot.busy { background: var(--vscode-progressBar-background, #0078d4); animation: pulse 1s infinite alternate; }
+        .dot.warn { background: var(--vscode-editorWarning-foreground, #cca700); }
         @keyframes pulse { from { opacity: .35; } to { opacity: 1; } }
         .toggles { margin: 10px 0 4px 0; }
         .trow { display: flex; align-items: center; gap: 8px; padding: 6px 2px; border-radius: 3px; }
@@ -398,7 +398,7 @@ export function renderConfigurationPage(options: ConfigurationPageOptions): stri
     <div class="block" id="blk-scanconfig">
         <div class="blockhead" data-block="scanconfig"><span class="chev">▶</span><span class="title">Scan configuration</span><span class="sub" id="cfgSub"></span></div>
         <div class="blockbody">
-            <div class="head"><span class="title">What to scan</span><span class="spacer"></span><a id="selectAll">Select all</a><a id="clear">Clear</a></div>
+            <div class="head"><span class="title">What to scan</span><span class="spacer"></span><a id="selectAll">Select all</a></div>
             <div class="cols"><span></span><span title="The scan types of Run scan. With SCA on, suspect dependencies also run. At least one is required.">Full scan</span><span title="The scan types of Auto Scan on Save. Only the scan types that can analyze just the changed files are offered; the others would scan the whole project on every save. A type must be in the full scan to run on save.">On save</span></div>
             ${rowsHtml}
             <div class="warn" id="scanNote"></div>
@@ -407,7 +407,7 @@ export function renderConfigurationPage(options: ConfigurationPageOptions): stri
             <div class="actions"><button class="btn" id="addFolder">Add folder…</button><button class="btn" id="addPattern">Add pattern…</button></div>
             <div class="note">Added to the scanner defaults (node_modules, target, dist…). Glob patterns, <code>**</code> at any depth, <code>path:</code> prefix for a sub-project. Needs scanner 6.23 or later.</div>
             <div class="head"><span class="title">Scanner options</span><span class="count" id="optionCount"></span><span class="spacer"></span></div>
-            <div id="options"></div>
+            <div id="scanOptions"></div>
             <div class="acwrap">
                 <div class="acrow"><input id="optInput" type="text" spellcheck="false" autocomplete="off" placeholder="--option=value  (type -- to see them)" aria-label="Scanner option to add" aria-autocomplete="list" aria-controls="ac" /><button class="btn" id="addOption" disabled>Add</button></div>
                 <div class="ac" id="ac" role="listbox"></div>
@@ -440,7 +440,7 @@ export function renderConfigurationPage(options: ConfigurationPageOptions): stri
         click('editUrl', { type: 'editUrl' }); click('editToken', { type: 'editToken' }); click('upgrade', { type: 'upgrade' });
         click('settings', { type: 'settings' }); click('mcpSetup', { type: 'mcpSetup' }); click('mcpCheck', { type: 'mcpCheck' }); click('mcpRestarted', { type: 'mcpRestarted' }); click('mcpRestartHow', { type: 'mcpSetup' });
         click('runScan', { type: 'runScan' }); click('scanOutput', { type: 'scanOutput' });
-        click('selectAll', { type: 'selectAll' }); click('clear', { type: 'clear' }); click('restore', { type: 'restoreDefaults' });
+        click('selectAll', { type: 'selectAll' }); click('restore', { type: 'restoreDefaults' });
         click('openFile', { type: 'openFile' }); click('addFolder', { type: 'addFolder' }); click('addPattern', { type: 'addPattern' });
         let cliMessage = { type: 'connect' };
         byId('cliAction').addEventListener('click', (event) => { event.preventDefault(); post(cliMessage); });
@@ -464,7 +464,7 @@ export function renderConfigurationPage(options: ConfigurationPageOptions): stri
             else if (c.installError) { text = 'Installation failed. Click to retry'; dot = 'err'; cliMessage = { type: 'install' }; }
             else if (c.installReady) { text = 'Ready to scan. Click to reinstall'; dot = 'ok'; cliMessage = { type: 'reinstall' }; }
             else { text = 'Click to install the scanner'; dot = 'ok'; cliMessage = { type: 'install' }; }
-            if (c.insecureHttp && c.connectionReady) { text += ' · insecure http: token in clear'; dot = 'busy'; }
+            if (c.insecureHttp && c.connectionReady) { text += ' · insecure http: token in clear'; dot = 'warn'; }
             byId('cliAction').textContent = text; byId('cliDot').className = 'dot ' + dot;
             const licDot = byId('licDot'), licText = byId('licText'), upgrade = byId('upgrade');
             if (!c.connectionReady) { licDot.className = 'dot'; licText.textContent = 'Unknown'; upgrade.style.display = 'none'; }
@@ -582,22 +582,23 @@ export function renderConfigurationPage(options: ConfigurationPageOptions): stri
         });
         function renderOptions(config) {
             const names = (o) => { const p = parseOpt(o); return p ? p : { name: o, value: '' }; };
-            byId('options').innerHTML = config.options.length === 0 ? '<div class="note">None: the scanner defaults apply.</div>'
+            byId('scanOptions').innerHTML = config.options.length === 0 ? '<div class="note">None: the scanner defaults apply.</div>'
                 : config.options.map((o) => { const p = names(o); const spec = SCAN_OPTIONS.find((s) => s.name === p.name);
                     return '<div class="ex" title="' + esc(spec ? spec.description : '') + '"><span class="name">' + esc(p.name) + '</span><span class="val">' + (p.value ? '=' + esc(p.value) : '') + '</span><button data-name="' + esc(p.name) + '" title="Remove" aria-label="Remove ' + esc(p.name) + '">✕</button></div>'; }).join('');
-            byId('options').querySelectorAll('button[data-name]').forEach((b) => b.addEventListener('click', () => post({ type: 'removeOption', name: b.dataset.name })));
+            byId('scanOptions').querySelectorAll('button[data-name]').forEach((b) => b.addEventListener('click', () => post({ type: 'removeOption', name: b.dataset.name })));
             byId('optionCount').textContent = String(config.options.length);
         }
 
-        function renderScanConfig(sc, autoScan) {
+        function renderScanConfig(sc, autoScan, licenseFree) {
             const config = sc.config;
             renderOptions(config);
             document.querySelectorAll('input[data-switch="scan"]').forEach((input) => { input.checked = config.scans.includes(input.dataset.key); });
             document.querySelectorAll('input[data-switch="onSave"]').forEach((input) => {
                 const inFull = config.scans.includes(input.dataset.key);
-                input.checked = config.onSave.includes(input.dataset.key); input.disabled = !inFull;
+                // On save needs Auto Scan on Save, which the Free plan does not have: the column is read-only there.
+                input.checked = config.onSave.includes(input.dataset.key); input.disabled = !inFull || licenseFree;
                 input.parentElement.classList.toggle('dim', !autoScan && inFull);
-                input.parentElement.title = !inFull ? 'Runs on save only while it is in the full scan' : autoScan ? 'On save' : 'Auto Scan on Save is off: switching this on turns it on';
+                input.parentElement.title = licenseFree ? 'Auto Scan on Save is not available on the Free plan' : !inFull ? 'Runs on save only while it is in the full scan' : autoScan ? 'On save' : 'Auto Scan on Save is off: switching this on turns it on';
             });
             const switched = config.scans.filter((type) => type !== 'suspectdeps').length;
             byId('cfgSub').textContent = switched + '/' + scannerCount + ' scanners · ' + config.onSave.length + '/' + onSaveCount + ' on save' + (config.excludes.length ? ' · ' + config.excludes.length + ' excluded' : '') + (config.options.length ? ' · ' + config.options.length + ' option' + (config.options.length > 1 ? 's' : '') : '');
@@ -613,7 +614,7 @@ export function renderConfigurationPage(options: ConfigurationPageOptions): stri
             renderConnection(state.connection);
             const canScan = state.connection.installReady && state.connection.licenseAvailable;
             renderScan(state.scan, canScan);
-            renderScanConfig(state.scanConfig, state.connection.autoScan);
+            renderScanConfig(state.scanConfig, state.connection.autoScan, state.connection.licenseFree);
             setOpen('scan', manual.scan !== undefined ? manual.scan : canScan);
             setOpen('scanconfig', manual.scanconfig !== undefined ? manual.scanconfig : false);
         }

@@ -20,10 +20,18 @@ suite('Scan options', () => {
         assert.deepStrictEqual(parseScanOption('--ai-review'), { name: '--ai-review' });
         assert.deepStrictEqual(parseScanOption('--ai-review=all'), { name: '--ai-review', value: 'all' });
         assert.deepStrictEqual(parseScanOption('  --ai-review  all '), { name: '--ai-review', value: 'all' });
-        assert.deepStrictEqual(parseScanOption('--run-languages = java, kotlin'), { name: '--run-languages', value: 'java, kotlin' });
+        assert.deepStrictEqual(parseScanOption('--include = src, lib'), { name: '--include', value: 'src, lib' });
         assert.strictEqual(parseScanOption('java'), undefined);
         assert.strictEqual(parseScanOption(''), undefined);
         assert.strictEqual(scanOptionName('--mute=.xygeni.mute.yml'), '--mute');
+    });
+
+    test('only options of `xygeni scan` are offered: the language options belong to sast / quality', () => {
+        // ScanCommand in DepsDoctor-CLI has no LanguageOptions group; `xygeni scan --run-languages=java` answers
+        // "Unknown option" with exit code 2, which would break the full scan and every on-save scan.
+        for (const name of ['--run-languages', '--skip-languages', '--languages']) {
+            assert.ok(!SCAN_OPTIONS.some((spec) => spec.name === name), `${name} is not a xygeni scan option`);
+        }
     });
 
     test('validate: canonical form for flags, enums, lists, text and paths', () => {
@@ -34,9 +42,9 @@ suite('Scan options', () => {
         assert.strictEqual(ok('--ai-review all'), '--ai-review=all');
         bad('--ai-review=sometimes', 'is one of off, all, ai-detected');
         bad('--ai-review', 'needs a value');
-        assert.strictEqual(ok('--run-languages = java, kotlin'), '--run-languages=java,kotlin');
-        bad('--run-languages=java,cobol', 'cobol not among');
-        bad('--run-languages=java,,kotlin', 'none empty');
+        assert.strictEqual(ok('--include = src/**, lib/**'), '--include=src/**,lib/**');
+        bad('--include=src,,lib', 'none empty');
+        bad('--ai-mode=sometimes', 'is one of off, auto, stored, rebuild');
         assert.strictEqual(ok('--ai-review-filter=high,!sql_injection'), '--ai-review-filter=high,!sql_injection', 'an open list accepts other items');
         assert.strictEqual(ok('--detectors=secrets=high|iac=all'), '--detectors=secrets=high|iac=all', 'the first = splits name and value');
         bad('--standard=owasp top10', 'no spaces');
@@ -60,7 +68,7 @@ suite('Scan options', () => {
         assert.deepStrictEqual(
             normalizeScanOptions(['--ai-review=all', '--run=secrets', '-o out.json', 42, '--ai-review off', '--include-license-analysis', '--nope']),
             ['--ai-review=off', '--include-license-analysis']);
-        assert.deepStrictEqual(scanOptionArguments(['--run-languages = java, kotlin']), ['--run-languages=java,kotlin']);
+        assert.deepStrictEqual(scanOptionArguments(['--include = src, lib']), ['--include=src,lib']);
     });
 
     test('scan configuration: options are part of ide.json, validated on read, and the defaults have none', () => {
@@ -71,11 +79,11 @@ suite('Scan options', () => {
 
         let config = withScanOption(defaultScanConfig(), '--ai-review=all');
         config = withScanOption(config, '--ai-review=off');
-        config = withScanOption(config, '--run-languages=java');
-        assert.deepStrictEqual(config.options, ['--run-languages=java', '--ai-review=off'], 'in the order of the option list, replaced by name');
+        config = withScanOption(config, '--include=src');
+        assert.deepStrictEqual(config.options, ['--include=src', '--ai-review=off'], 'in the order of the option list, replaced by name');
         config = withoutScanOption(config, '--ai-review');
-        assert.deepStrictEqual(config.options, ['--run-languages=java']);
-        assert.deepStrictEqual(JSON.parse(serializeScanConfig(config)).options, ['--run-languages=java']);
-        assert.ok(isDefaultScanConfig(withoutScanOption(config, '--run-languages')));
+        assert.deepStrictEqual(config.options, ['--include=src']);
+        assert.deepStrictEqual(JSON.parse(serializeScanConfig(config)).options, ['--include=src']);
+        assert.ok(isDefaultScanConfig(withoutScanOption(config, '--include')));
     });
 });

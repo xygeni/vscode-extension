@@ -4,7 +4,7 @@ import * as _ from 'lodash';
 import { AiIssueView, ApisecIssueView, IaCIssueView, IssueView, MalwareIssueView, MisconfIssueView, QualityIssueView, SastIssueView, ScaIssueView, SecretsIssueView } from './views/issue-view';
 import { HelpView } from './views/help-view';
 import { ConfigurationWebview } from './views/configuration-webview';
-import { XYGENI_SHOW_CONFIG_COMMAND, XYGENI_CONTEXT, COMMAND_EDIT_XYGENI_API_URL, COMMAND_EDIT_XYGENI_TOKEN, COMMAND_TEST_XYGENI_CONNECTION, COMMAND_INSTALL_SCANNER, XYGENI_CLOSE_CONFIG_COMMAND, COMMAND_RUN_SCANNER, COMMAND_SHOW_OUTPUT, COMMAND_OPEN_PROXY_CONFIG, COMMAND_OPEN_SETTINGS, COMMAND_SHOW_SCAN_OUTPUT, COMMAND_SHOW_MCP_SETUP, COMMAND_CHECK_MCP_UPDATES, COMMAND_TOGGLE_AUTO_SCAN, COMMAND_TOGGLE_GLOBAL_OPTION, COMMAND_UPGRADE_LICENSE, COMMAND_TOGGLE_SCAN_TYPE, COMMAND_TOGGLE_ON_SAVE_SCAN_TYPE, COMMAND_SELECT_ALL_SCAN_TYPES, COMMAND_CLEAR_SCAN_TYPES, COMMAND_RESTORE_SCAN_DEFAULTS, COMMAND_OPEN_SCAN_CONFIG_FILE, COMMAND_ADD_EXCLUDE_FOLDER, COMMAND_ADD_EXCLUDE_PATTERN, COMMAND_REMOVE_EXCLUDE, COMMAND_ADD_SCAN_OPTION, COMMAND_REMOVE_SCAN_OPTION, COMMAND_RUN_SCAN_TYPE_PREFIX, RESULT_VIEW_SCAN_TYPES } from './common/constants';
+import { XYGENI_SHOW_CONFIG_COMMAND, XYGENI_CONTEXT, COMMAND_EDIT_XYGENI_API_URL, COMMAND_EDIT_XYGENI_TOKEN, COMMAND_TEST_XYGENI_CONNECTION, COMMAND_INSTALL_SCANNER, XYGENI_CLOSE_CONFIG_COMMAND, COMMAND_RUN_SCANNER, COMMAND_SHOW_OUTPUT, COMMAND_OPEN_PROXY_CONFIG, COMMAND_OPEN_SETTINGS, COMMAND_SHOW_SCAN_OUTPUT, COMMAND_SHOW_MCP_SETUP, COMMAND_CHECK_MCP_UPDATES, COMMAND_TOGGLE_AUTO_SCAN, COMMAND_TOGGLE_GLOBAL_OPTION, COMMAND_UPGRADE_LICENSE, COMMAND_TOGGLE_SCAN_TYPE, COMMAND_TOGGLE_ON_SAVE_SCAN_TYPE, COMMAND_SELECT_ALL_SCAN_TYPES, COMMAND_RESTORE_SCAN_DEFAULTS, COMMAND_OPEN_SCAN_CONFIG_FILE, COMMAND_ADD_EXCLUDE_FOLDER, COMMAND_ADD_EXCLUDE_PATTERN, COMMAND_REMOVE_EXCLUDE, COMMAND_ADD_SCAN_OPTION, COMMAND_REMOVE_SCAN_OPTION, COMMAND_RUN_SCAN_TYPE_PREFIX, RESULT_VIEW_SCAN_TYPES } from './common/constants';
 import { ScanType } from './service/scan-config';
 import { XyContextImpl } from './common/context';
 import InstallerService from './service/installer';
@@ -33,8 +33,7 @@ class XygeniExtension {
     const xygeniContext = XyContextImpl.getInstance();
     const commands = CommandsImpl.getInstance(context, xygeniContext);
 
-    // Create and register view providers. Configuration (connection, scan, scan configuration) is a webview
-    // (#415); ConfigurationView / ScanView keep the tree versions, unused.
+    // Create and register view providers. Configuration (connection, scan, scan configuration) is a webview (#415).
     const resultTreeViews: Record<string, vscode.TreeView<unknown>> = {};
     const resultTree = (id: string, treeDataProvider: vscode.TreeDataProvider<any>) => {
       const treeView = vscode.window.createTreeView(id, { treeDataProvider });
@@ -153,9 +152,6 @@ class XygeniExtension {
       }),
       vscode.commands.registerCommand(COMMAND_SELECT_ALL_SCAN_TYPES, () => {
         commands.setAllScanTypes(true);
-      }),
-      vscode.commands.registerCommand(COMMAND_CLEAR_SCAN_TYPES, () => {
-        commands.setAllScanTypes(false);
       }),
       vscode.commands.registerCommand(COMMAND_RESTORE_SCAN_DEFAULTS, () => {
         commands.restoreScanDefaults();

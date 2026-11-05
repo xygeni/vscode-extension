@@ -55,7 +55,7 @@ export function isNewerVersion(remote?: string, local?: string): boolean {
 
 /** The version in a `version.txt` body: first non-blank line, trimmed, without the `v` prefix. Undefined when invalid. */
 export function versionFromFile(content?: string): string | undefined {
-    const line = (content ?? '').split(/\r?\n/).map(l => l.trim()).find(l => l.length > 0);
+    const line = (content ?? '').split(/\r?\n/).map(entry => entry.trim()).find(entry => entry.length > 0);
     if (!line || !parseVersion(line)) {
         return undefined;
     }
