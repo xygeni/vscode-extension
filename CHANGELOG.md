@@ -77,6 +77,7 @@
   autocompletion and validation (a closed list: include patterns, detectors, mute, standard, AI review,
   license analysis, custom configuration); the options the plugin sets itself (`--run`, `-o`, excludes…) are refused.
   Saved as `options` in `.xygeni/ide.json` and validated again when the file is read.
+- `.xygeni/ide.json` is treated as input from the repository (xygeni/xygeni-product-backlog#415): an option or exclude with a quote or a control character is refused (on Windows it could add scanner options of its own), `--conf`, `--custom-detectors-dir` and `--mute` take a path inside the project (or `--mute=#profile`), the file is never written through a symbolic link, a save keeps the keys another plugin added, and "Restore defaults" rewrites the file instead of deleting it.
 - Run one scan type alone: a play button in the title of each results view (SAST, SCA, Secrets…) runs just that scan
   and refreshes only its findings.
 - Configuration view: more room between rows and blocks.
@@ -101,7 +102,7 @@
   instead of "Not installed yet". The MCP Setup guide gains the Java prerequisite, where the configuration goes for each
   assistant (`servers` vs `mcpServers`), a check-that-it-works step and troubleshooting.
 - The installed MCP server version is written to `~/.xygeni/mcp/version.txt` and shown with the path and the update status in the MCP Server Setup guide (xygeni/xygeni-product-backlog#2382)
-- The MCP server download is verified against the published SHA-256 checksum; a mismatch keeps the JAR already installed. An update that cannot replace a JAR locked by a running MCP client (Windows) is kept as `.pending` and applied the next time VS Code starts (xygeni/xygeni-product-backlog#2382)
+- The MCP server download is verified against the published SHA-256 checksum; a mismatch, or an update whose checksum cannot be read, keeps the JAR already installed. Until the checksum is published, a first install goes ahead with a visible warning. An update that cannot replace a JAR locked by a running MCP client (Windows) is kept as `.pending` and applied the next time VS Code starts (xygeni/xygeni-product-backlog#2382)
 - The MCP server is installed in `~/.xygeni/mcp/xygeni-mcp-server.jar`, shared with the other Xygeni IDE plugins, so its path no longer changes when the extension is updated. An existing copy inside the extension folder is moved there and a notification asks to update the path in the MCP client configuration (xygeni/xygeni-product-backlog#2382)
 - The MCP server is downloaded when it is missing even if the scanner is already installed; before, it was reported as installed without checking the file (xygeni/xygeni-product-backlog#2382)
 - New "Malware" view listing the malware evidences of the scan (kind, detector, severity, explanation, scan type, location, resolved code and tags, plus the CODE FLOW tab with graph, path and AI explain for the evidences that carry code flows), which were already scanned but never shown (xygeni/xygeni-product-backlog#1473)

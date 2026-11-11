@@ -10,6 +10,7 @@ import { XyContextImpl } from '../xygeni/common/context';
 import { XYGENI_CONTEXT } from '../xygeni/common/constants';
 import { DetailsView } from '../xygeni/views/details-view';
 import LicenseStateService from '../xygeni/service/license-state';
+import { testApi } from '../extension';
 
 const EXTENSION_ID = 'xygeni-security.xygeni-scanner-vscode';
 
@@ -61,6 +62,13 @@ suite('Xygeni Extension — E2E inside VS Code', () => {
         const extension = vscode.extensions.getExtension(EXTENSION_ID);
         assert.ok(extension, 'extension lookup');
         assert.strictEqual(extension!.isActive, true, 'extension active after activate()');
+    });
+
+    test('the test API is only exported under the test host: other extensions read exports (H1)', () => {
+        const contextIn = (extensionMode: vscode.ExtensionMode) => ({ extensionMode } as vscode.ExtensionContext);
+        assert.strictEqual(testApi(contextIn(vscode.ExtensionMode.Production)), undefined, 'no token or URL setter in production');
+        assert.strictEqual(testApi(contextIn(vscode.ExtensionMode.Development)), undefined, 'nor in the development host');
+        assert.ok(testApi(contextIn(vscode.ExtensionMode.Test)), 'the E2E suite still drives the extension');
     });
 
     test('registers core scanner commands', async () => {

@@ -390,6 +390,7 @@
           "xygeni.api.allowInsecureHttp": {
             "order": 3,
             "type": "boolean",
+            "scope": "application",
             "default": false,
             "markdownDescription": "Allow a server URL that uses `http://` to a host other than localhost. The API token then travels in clear on every request, so leave this off unless the Xygeni server really has no TLS. `http://localhost` is always allowed."
           }

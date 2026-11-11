@@ -17,6 +17,7 @@ import { ConfigManager } from '../config/xygeni-configuration';
 import { GLOBAL_OPTION_TOGGLES, SKIP_SSL_VERIFY_OPTION, blockedOptionsIn, buildGlobalOptions, isCertificateError } from './scanner-options';
 import { ScanConfig, ScanType, defaultScanConfig, excludeAddArgument } from './scan-config';
 import { scanOptionArguments } from './scan-options';
+import { assertTokenMayBeSentTo } from '../common/insecure-url';
 
 
     /**
@@ -496,6 +497,8 @@ class XygeniScannerService extends EventEmitter {
     }
 
     async getEnvVariables(env: NodeJS.ProcessEnv): Promise<NodeJS.ProcessEnv> {
+        // The scanner sends the token to XYGENI_URL: refuse an http URL the settings do not allow (#1438).
+        assertTokenMayBeSentTo(this.commands.getXygeniUrl(), ConfigManager.getAllowInsecureHttp());
         env.XYGENI_URL = this.commands.getXygeniUrl();
         await this.commands.getToken().then(token => env.XYGENI_TOKEN = token);
 

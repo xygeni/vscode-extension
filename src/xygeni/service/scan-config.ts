@@ -10,7 +10,7 @@ import * as path from 'path';
  * full scan, the file-scoped ones on save, nothing excluded.
  */
 
-import { normalizeScanOptions, scanOptionName } from './scan-options';
+import { hasUnsafeChars, normalizeScanOptions, scanOptionName } from './scan-options';
 
 export const SCAN_CONFIG_DIR = '.xygeni';
 export const SCAN_CONFIG_FILE = 'ide.json';
@@ -108,7 +108,9 @@ export function normalizeScanConfig(input: Partial<ScanConfig> | undefined): Sca
         .filter(type => requestedOnSave.has(type) && onSaveTypes.includes(type) && effectiveScans.includes(type));
 
     const excludes = Array.isArray(input?.excludes)
-        ? Array.from(new Set(input!.excludes.filter((value): value is string => typeof value === 'string').map(value => value.trim()).filter(value => value.length > 0)))
+        // A quote or control character could end the argument on Windows (see hasUnsafeChars): dropped.
+        ? Array.from(new Set(input!.excludes.filter((value): value is string => typeof value === 'string').map(value => value.trim())
+            .filter(value => value.length > 0 && !hasUnsafeChars(value))))
         : [];
     const options = normalizeScanOptions(input?.options);
     return { scans: effectiveScans, onSave, excludes, options };
@@ -125,8 +127,24 @@ export function parseScanConfig(content: string | undefined): ScanConfig {
     }
 }
 
-export function serializeScanConfig(config: ScanConfig): string {
-    return JSON.stringify({ scans: config.scans, onSave: config.onSave, excludes: config.excludes, options: config.options }, null, 2) + '\n';
+/** The keys this version reads and writes; any other key in the file is kept as it is. */
+export const SCAN_CONFIG_KNOWN_KEYS = ['scans', 'onSave', 'excludes', 'options'];
+
+/**
+ * The file content. The file is shared by the four plugins and committed: the keys of `existing` this version does
+ * not know (added by another plugin or a later version) are kept, only the four known ones are replaced.
+ */
+export function serializeScanConfig(config: ScanConfig, existing?: string): string {
+    let others: Record<string, unknown> = {};
+    try {
+        const parsed: unknown = existing ? JSON.parse(existing) : undefined;
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            others = Object.fromEntries(Object.entries(parsed as Record<string, unknown>).filter(([key]) => !SCAN_CONFIG_KNOWN_KEYS.includes(key)));
+        }
+    } catch {
+        // Not JSON: rewritten with the known keys only, as before.
+    }
+    return JSON.stringify({ scans: config.scans, onSave: config.onSave, excludes: config.excludes, options: config.options, ...others }, null, 2) + '\n';
 }
 
 export function scanConfigPath(workspaceRoot: string): string {
@@ -144,16 +162,32 @@ export function loadScanConfig(workspaceRoot: string | undefined): ScanConfig {
     }
 }
 
-/** Writes the configuration; the defaults remove the file instead, so an untouched project leaves nothing behind. */
+/**
+ * Refuses to write through a link: a repository can commit `.xygeni` or `ide.json` as a symbolic link, and a switch
+ * in the IDE would then overwrite the file it points to (`~/.bashrc`…), outside the project.
+ */
+export function assertScanConfigNotLinked(filePath: string): void {
+    for (const candidate of [path.dirname(filePath), filePath]) {
+        if (fs.lstatSync(candidate, { throwIfNoEntry: false })?.isSymbolicLink()) {
+            throw new Error(`${candidate} is a symbolic link: not written, so a change cannot land outside the project`);
+        }
+    }
+}
+
+/**
+ * Writes the configuration, keeping the keys of the file this version does not know. The defaults do not create the
+ * file (an untouched project leaves nothing behind), but an existing one is rewritten, never deleted: it is usually
+ * committed, and "Restore defaults" must not show up as a deleted file.
+ */
 export function saveScanConfig(workspaceRoot: string, config: ScanConfig): void {
     const filePath = scanConfigPath(workspaceRoot);
+    assertScanConfigNotLinked(filePath);
     const normalized = normalizeScanConfig(config);
-    if (isDefaultScanConfig(normalized)) {
-        fs.rmSync(filePath, { force: true });
-        return;
-    }
+    const exists = fs.existsSync(filePath);
+    if (isDefaultScanConfig(normalized) && !exists) { return; }
+    const existing = exists ? fs.readFileSync(filePath, 'utf8') : undefined;
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, serializeScanConfig(normalized));
+    fs.writeFileSync(filePath, serializeScanConfig(normalized, existing));
 }
 
 /** A copy with `type` switched in or out of the full scan; on-save follows (it can never exceed the full scan). */

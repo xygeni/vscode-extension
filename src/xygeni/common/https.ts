@@ -4,7 +4,7 @@ import { IncomingMessage, ClientRequest } from 'http';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import { ProxyConfigManager } from '../config/proxy-configuration';
 import { ConfigManager } from '../config/xygeni-configuration';
-import { insecureUrlProblem } from './insecure-url';
+import { assertTokenMayBeSentTo } from './insecure-url';
 import { Commands, IHttpClient } from './interfaces';
 import { commands } from 'vscode';
 
@@ -115,8 +115,7 @@ export class HttpClientFactory {
      */
     static getClient(url: string, commands: Commands): IHttpClient {
         // Fail safe for every request path: an http URL that would send the token in clear is refused here too (#1438).
-        const problem = insecureUrlProblem(url, ConfigManager.getAllowInsecureHttp());
-        if (problem) { throw new Error(problem); }
+        assertTokenMayBeSentTo(url, ConfigManager.getAllowInsecureHttp());
         const parsedUrl = new URL(url);
         return parsedUrl.protocol === 'https:' ? new HttpsClient(commands) : new HttpClient(commands);
     }

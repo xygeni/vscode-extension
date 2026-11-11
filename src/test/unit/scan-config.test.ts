@@ -76,7 +76,7 @@ suite('Scan configuration', () => {
         assert.strictEqual(excludeAddArgument(withoutExclude(config, '**/fixtures/**')), undefined, 'no excludes, no argument: the scanner defaults apply');
     });
 
-    test('save writes .xygeni/ide.json and the defaults remove it', () => {
+    test('save writes .xygeni/ide.json, keeps the keys it does not know, and never deletes the file', () => {
         const root = fs.mkdtempSync(path.join(os.tmpdir(), 'xygeni-scan-config-'));
         try {
             const config = withScanType(defaultScanConfig(), 'quality', false);
@@ -87,11 +87,48 @@ suite('Scan configuration', () => {
             assert.deepStrictEqual(JSON.parse(written), { scans: config.scans, onSave: config.onSave, excludes: ['vendor/**'], options: [] });
             assert.deepStrictEqual(loadScanConfig(root), config);
 
+            // A key written by another plugin or a later version survives the next save.
+            fs.writeFileSync(scanConfigPath(root), JSON.stringify({ ...JSON.parse(written), future: { x: 1 } }));
+            saveScanConfig(root, withExclude(config, 'dist/**'));
+            assert.deepStrictEqual(JSON.parse(fs.readFileSync(scanConfigPath(root), 'utf8')).future, { x: 1 });
+
+            // Restore defaults rewrites a committed file instead of deleting it.
             saveScanConfig(root, defaultScanConfig());
-            assert.strictEqual(fs.existsSync(scanConfigPath(root)), false);
+            assert.ok(fs.existsSync(scanConfigPath(root)), 'an existing file is not deleted');
             assert.deepStrictEqual(loadScanConfig(root), defaultScanConfig());
+            assert.deepStrictEqual(JSON.parse(fs.readFileSync(scanConfigPath(root), 'utf8')).future, { x: 1 });
         } finally {
             fs.rmSync(root, { recursive: true, force: true });
+        }
+    });
+
+    test('the defaults do not create the file in an untouched project', () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'xygeni-scan-config-'));
+        try {
+            saveScanConfig(root, defaultScanConfig());
+            assert.strictEqual(fs.existsSync(scanConfigPath(root)), false);
+        } finally {
+            fs.rmSync(root, { recursive: true, force: true });
+        }
+    });
+
+    test('a symlinked .xygeni or ide.json is not written through (it could point outside the project)', function () {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'xygeni-scan-config-'));
+        const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'xygeni-outside-'));
+        try {
+            const victim = path.join(outside, 'victim.txt');
+            fs.writeFileSync(victim, 'keep me');
+            fs.mkdirSync(path.join(root, '.xygeni'));
+            try {
+                fs.symlinkSync(victim, scanConfigPath(root));
+            } catch {
+                this.skip(); // no symlink permission (Windows without developer mode)
+            }
+            assert.throws(() => saveScanConfig(root, withScanType(defaultScanConfig(), 'quality', false)), /symbolic link/);
+            assert.strictEqual(fs.readFileSync(victim, 'utf8'), 'keep me');
+        } finally {
+            fs.rmSync(root, { recursive: true, force: true });
+            fs.rmSync(outside, { recursive: true, force: true });
         }
     });
 });

@@ -1,5 +1,6 @@
 import * as assert from 'assert';
 import {
+    hasUnsafeChars, isPathInsideProject,
     MANAGED_SCAN_OPTIONS, SCAN_OPTIONS, normalizeScanOptions, parseScanOption, scanOptionArguments, scanOptionName, validateScanOption
 } from '../../xygeni/service/scan-options';
 import { defaultScanConfig, isDefaultScanConfig, normalizeScanConfig, parseScanConfig, serializeScanConfig, withScanOption, withoutScanOption } from '../../xygeni/service/scan-config';
@@ -85,5 +86,20 @@ suite('Scan options', () => {
         assert.deepStrictEqual(config.options, ['--include=src']);
         assert.deepStrictEqual(JSON.parse(serializeScanConfig(config)).options, ['--include=src']);
         assert.ok(isDefaultScanConfig(withoutScanOption(config, '--include')));
+    });
+
+    test('a value from ide.json cannot break out of its argument or reach outside the project', () => {
+        // On Windows xygeni.ps1 forwards its arguments to java without escaping an embedded quote.
+        assert.ok(!validateScanOption('--mute=x" "--set-baseline').ok);
+        assert.ok(!validateScanOption('--standard=a\u0001b').ok);
+        assert.ok(hasUnsafeChars('build" --upload') && !hasUnsafeChars('vendor/**'));
+        assert.deepStrictEqual(normalizeScanConfig({ excludes: ['vendor/**', 'x" --upload "y'] }).excludes, ['vendor/**']);
+        // Paths the scanner reads stay inside the project; --mute=#name is a profile.
+        for (const path of ['/etc/detectors', '\\\\server\\share', 'C:\\conf', '~/detectors', '../other', 'conf/../../x']) {
+            assert.ok(!isPathInsideProject(path), path);
+            assert.ok(!validateScanOption(`--custom-detectors-dir=${path}`).ok, path);
+        }
+        assert.ok(validateScanOption('--conf=conf/custom.yml').ok);
+        assert.ok(validateScanOption('--mute=#team-profile').ok);
     });
 });

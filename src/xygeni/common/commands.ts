@@ -25,8 +25,8 @@ import { VulnXygeniIssue } from '../service/vuln-issue';
 import { RemediationService } from '../service/remediation';
 import { McpSetupView } from '../views/mcp-setup-view';
 import GlobalContextImpl from '../service/global-context';
-import { ScanConfig, ScanType, SCANNERS, defaultScanConfig, excludePatternForFolder, loadScanConfig, saveScanConfig, scanConfigPath, serializeScanConfig, withAllScanTypes, withDefaultOnSave, withExclude, withOnSaveType, withScanOption, withScanType, withoutExclude, withoutScanOption } from '../service/scan-config';
-import { SCAN_OPTIONS, validateScanOption } from '../service/scan-options';
+import { ScanConfig, ScanType, SCANNERS, assertScanConfigNotLinked, defaultScanConfig, excludePatternForFolder, loadScanConfig, saveScanConfig, scanConfigPath, serializeScanConfig, withAllScanTypes, withDefaultOnSave, withExclude, withOnSaveType, withScanOption, withScanType, withoutExclude, withoutScanOption } from '../service/scan-config';
+import { SCAN_OPTIONS, hasUnsafeChars, validateScanOption } from '../service/scan-options';
 import { INSECURE_HTTP_WARNING, insecureUrlProblem, isInsecureRemoteUrl } from './insecure-url';
 
 
@@ -97,9 +97,24 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     });
 
     if (newUrl !== undefined) {
-      ConfigManager.updateXygeniUrl(newUrl);
+      await ConfigManager.updateXygeniUrl(newUrl);
       vscode.window.showInformationMessage('Xygeni API URL updated successfully');
+      this.onApiSettingsChanged();
       this.refreshAllViews();
+    }
+  }
+
+  /**
+   * The server URL or "Allow insecure HTTP" changed (Edit URL, settings.json, Settings UI). A connection validated
+   * against the previous URL must not keep the scans enabled when the new one is refused (#1438); the scanner
+   * environment refuses it anyway, this makes the views say so.
+   */
+  public onApiSettingsChanged(): void {
+    const problem = insecureUrlProblem(ConfigManager.getXygeniUrl(), ConfigManager.getAllowInsecureHttp());
+    if (problem) {
+      Logger.log(problem);
+      this.resetConnectionStatus();
+      this.updateLicenseIdeAvailability(false);
     }
   }
 
@@ -568,7 +583,8 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     const pattern = await vscode.window.showInputBox({
       prompt: 'Pattern to exclude from the Xygeni scan (added to the scanner defaults)',
       placeHolder: '**/fixtures/**',
-      validateInput: (value) => value.trim().length === 0 ? 'Enter a pattern' : value.includes(',') ? 'One pattern at a time (no commas)' : null
+      validateInput: (value) => value.trim().length === 0 ? 'Enter a pattern' : value.includes(',') ? 'One pattern at a time (no commas)'
+        : hasUnsafeChars(value) ? 'No quotes or control characters' : null
     });
     if (pattern === undefined) { return; }
     this.saveScanConfig(withExclude(this.getScanConfig(), pattern.trim()));
@@ -622,6 +638,12 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
     const filePath = this.getScanConfigPath();
     if (!filePath) { return; }
     if (!fs.existsSync(filePath)) {
+      try {
+        assertScanConfigNotLinked(filePath);
+      } catch (error: any) {
+        vscode.window.showWarningMessage(error.message);
+        return;
+      }
       fs.mkdirSync(path.dirname(filePath), { recursive: true });
       fs.writeFileSync(filePath, serializeScanConfig(this.getScanConfig()));
     }
@@ -783,6 +805,9 @@ export class CommandsImpl implements Commands, ScanViewEmitter, IssueViewEmitter
         }
         this.setMcpLibraryInstalled();
         Logger.log(`=== MCP Library is ready. Check Xygeni MCP Setup to configure it. ===`);
+        if (installer.lastMcpInstallUnverified) {
+          void vscode.window.showWarningMessage('The Xygeni MCP server was installed without checksum verification: the checksum is not published yet. Updates are only installed once it is.');
+        }
         if (movedFromLegacyPath) {
           const message = `The Xygeni MCP server moved to ${installer.getMcpLibraryPath()}. Update the path in your MCP client configuration.`;
           Logger.log(message);

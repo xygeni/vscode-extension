@@ -607,4 +607,91 @@ suite('Installer Test Suite', () => {
             );
         });
     });
+
+    /**
+     * MCP server download (#2382): an installed JAR is never replaced with an unverified one, and the shared lock keeps
+     * two IDEs from installing at once. The installer runs against a temporary folder instead of ~/.xygeni/mcp.
+     */
+    suite('MCP server download', () => {
+        const goodHash = 'a'.repeat(64);
+        let mcpDir: string;
+        let jarPath: string;
+        let downloadStub: sinon.SinonStub;
+
+        const published = (checksum: { status?: number; body?: string }) => {
+            sandbox.stub(installer as any, 'fetchTextWithStatus').callsFake(async (...args: unknown[]) =>
+                String(args[0]).endsWith('.sha256') ? checksum : { status: 200, body: '1.2.0\n' });
+        };
+
+        setup(() => {
+            mcpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'xygeni-mcp-'));
+            jarPath = path.join(mcpDir, 'xygeni-mcp-server.jar');
+            sandbox.stub(installer, 'getMcpLibratyInstallationDir').returns(mcpDir);
+            sandbox.stub(installer as any, 'makeExecutable').resolves();
+            downloadStub = sandbox.stub(installer as any, 'downloadFile').callsFake(async (...args: unknown[]) => {
+                const target = path.join(String(args[1]), String(args[2]));
+                fs.writeFileSync(target, 'new jar');
+                return target;
+            });
+        });
+
+        teardown(() => fs.rmSync(mcpDir, { recursive: true, force: true }));
+
+        test('a checksum mismatch keeps the installed JAR', async () => {
+            fs.writeFileSync(jarPath, 'installed jar');
+            published({ status: 200, body: `${goodHash}  xygeni-mcp-server.jar` });
+            sandbox.stub(installer as any, 'calculateChecksum').resolves('b'.repeat(64));
+            await assert.rejects(installer.updateMcpLibrary(), /checksum mismatch/);
+            assert.strictEqual(fs.readFileSync(jarPath, 'utf8'), 'installed jar');
+            assert.ok(!fs.existsSync(jarPath + '.tmp'), 'the rejected download is removed');
+        });
+
+        test('a matching checksum installs the download', async () => {
+            fs.writeFileSync(jarPath, 'installed jar');
+            published({ status: 200, body: `${goodHash}  xygeni-mcp-server.jar` });
+            sandbox.stub(installer as any, 'calculateChecksum').resolves(goodHash.toUpperCase());
+            assert.strictEqual(await installer.updateMcpLibrary(), 'installed');
+            assert.strictEqual(fs.readFileSync(jarPath, 'utf8'), 'new jar');
+        });
+
+        test('an update without a published checksum is not even downloaded', async () => {
+            fs.writeFileSync(jarPath, 'installed jar');
+            for (const checksum of [{ status: 403 }, { status: 404 }, { status: 503 }, {}, { status: 200, body: '<Error>AccessDenied</Error>' }]) {
+                sandbox.restore();
+                sandbox.stub(installer, 'getMcpLibratyInstallationDir').returns(mcpDir);
+                downloadStub = sandbox.stub(installer as any, 'downloadFile').rejects(new Error('must not download'));
+                published(checksum);
+                await assert.rejects(installer.updateMcpLibrary(), /installed copy is kept/, JSON.stringify(checksum));
+                assert.ok(downloadStub.notCalled, JSON.stringify(checksum));
+                assert.strictEqual(fs.readFileSync(jarPath, 'utf8'), 'installed jar');
+            }
+        });
+
+        test('a first install goes ahead unverified only while the checksum is not published (403/404)', async () => {
+            published({ status: 403 });
+            assert.strictEqual(await installer.updateMcpLibrary(), 'installed');
+            assert.strictEqual(fs.readFileSync(jarPath, 'utf8'), 'new jar');
+            assert.strictEqual(installer.lastMcpInstallUnverified, true, 'the user is warned');
+
+            fs.rmSync(jarPath);
+            sandbox.restore();
+            sandbox.stub(installer, 'getMcpLibratyInstallationDir').returns(mcpDir);
+            published({});
+            await assert.rejects(installer.updateMcpLibrary(), /nothing installed/, 'no answer: retried at the next start');
+            assert.ok(!fs.existsSync(jarPath));
+        });
+
+        test('the MCP lock is exclusive: a held lock blocks a second installer', async () => {
+            (installer as any).mcpLockWaitMs = 0;
+            let secondRan = false;
+            await (installer as any).withMcpLock(mcpDir, async () => {
+                await assert.rejects((installer as any).withMcpLock(mcpDir, async () => { secondRan = true; }), /being installed by another IDE/);
+            });
+            assert.strictEqual(secondRan, false);
+            assert.ok(!fs.existsSync(path.join(mcpDir, '.lock')), 'released when the action ends');
+            let thirdRan = false;
+            await (installer as any).withMcpLock(mcpDir, async () => { thirdRan = true; });
+            assert.ok(thirdRan, 'the lock is released afterwards');
+        });
+    });
 });

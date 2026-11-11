@@ -64,6 +64,13 @@ class XygeniExtension {
     }, 1000, { leading: false, trailing: true });
 
     context.subscriptions.push(
+      // A URL changed outside Edit URL (settings.json, Settings UI) must not keep a connection validated for another (#1438).
+      vscode.workspace.onDidChangeConfiguration((event) => {
+        if (event.affectsConfiguration('xygeni.api.xygeniUrl') || event.affectsConfiguration('xygeni.api.allowInsecureHttp')) {
+          commands.onApiSettingsChanged();
+        }
+      }),
+
       // Register help webview provider
       vscode.window.registerWebviewViewProvider(HelpView.viewType, new HelpView(xygeniVersion)),
 

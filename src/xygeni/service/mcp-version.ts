@@ -67,3 +67,20 @@ export function checksumFromFile(content?: string): string | undefined {
     const token = (content ?? '').trim().split(/\s+/)[0];
     return SHA256_PATTERN.test(token) ? token.toLowerCase() : undefined;
 }
+
+export type ChecksumAction = 'verify' | 'install-unverified' | 'skip';
+
+/**
+ * What to do with the MCP download given the published `.sha256` (#2382). An installed JAR is never replaced with an
+ * unverified one: an update without a valid checksum keeps the installed copy and is retried at the next check. A
+ * first install goes ahead unverified only when the server answers that the `.sha256` is not published (403/404, the
+ * state until #2381 is promoted to get.xygeni.io); a timeout, 5xx or an unreadable checksum installs nothing.
+ *
+ * @param status HTTP status of the `.sha256` GET, undefined when there was no answer
+ * @param expected the hash read from a 200 body, undefined when it is not one
+ */
+export function checksumAction(status: number | undefined, expected: string | undefined, jarInstalled: boolean): ChecksumAction {
+    if (status === 200 && expected !== undefined) { return 'verify'; }
+    if (!jarInstalled && (status === 403 || status === 404)) { return 'install-unverified'; }
+    return 'skip';
+}

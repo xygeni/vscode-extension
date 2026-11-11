@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { INSECURE_HTTP_REFUSED, insecureUrlProblem, isInsecureRemoteUrl, isLoopbackHost } from '../../xygeni/common/insecure-url';
+import { INSECURE_HTTP_REFUSED, assertTokenMayBeSentTo, insecureUrlProblem, isInsecureRemoteUrl, isLoopbackHost } from '../../xygeni/common/insecure-url';
 
 /** Plain-http server URLs send the token in clear (xygeni/xygeni-product-backlog#1438). */
 suite('Insecure server URL', () => {
@@ -24,6 +24,15 @@ suite('Insecure server URL', () => {
         assert.strictEqual(isInsecureRemoteUrl('http://api.xygeni.io'), true, 'a missing s is the typical typo');
         assert.strictEqual(isInsecureRemoteUrl(undefined), false);
         assert.strictEqual(isInsecureRemoteUrl('not a url'), false, 'a malformed URL is somebody else\'s error');
+        assert.strictEqual(isInsecureRemoteUrl('HTTP://xygeni.corp.local'), true, 'scheme case does not matter');
+        assert.strictEqual(isInsecureRemoteUrl('http://[bad'), true, 'an http string that does not parse fails closed');
+    });
+
+    test('the scanner environment refuses the token for a refused URL (H2)', () => {
+        assert.throws(() => assertTokenMayBeSentTo('http://xygeni.corp.local/deps-doctor-service', false), new RegExp('^Error: Insecure URL'));
+        assert.doesNotThrow(() => assertTokenMayBeSentTo('http://xygeni.corp.local/deps-doctor-service', true), 'explicit opt-in');
+        assert.doesNotThrow(() => assertTokenMayBeSentTo('http://localhost:8086/deps-doctor-service', false), 'loopback');
+        assert.doesNotThrow(() => assertTokenMayBeSentTo('https://api.xygeni.io', false));
     });
 
     test('the problem is reported unless the user allowed insecure http', () => {

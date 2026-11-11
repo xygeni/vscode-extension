@@ -256,7 +256,7 @@ export class McpSetupView {
 
             <div class="warning">
                 ${savedToken
-                  ? '<strong>Security note:</strong> The following examples include your current <code>XYGENI_TOKEN</code> in clear text under <code>servers.env</code>. Keep this file private.'
+                  ? '<strong>Security note:</strong> The following examples include your current <code>XYGENI_TOKEN</code> in clear text under <code>servers.env</code>. Put it in your user configuration (step 2), not in a file of the project: project files are usually committed. If you do use one, add it to <code>.gitignore</code>.'
                   : '<strong>Warning:</strong> No token is currently stored in Xygeni settings. Replace <code>$XYGENI_TOKEN</code> with your real token before using the config.'}
             </div>
 
@@ -280,11 +280,11 @@ export class McpSetupView {
                 <p>Each assistant reads it from its own file. The JSON above is in the VS Code format (top key <code>servers</code>);
                    the others call that key <code>mcpServers</code>, everything inside stays the same.</p>
                 <ul>
-                    <li><strong>GitHub Copilot in VS Code:</strong> create <code>.vscode/mcp.json</code> in your project and paste the JSON as is.
-                        For every project: Command Palette → <em>MCP: Open User Configuration</em> and paste it there.</li>
-                    <li><strong>Claude Code:</strong> create <code>.mcp.json</code> at the project root with the JSON, renaming <code>servers</code> to <code>mcpServers</code>.
-                        Or in a terminal: <code>claude mcp add-json xygeni-mcp-server '&lt;the object under servers&gt;'</code>.</li>
-                    <li><strong>Cursor:</strong> <code>.cursor/mcp.json</code> in the project (or <code>~/.cursor/mcp.json</code> for all of them), key <code>mcpServers</code>.</li>
+                    <li><strong>GitHub Copilot in VS Code:</strong> Command Palette → <em>MCP: Open User Configuration</em> and paste the JSON as is (it applies to every project).
+                        Not <code>.vscode/mcp.json</code> in the project: it is usually committed, and this configuration holds your token.</li>
+                    <li><strong>Claude Code:</strong> in a terminal, <code>claude mcp add-json --scope user xygeni-mcp-server '&lt;the object under servers&gt;'</code>.
+                        Not <code>.mcp.json</code> at the project root: that file is meant to be committed.</li>
+                    <li><strong>Cursor:</strong> <code>~/.cursor/mcp.json</code> (every project), key <code>mcpServers</code>. Not <code>.cursor/mcp.json</code> in the project.</li>
                     <li><strong>Claude Desktop:</strong> Settings → Developer → <em>Edit Config</em> opens <code>claude_desktop_config.json</code>; key <code>mcpServers</code>.</li>
                     <li><strong>Codex CLI:</strong> <code>~/.codex/config.toml</code> with the TOML above, renaming <code>[servers.…]</code> to <code>[mcp_servers.…]</code>.</li>
                     <li><strong>Any other assistant:</strong> look for "MCP servers" in its settings and add a <em>stdio</em> server with the same command, arguments and environment.</li>

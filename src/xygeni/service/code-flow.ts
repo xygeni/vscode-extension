@@ -118,8 +118,8 @@ export function getCodeFlowContentHtml(codeFlows: IssueCodeFlow[] | undefined, i
         </div>
       </div>
 
-      <input type="hidden" id="issue-type" value="${issueType || ''}" />
-      <input type="hidden" id="issue-file" value="${file || ''}" />
+      <input type="hidden" id="issue-type" value="${escapeAttribute(issueType || '')}" />
+      <input type="hidden" id="issue-file" value="${escapeAttribute(file || '')}" />
       <script type="application/json" id="vuln-json">${escapeForScriptTag(JSON.stringify(vulnerabilityRaw) ?? 'null')}</script>
       <script src="https://d3js.org/d3.v7.min.js" nonce="{{nonce}}"></script>
       <script nonce="{{nonce}}">
@@ -134,6 +134,11 @@ export function getCodeFlowContentHtml(codeFlows: IssueCodeFlow[] | undefined, i
  * JSON written inside a <script> element: scanned code may contain `</script>`, which would close the
  * element early. `\u003c` reads back as the same `<` in JSON and JavaScript strings.
  */
+/** A value inside a double-quoted HTML attribute: a file name from the report must not close it. */
+function escapeAttribute(value: string): string {
+    return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 function escapeForScriptTag(json: string): string {
   return json.replace(/</g, '\\u003c');
 }
@@ -451,17 +456,21 @@ const DIAGRAM_FUNCTION_SCRIPT = `
 
           nodeGroups
           .on("mouseover", (event, d) => {
-            tooltip
-              .style("opacity", 1)
-              .html(
-                (d.filePath ? "<strong>" + d.filePath + "</strong><br>" : "") +
-                "Line: " + d.line + "<br>" +
-                (d.type ? "Type: " + d.type + "<br>" : "") +
-                (d.category ? "Category: " + d.category + "<br>" : "") +
-                (d.container ? "Container: " + d.container + "<br>" : "") +
-                (d.injectionPoint ? "InjectionPoint: " + d.injectionPoint + "<br>" : "") +
-                (d.code ? "<pre><code>" + d.code + "</code></pre>" : "")
-              );
+            // Report strings (paths, the code of a malware evidence) are text, never markup: built with .text().
+            tooltip.style("opacity", 1).html("");
+            const row = (label, value, strong) => {
+              if (value === undefined || value === null || value === "") { return; }
+              const line = tooltip.append("div");
+              if (label) { line.append("span").text(label + ": "); }
+              line.append(strong ? "strong" : "span").text(String(value));
+            };
+            row("", d.filePath, true);
+            row("Line", d.line);
+            row("Type", d.type);
+            row("Category", d.category);
+            row("Container", d.container);
+            row("InjectionPoint", d.injectionPoint);
+            if (d.code) { tooltip.append("pre").append("code").text(d.code); }
           })
           .on("mousemove", (event) => {
             const [mx, my] = d3.pointer(event, container.node());

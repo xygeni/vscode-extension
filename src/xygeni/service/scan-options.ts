@@ -90,6 +90,26 @@ export type ScanOptionValidation = { ok: true; option: string; spec: ScanOptionS
  * Checks one entry and gives its canonical form (`--name=value`, or `--name` for a flag). Refuses what is not in
  * SCAN_OPTIONS, saying why when the plugin manages that option itself.
  */
+/**
+ * A double quote or a control character. On Windows the scanner is started through `powershell -File xygeni.ps1`,
+ * which forwards its arguments to java without escaping an embedded quote: a quote in a value from
+ * `.xygeni/ide.json` (written by whoever authored the repository) would end the argument and pass the rest as
+ * options of its own, past the closed list. Values and excludes with one are refused.
+ */
+export function hasUnsafeChars(value: string): boolean {
+    return /["\u0000-\u001f\u007f]/.test(value);
+}
+
+/**
+ * A path the scanner reads (`--conf`, `--custom-detectors-dir`, `--mute`) must stay inside the project: relative and
+ * without `..`. The file is committed, so an absolute path or `..` would let a repository load detectors or mute
+ * rules from anywhere on the developer's machine. `--mute=#name` names a profile, not a file.
+ */
+export function isPathInsideProject(value: string): boolean {
+    if (/^[\\/~]/.test(value) || /^[A-Za-z]:/.test(value)) { return false; }
+    return !value.split(/[\\/]/).includes('..');
+}
+
 export function validateScanOption(text: string): ScanOptionValidation {
     const parsed = parseScanOption(text);
     if (!parsed) { return { ok: false, error: 'An option starts with -- (type -- to see them)' }; }
@@ -102,6 +122,10 @@ export function validateScanOption(text: string): ScanOptionValidation {
     }
     const value = parsed.value?.trim() ?? '';
     if (value.length === 0) { return { ok: false, error: `${spec.name} needs a value${spec.placeholder ? `, like ${spec.placeholder}` : ''}` }; }
+    if (hasUnsafeChars(value)) { return { ok: false, error: `${spec.name}: no quotes or control characters in the value` }; }
+    if (spec.kind === 'path' && !(spec.name === '--mute' && value.startsWith('#')) && !isPathInsideProject(value)) {
+        return { ok: false, error: `${spec.name}: a path inside the project (relative, without ..)` };
+    }
     if (spec.kind === 'enum' && !spec.values!.includes(value)) {
         return { ok: false, error: `${spec.name} is one of ${spec.values!.join(', ')}` };
     }

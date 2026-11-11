@@ -7,7 +7,7 @@ import * as zlib from 'zlib';
 import { spawn } from 'child_process';
 import { ILogger, IOutputChannel, EventEmitter, Commands } from '../common/interfaces';
 import { Platform } from '../common/platform';
-import { checksumFromFile, isNewerVersion, McpUpdateCheck, versionFromFile } from './mcp-version';
+import { checksumAction, checksumFromFile, isNewerVersion, McpUpdateCheck, versionFromFile } from './mcp-version';
 
 /** What an MCP server download left behind: the JAR in place, or a `.pending` copy while a client locks it. */
 export type McpDownloadOutcome = 'installed' | 'pending';
@@ -19,6 +19,10 @@ export type McpUpdateCheckResult =
     | { status: 'unavailable' }
     | ({ status: 'up-to-date' | 'update-available' } & McpUpdateCheck);
 
+
+
+/** A connection or token check that gets no answer in this time fails, instead of hanging. */
+const CONNECTION_CHECK_TIMEOUT_MS = 20000;
 
 /**
  * Service to install Xygeni Scanner
@@ -241,6 +245,9 @@ export default class InstallerService {
         return versionFromFile(this.readTextOrUndefined(path.join(this.getMcpLibratyInstallationDir(), this.mcpVersionFileName)));
     }
 
+    /** True when the last MCP download was a first install without a published checksum, to warn the user. */
+    public lastMcpInstallUnverified = false;
+
     /**
      * Makes sure the MCP library is in the shared folder: downloads it when it is missing, or always when
      * `force` is set (reinstall). Legacy copies inside extension folders are removed afterwards.
@@ -312,12 +319,23 @@ export default class InstallerService {
         this.logger.log(`  MCP server published version: ${remoteVersion ?? 'unknown'}`);
         this.logger.log(`  Downloading MCP library... from : ${this.xygeniMCPLibraryUrl}  to: ${installMcpPath}`);
 
+        // Checksum first: without one an update is not even downloaded (see checksumAction).
+        const checksum = await this.fetchTextWithStatus(this.xygeniMCPChecksumUrl);
+        const expectedChecksum = checksum.status === 200 ? checksumFromFile(checksum.body) : undefined;
+        const jarInstalled = fs.existsSync(mcpLibraryPath);
+        const action = checksumAction(checksum.status, expectedChecksum, jarInstalled);
+        this.lastMcpInstallUnverified = false;
+        if (action === 'skip') {
+            throw new Error(`the MCP server checksum is not available at ${this.xygeniMCPChecksumUrl} (${checksum.status ?? 'no answer'}); `
+                + (jarInstalled ? 'the installed copy is kept and the update is retried at the next check' : 'nothing installed, retried at the next start'));
+        }
+
         // Download next to the JAR and rename it into place, so an MCP client never runs a half-written JAR.
         const temporaryPath = await this.downloadFile(this.xygeniMCPLibraryUrl, installMcpPath, this.xygeniMCPLibraryName + '.tmp');
         try {
-            const expectedChecksum = checksumFromFile(await this.fetchText(this.xygeniMCPChecksumUrl));
-            if (expectedChecksum === undefined) {
-                this.logger.log(`  MCP server checksum is not available at ${this.xygeniMCPChecksumUrl}; the download is not verified`);
+            if (action === 'install-unverified') {
+                this.logger.log(`  MCP server checksum is not published yet at ${this.xygeniMCPChecksumUrl} (${checksum.status}); first install not verified`);
+                this.lastMcpInstallUnverified = true;
             } else {
                 const actualChecksum = await this.calculateChecksum(temporaryPath);
                 if (actualChecksum.toLowerCase() !== expectedChecksum) {
@@ -426,34 +444,43 @@ export default class InstallerService {
     }
 
     /** GET a small text resource (version, checksum); undefined on any failure, which is logged and never thrown. */
-    private fetchText(url: string): Promise<string | undefined> {
+    private async fetchText(url: string): Promise<string | undefined> {
+        const result = await this.fetchTextWithStatus(url);
+        return result.status === 200 ? result.body : undefined;
+    }
+
+    /** The HTTP status (undefined when there was no answer) and the body of a 200; failures are logged, never thrown. */
+    private fetchTextWithStatus(url: string): Promise<{ status?: number; body?: string }> {
         return new Promise((resolve) => {
-            const finish = (value: string | undefined, reason?: string) => {
+            let settled = false;
+            const finish = (status: number | undefined, body: string | undefined, reason?: string) => {
+                if (settled) { return; }
+                settled = true;
                 if (reason) {
                     this.logger.log(`  GET ${url}: ${reason}`);
                 }
-                resolve(value);
+                resolve({ status, body });
             };
             try {
                 const request = this.commands.getHttpClient(url).get(url, (response) => {
                     if (response.statusCode !== 200) {
                         response.resume();
-                        finish(undefined, `HTTP ${response.statusCode}`);
+                        finish(response.statusCode, undefined, `HTTP ${response.statusCode}`);
                         return;
                     }
                     const chunks: Buffer[] = [];
                     response.on('data', (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
-                    response.on('end', () => finish(Buffer.concat(chunks).toString('utf8')));
-                    response.on('error', (error) => finish(undefined, error.message));
+                    response.on('end', () => finish(200, Buffer.concat(chunks).toString('utf8')));
+                    response.on('error', (error) => finish(undefined, undefined, error.message));
                 });
-                request.on('error', (error) => finish(undefined, error.message));
+                request.on('error', (error) => finish(undefined, undefined, error.message));
                 // Tiny files read at startup: fail fast rather than hold anything up.
                 request.setTimeout(10000, () => {
                     request.destroy();
-                    finish(undefined, 'timeout');
+                    finish(undefined, undefined, 'timeout');
                 });
             } catch (error: any) {
-                finish(undefined, error.message);
+                finish(undefined, undefined, error.message);
             }
         });
     }
@@ -559,6 +586,9 @@ export default class InstallerService {
             request.on('error', (error) => {
                 reject(new Error(`The Xygeni server is unreachable (${error.message}). Try again later.`));
             });
+            // The `timeout` option only emits an event: without this a server that accepts the connection and never
+            // answers leaves the view on "Connecting…" for good.
+            request.setTimeout(CONNECTION_CHECK_TIMEOUT_MS, () => request.destroy(new Error('no answer in time')));
         });
 
     }
@@ -586,6 +616,7 @@ export default class InstallerService {
             request.on('error', (error) => {
                 reject(new Error(`Error checking Xygeni API URL: ${error.message}`));
             });
+            request.setTimeout(CONNECTION_CHECK_TIMEOUT_MS, () => request.destroy(new Error('no answer in time')));
         });
 
     }
@@ -605,13 +636,17 @@ export default class InstallerService {
             }
 
             const request = client.get(scriptUrl, (response) => {
-                // Handle redirects
-                if (response.statusCode === 301 || response.statusCode === 302) {
-                    const redirectUrl = response.headers.location;
-                    if (redirectUrl) {
+                // Handle redirects. The token follows only to the same origin: a scanner download redirected to a
+                // CDN or any other host must not carry it there (getHttpClient still applies the http guard).
+                if ([301, 302, 303, 307, 308].includes(response.statusCode ?? 0)) {
+                    const location = response.headers.location;
+                    if (location) {
+                        response.resume?.();
                         file.close();
                         fs.unlinkSync(filePath);
-                        this.downloadFile(redirectUrl, targetDir, installName, authToken).then(resolve).catch(reject);
+                        const redirectUrl = new URL(location, scriptUrl);
+                        const sameOrigin = redirectUrl.origin === new URL(scriptUrl).origin;
+                        this.downloadFile(redirectUrl.toString(), targetDir, installName, sameOrigin ? authToken : undefined).then(resolve).catch(reject);
                         return;
                     }
                 }

@@ -24,18 +24,30 @@ export function isLoopbackHost(hostname: string): boolean {
         || host === '::1' || host === '0:0:0:0:0:0:0:1';
 }
 
-/** True for an `http://` URL whose host is not loopback: the token would leave the machine in clear. */
+/**
+ * True for an `http://` URL whose host is not loopback: the token would leave the machine in clear. An `http:` string
+ * that does not parse counts as insecure: the check must not fail open.
+ */
 export function isInsecureRemoteUrl(url: string | undefined): boolean {
     if (!url) { return false; }
     try {
-        const parsed = new URL(url);
+        const parsed = new URL(url.trim());
         return parsed.protocol === 'http:' && !isLoopbackHost(parsed.hostname);
     } catch {
-        return false;
+        return /^\s*http:/i.test(url);
     }
 }
 
 /** Why the URL cannot be used, or undefined when it can (https, loopback, or insecure but allowed). */
 export function insecureUrlProblem(url: string | undefined, allowInsecureHttp: boolean): string | undefined {
     return isInsecureRemoteUrl(url) && !allowInsecureHttp ? INSECURE_HTTP_REFUSED : undefined;
+}
+
+/**
+ * Throws when the token must not go to `url`. Called where the scanner environment gets XYGENI_URL and XYGENI_TOKEN,
+ * so no scan, rectify or AI explain can send it in clear, whatever the connection status says.
+ */
+export function assertTokenMayBeSentTo(url: string | undefined, allowInsecureHttp: boolean): void {
+    const problem = insecureUrlProblem(url, allowInsecureHttp);
+    if (problem) { throw new Error(problem); }
 }

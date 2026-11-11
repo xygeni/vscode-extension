@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { checksumFromFile, compareVersions, isNewerVersion, parseVersion, versionFromFile } from '../../xygeni/service/mcp-version';
+import { checksumAction, checksumFromFile, compareVersions, isNewerVersion, parseVersion, versionFromFile } from '../../xygeni/service/mcp-version';
 
 /** MCP server update detection (xygeni/xygeni-product-backlog#2382). */
 suite('MCP server version', () => {
@@ -42,5 +42,19 @@ suite('MCP server version', () => {
         assert.strictEqual(checksumFromFile(hash), hash.toLowerCase());
         assert.strictEqual(checksumFromFile('not a checksum'), undefined);
         assert.strictEqual(checksumFromFile('<Error>AccessDenied</Error>'), undefined);
+    });
+
+    test('checksumAction: an installed JAR is never replaced without a valid checksum (#2382)', () => {
+        const hash = 'a'.repeat(64);
+        for (const installed of [true, false]) {
+            assert.strictEqual(checksumAction(200, hash, installed), 'verify');
+            assert.strictEqual(checksumAction(200, undefined, installed), 'skip', 'unreadable checksum');
+            assert.strictEqual(checksumAction(undefined, undefined, installed), 'skip', 'timeout / proxy');
+            assert.strictEqual(checksumAction(503, undefined, installed), 'skip', 'server error');
+        }
+        assert.strictEqual(checksumAction(403, undefined, true), 'skip', 'update without checksum');
+        assert.strictEqual(checksumAction(404, undefined, true), 'skip', 'update without checksum');
+        assert.strictEqual(checksumAction(403, undefined, false), 'install-unverified', 'first install before #2381 is promoted');
+        assert.strictEqual(checksumAction(404, undefined, false), 'install-unverified');
     });
 });
