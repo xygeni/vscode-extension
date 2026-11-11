@@ -25,7 +25,9 @@ Xygeni Security Scanner is a powerful extension that brings comprehensive securi
 - **In-Editor Issue Highlighting:** View security findings directly in your code, making it easy to pinpoint and fix issues.
 - **Detailed Vulnerability Information:** Get rich details for each identified issue, including severity, description, and remediation guidance.
 - **Proxy Support:** Configure the extension to work with your corporate proxy.
+- **Scan configuration per project:** Choose which scan types run in the full scan and on save, and which folders are excluded, from the Scan configuration section of the sidebar; the choice is saved in `.xygeni/ide.json` at the workspace root, shared with the other Xygeni IDE plugins.
 - **MCP Setup:** Generate ready-to-use MCP server configuration from the extension to connect Xygeni security tools to MCP-compatible AI assistants.
+- **MCP Server Updates:** The MCP server is installed in `~/.xygeni/mcp` (shared with the other Xygeni IDE plugins) and checked once a day against the published version; the `xygeni.mcp.updates` setting chooses between a notification, a background update or no check, and `Xygeni: Check for MCP Server Updates` checks on demand.
 
 ## Installation
 

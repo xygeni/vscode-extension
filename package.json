@@ -1,7 +1,7 @@
 {
   "name": "xygeni-scanner-vscode",
   "displayName": "Xygeni Security for VSCode",
-  "description": "Secure your codebase with Secrets, SAST, SCA, IaC, Code Quality, API Security, AI Security & Supply Chain scanning",
+  "description": "Secure your codebase with Secrets, SAST, SCA, IaC, Code Quality, API Security, AI Security, Malware & Supply Chain scanning",
   "publisher": "xygeni-security",
   "license": "MIT",
   "repository": {
@@ -9,7 +9,7 @@
     "url": "https://github.com/xygeni/vscode-extension"
   },
   "icon": "media/images/logo_xy.png",
-  "version": "1.2.10",
+  "version": "1.2.11",
   "engines": {
     "vscode": "^1.99.2"
   },
@@ -39,12 +39,8 @@
         {
           "id": "xygeni.views.configuration",
           "name": "Configuration",
-          "when": "xygeni:showConfig && xygeni:workspaceFound"
-        },
-        {
-          "id": "xygeni.views.scan",
-          "name": "Scan",
-          "when": "xygeni:installReady && xygeni:workspaceFound"
+          "type": "webview",
+          "when": "!xygeni:welcome && xygeni:workspaceFound"
         },
         {
           "id": "xygeni.views.sast",
@@ -87,6 +83,11 @@
           "when": "xygeni:scannerResults && xygeni:workspaceFound"
         },
         {
+          "id": "xygeni.views.malware",
+          "name": "Malware",
+          "when": "xygeni:scannerResults && xygeni:workspaceFound"
+        },
+        {
           "id": "xygeni.views.help",
           "name": "Xygeni Docs & Help",
           "type": "webview"
@@ -114,17 +115,12 @@
       "view/title": [
         {
           "command": "xygeni.showConfig",
-          "when": "view == 'xygeni.views.welcome' || view == 'xygeni.views.scan'",
-          "group": "navigation"
-        },
-        {
-          "command": "xygeni.closeConfig",
-          "when": "view == 'xygeni.views.configuration' && xygeni:installReady",
+          "when": "view == 'xygeni.views.welcome'",
           "group": "navigation"
         },
         {
           "command": "xygeni.scan.run",
-          "when": "view == 'xygeni.views.scan'",
+          "when": "view == 'xygeni.views.configuration' && xygeni:installReady",
           "group": "navigation"
         },
         {
@@ -139,8 +135,67 @@
         },
         {
           "command": "xygeni.showScanOutput",
-          "when": "view == 'xygeni.views.scan'",
+          "when": "view == 'xygeni.views.configuration'",
           "group": "navigation"
+        },
+        {
+          "command": "xygeni.scan.runOnly.sast",
+          "when": "view == 'xygeni.views.sast' && xygeni:installReady",
+          "group": "navigation"
+        },
+        {
+          "command": "xygeni.scan.runOnly.deps",
+          "when": "view == 'xygeni.views.sca' && xygeni:installReady",
+          "group": "navigation"
+        },
+        {
+          "command": "xygeni.scan.runOnly.misconf",
+          "when": "view == 'xygeni.views.cicd' && xygeni:installReady",
+          "group": "navigation"
+        },
+        {
+          "command": "xygeni.scan.runOnly.secrets",
+          "when": "view == 'xygeni.views.secrets' && xygeni:installReady",
+          "group": "navigation"
+        },
+        {
+          "command": "xygeni.scan.runOnly.iac",
+          "when": "view == 'xygeni.views.iac' && xygeni:installReady",
+          "group": "navigation"
+        },
+        {
+          "command": "xygeni.scan.runOnly.quality",
+          "when": "view == 'xygeni.views.quality' && xygeni:installReady",
+          "group": "navigation"
+        },
+        {
+          "command": "xygeni.scan.runOnly.apisec",
+          "when": "view == 'xygeni.views.apisec' && xygeni:installReady",
+          "group": "navigation"
+        },
+        {
+          "command": "xygeni.scan.runOnly.ai",
+          "when": "view == 'xygeni.views.ai' && xygeni:installReady",
+          "group": "navigation"
+        },
+        {
+          "command": "xygeni.scan.runOnly.malware",
+          "when": "view == 'xygeni.views.malware' && xygeni:installReady",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "xygeni.scan.selectAllScanTypes",
+          "when": "false"
+        },
+        {
+          "command": "xygeni.scan.removeExclude",
+          "when": "false"
+        },
+        {
+          "command": "xygeni.scan.removeOption",
+          "when": "false"
         }
       ]
     },
@@ -207,6 +262,103 @@
       {
         "command": "xygeni.showMcpSetup",
         "title": "Xygeni: Show Xygeni MCP Server Setup Guide"
+      },
+      {
+        "command": "xygeni.mcp.checkUpdates",
+        "title": "Xygeni: Check for MCP Server Updates"
+      },
+      {
+        "command": "xygeni.scan.selectAllScanTypes",
+        "title": "Select all scan types",
+        "icon": "$(check-all)"
+      },
+      {
+        "command": "xygeni.scan.restoreDefaults",
+        "title": "Xygeni: Restore the default scan configuration",
+        "icon": "$(discard)"
+      },
+      {
+        "command": "xygeni.scan.openConfigFile",
+        "title": "Xygeni: Open the scan configuration file (.xygeni/ide.json)"
+      },
+      {
+        "command": "xygeni.scan.addExcludeFolder",
+        "title": "Xygeni: Exclude a folder from the scan",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "xygeni.scan.addExcludePattern",
+        "title": "Xygeni: Exclude a pattern from the scan",
+        "icon": "$(add)"
+      },
+      {
+        "command": "xygeni.scan.removeExclude",
+        "title": "Stop excluding",
+        "icon": "$(close)"
+      },
+      {
+        "command": "xygeni.scan.addOption",
+        "title": "Add Scanner Option",
+        "category": "Xygeni"
+      },
+      {
+        "command": "xygeni.scan.removeOption",
+        "title": "Remove Scanner Option",
+        "icon": "$(close)"
+      },
+      {
+        "command": "xygeni.scan.runOnly.sast",
+        "title": "Run SAST Scan",
+        "icon": "$(play)",
+        "category": "Xygeni"
+      },
+      {
+        "command": "xygeni.scan.runOnly.deps",
+        "title": "Run SCA Scan",
+        "icon": "$(play)",
+        "category": "Xygeni"
+      },
+      {
+        "command": "xygeni.scan.runOnly.misconf",
+        "title": "Run CI/CD Scan",
+        "icon": "$(play)",
+        "category": "Xygeni"
+      },
+      {
+        "command": "xygeni.scan.runOnly.secrets",
+        "title": "Run Secrets Scan",
+        "icon": "$(play)",
+        "category": "Xygeni"
+      },
+      {
+        "command": "xygeni.scan.runOnly.iac",
+        "title": "Run IaC Scan",
+        "icon": "$(play)",
+        "category": "Xygeni"
+      },
+      {
+        "command": "xygeni.scan.runOnly.quality",
+        "title": "Run Code Quality Scan",
+        "icon": "$(play)",
+        "category": "Xygeni"
+      },
+      {
+        "command": "xygeni.scan.runOnly.apisec",
+        "title": "Run API Security Scan",
+        "icon": "$(play)",
+        "category": "Xygeni"
+      },
+      {
+        "command": "xygeni.scan.runOnly.ai",
+        "title": "Run AI Security Scan",
+        "icon": "$(play)",
+        "category": "Xygeni"
+      },
+      {
+        "command": "xygeni.scan.runOnly.malware",
+        "title": "Run Malware Scan",
+        "icon": "$(play)",
+        "category": "Xygeni"
       }
     ],
     "configuration": [
@@ -234,6 +386,13 @@
             ],
             "default": "Use Xygeni Configuration to store Xygeni Token as a secret",
             "markdownDescription": "Authentication token for the Xygeni API server"
+          },
+          "xygeni.api.allowInsecureHttp": {
+            "order": 3,
+            "type": "boolean",
+            "scope": "application",
+            "default": false,
+            "markdownDescription": "Allow a server URL that uses `http://` to a host other than localhost. The API token then travels in clear on every request, so leave this off unless the Xygeni server really has no TLS. `http://localhost` is always allowed."
           }
         }
       },
@@ -334,6 +493,30 @@
             "markdownDescription": "Advanced: extra global options for the Xygeni scanner, placed before the command (`xygeni <options> scan ...`). Separate them with spaces. Example: `-cop key=value`. Leave empty unless Xygeni support asks for it. `-q`/`--quiet` (the extension reads the scanner output) and `--api-key` (the token comes from the Xygeni configuration) are ignored."
           }
         }
+      },
+      {
+        "order": 4,
+        "id": "mcp",
+        "title": "MCP Server",
+        "properties": {
+          "xygeni.mcp.updates": {
+            "scope": "machine",
+            "order": 1,
+            "type": "string",
+            "enum": [
+              "notify",
+              "auto",
+              "off"
+            ],
+            "enumDescriptions": [
+              "Notify when a newer Xygeni MCP server is published, with Update and Ignore this version actions.",
+              "Download and install the newer Xygeni MCP server in the background, and notify when done.",
+              "Never check. The command Xygeni: Check for MCP Server Updates still works."
+            ],
+            "default": "notify",
+            "markdownDescription": "What to do when a newer Xygeni MCP server is published. The published version is checked once a day after the connection is validated; the installed JAR lives in `~/.xygeni/mcp/xygeni-mcp-server.jar`, shared with the other Xygeni IDE plugins."
+          }
+        }
       }
     ]
   },
@@ -351,9 +534,10 @@
     "pretest": "npm run cleanup && npm run compile-tests && npm run compile",
     "check-types": "tsc --noEmit",
     "lint": "eslint src",
-    "test": "vscode-test",
+    "test": "vscode-test --label e2e",
     "copy-test-data": "cp -r src/test/unit/issues.test.data out/test/unit/",
-    "test:unit": "npm run pretest && npm run copy-test-data && mocha --ui tdd -c 'out/test/unit/**/*.test.js'"
+    "test:unit": "npm run pretest && npm run copy-test-data && mocha --ui tdd -c 'out/test/unit/**/*.test.js'",
+    "test:real": "npm run pretest && vscode-test --label real"
   },
   "devDependencies": {
     "@types/lodash": "^4.17.20",
@@ -365,7 +549,7 @@
     "@typescript-eslint/eslint-plugin": "^8.31.1",
     "@typescript-eslint/parser": "^8.31.1",
     "@vscode/test-cli": "^0.0.10",
-    "@vscode/test-electron": "^2.5.2",
+    "@vscode/test-electron": "^3.1.0",
     "esbuild": "0.25.3",
     "eslint": "9.25.1",
     "mocha": "11.7.1",

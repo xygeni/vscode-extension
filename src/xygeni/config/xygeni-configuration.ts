@@ -15,11 +15,15 @@ export interface ProxySettings {
     nonProxyHosts?: string;
 }
 
+/** How the extension reacts to a newer MCP server being published (xygeni/xygeni-product-backlog#2382). */
+export type McpUpdateMode = 'notify' | 'auto' | 'off';
+
 export class ConfigManager {
 
     private static readonly XYGENI_CONFIG_SECTION = 'xygeni.api';
     private static readonly PROXY_CONFIG_SECTION = 'xygeni.proxy';
     private static readonly SCAN_CONFIG_SECTION = 'xygeni.scan';
+    private static readonly MCP_CONFIG_SECTION = 'xygeni.mcp';
     private static readonly XYGENI_DEFAULT_API_URL = 'https://api.xygeni.io';
     private static readonly XYGENI_URL_PROP_NAME = 'xygeniUrl';
     private static readonly XYGENI_TOKEN_SECRET_NAME = 'xygeniToken';
@@ -130,6 +134,23 @@ export class ConfigManager {
     public static getAdditionalGlobalOptions(): string {
         const config = vscode.workspace.getConfiguration(this.SCAN_CONFIG_SECTION);
         return config.get<string>('additionalGlobalOptions', '');
+    }
+
+    /** `xygeni.mcp.updates`: notify (default), auto or off. */
+    /** "Allow insecure HTTP": an http server URL to a non-loopback host is refused unless this is on (#1438). */
+    public static getAllowInsecureHttp(): boolean {
+        return vscode.workspace.getConfiguration(this.XYGENI_CONFIG_SECTION).get<boolean>('allowInsecureHttp', false);
+    }
+
+    public static getMcpUpdateMode(): McpUpdateMode {
+        const config = vscode.workspace.getConfiguration(this.MCP_CONFIG_SECTION);
+        const mode = config.get<string>('updates', 'notify');
+        return mode === 'auto' || mode === 'off' ? mode : 'notify';
+    }
+
+    public static async setAutoScan(value: boolean): Promise<void> {
+        const config = vscode.workspace.getConfiguration(this.SCAN_CONFIG_SECTION);
+        await config.update('autoScan', value, vscode.ConfigurationTarget.Global);
     }
 
     public static async toggleAutoScan(): Promise<boolean> {

@@ -1,3 +1,5 @@
+import * as vscode from 'vscode';
+import type { ScanConfig } from '../service/scan-config';
 import { IncomingMessage, ClientRequest } from 'http';
 import { ProxySettings } from '../config/xygeni-configuration';
 
@@ -77,6 +79,8 @@ export interface Commands extends WorkspaceFiles {
   openUpgradePage(): void;
   getScannerInstallationDir(): string;
   getMcpLibraryPath(): string | undefined;
+  /** Installed MCP server version, what the last check found and the update setting (#2382). Optional for mocks. */
+  getMcpStatus?(): McpStatus;
 
   getXygeniMedia(): XygeniMedia;
 
@@ -88,6 +92,29 @@ export interface Commands extends WorkspaceFiles {
 
 }
 
+
+export interface McpStatus {
+  installedVersion?: string;
+  availableVersion?: string;
+  /** Undefined until a check ran in this session. */
+  updateAvailable?: boolean;
+  updateMode: string;
+  /** Set after an update until the user confirms the MCP client was restarted: the JAR on disk is newer than what a running client loaded. */
+  restartPending?: string;
+}
+
+/** What the Scan block of the Configuration view reads from the commands. */
+export interface ScanViewEmitter {
+  refreshScannerEventEmitter: vscode.Event<void>;
+  getScans(): ScanResult[];
+}
+
+/** What the Scan configuration block of the Configuration view reads from the commands (#415). */
+export interface ConfigurationViewEmitter {
+  refreshConfigEventEmitter: vscode.Event<void>;
+  getScanConfig(): ScanConfig;
+  getScanConfigPath(): string | undefined;
+}
 
 export interface ScanResult {
   timestamp: Date;
@@ -114,11 +141,11 @@ export interface XygeniIssueData {
   type: string;
   detector: string;
   tool: string;
-  kind: 'secret' | 'misconfiguration' | 'iac_flaw' | 'code_vulnerability' | 'sca_vulnerability' | 'quality_issue' | 'api_flaw' | 'ia_vulnerability';
+  kind: 'secret' | 'misconfiguration' | 'iac_flaw' | 'code_vulnerability' | 'sca_vulnerability' | 'quality_issue' | 'api_flaw' | 'ia_vulnerability' | 'malware_evidence';
   severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
   confidence: 'highest' | 'high' | 'medium' | 'low';
-  category: 'secrets' | 'misconf' | 'iac' | 'sast' | 'sca' | 'quality' | 'apisec' | 'ai';
-  categoryName: 'Secret' | 'Misconfiguration' | 'IaC' | 'SAST' | 'Vulnerability' | 'Quality' | 'API Security' | 'AI Security';
+  category: 'secrets' | 'misconf' | 'iac' | 'sast' | 'sca' | 'quality' | 'apisec' | 'ai' | 'malware';
+  categoryName: 'Secret' | 'Misconfiguration' | 'IaC' | 'SAST' | 'Vulnerability' | 'Quality' | 'API Security' | 'AI Security' | 'Malware';
   file?: string;
   beginLine: number;
   endLine: number;
