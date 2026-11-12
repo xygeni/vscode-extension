@@ -1,4 +1,4 @@
-# This workflow will execute xygeni scanner deployed in the LabDev environment on demand.
+# This workflow runs the latest xygeni scanner against the Certi environment (apicerti) nightly and on demand.
 # Reports will be uploaded with the user nicolas.carmona+dogfooding@xygeni.io
 
 name: Testing-Demo
@@ -30,7 +30,7 @@ jobs:
         command: scan --never-fail -o ./vscode.json -f json
         token: ${{ secrets.XYGENI_TOKEN_DEMO }}
         gh_token: ${{ secrets.GH_PAT_FOR_DOGFOODING }}
-        xygeni_url: https://apidemo.xygeni.io/deps-doctor-service
+        xygeni_url: https://apicerti.xygeni.io
 
       # https://github.com/marketplace/actions/upload-a-build-artifact
     - name: Upload scan report result (deps)
